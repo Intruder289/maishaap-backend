@@ -1,0 +1,1144 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Reports Dashboard{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item active" aria-current="page">Reports Dashboard</li>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="row g-3 mb-4 align-items-center justify-content-between">
+    <div class="col-auto">
+        <div class="d-flex align-items-center">
+            <h2 class="mb-0">Reports Dashboard</h2>
+        </div>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="bg-primary-subtle rounded-3 p-3">
+                            <span class="fas fa-home text-primary fs-7"></span>
+            </div>
+        </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-1">Total Properties</h6>
+                        <h4 class="mb-0">{{ total_properties|default:0 }}</h4>
+                        <p class="fs--1 mb-0 text-500">Active properties managed</p>
+            </div>
+        </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-lg-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="bg-warning-subtle rounded-3 p-3">
+                            <span class="fas fa-tools text-warning fs-7"></span>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-1">Maintenance Requests</h6>
+                        <h4 class="mb-0">{{ total_maintenance|default:0 }}</h4>
+                        <p class="fs--1 mb-0 text-500">Service requests logged</p>
+            </div>
+            </div>
+            </div>
+            </div>
+    </div>
+
+    <div class="col-6 col-lg-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="bg-info-subtle rounded-3 p-3">
+                            <span class="fas fa-clock text-info fs-7"></span>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-1">Pending Reports</h6>
+                        <h4 class="mb-0">{{ pending_reports|default:0 }}</h4>
+                        <p class="fs--1 mb-0 text-500">Reports in queue</p>
+                    </div>
+                </div>
+            </div>
+                        </div>
+                    </div>
+    
+    <div class="col-6 col-lg-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="bg-success-subtle rounded-3 p-3">
+                            <span class="fas fa-chart-bar text-success fs-7"></span>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-1">Recent Reports</h6>
+                        <h4 class="mb-0">{{ recent_reports|length|default:0 }}</h4>
+                        <p class="fs--1 mb-0 text-500">Recently generated</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+                    </div>
+                </div>
+
+<!-- Main Content -->
+<div class="row g-3">
+    <!-- Report Categories -->
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex align-items-center">
+                    <span class="fas fa-chart-pie text-primary me-2"></span>
+                    <h5 class="mb-0">Report Categories</h5>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="card border-0 bg-light">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center mb-3">
+                                    <div class="bg-success-subtle rounded-3 p-2 me-3">
+                                        <span class="fas fa-chart-line text-success fs-6"></span>
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-0">Financial Reports</h6>
+                                        <p class="fs--1 mb-0 text-500">Revenue analysis & forecasting</p>
+                                    </div>
+                                </div>
+                                <p class="text-600 fs--1 mb-3">Revenue analysis, expense tracking, profit margins, and financial forecasting</p>
+                                
+                                <!-- Financial Metrics -->
+                                <div class="row g-2 mb-3">
+                                    <div class="col-6">
+                                        <div class="text-center p-2 bg-white rounded">
+                                            <h6 class="mb-1 text-success">{{ total_rent_collected|floatformat:0 }} Tsh</h6>
+                                            <small class="text-muted">30-Day Revenue</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="text-center p-2 bg-white rounded">
+                                            <h6 class="mb-1 text-info">{{ maintenance_costs|floatformat:0 }} Tsh</h6>
+                                            <small class="text-muted">Maintenance Costs</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="d-flex gap-2 mb-3">
+                                    <span class="badge bg-success-subtle text-success">
+                                        <span class="fas fa-chart-line me-1"></span>Revenue Trends
+                                    </span>
+                                    <span class="badge bg-info-subtle text-info">
+                                        <span class="fas fa-calculator me-1"></span>Cost Analysis
+                                    </span>
+                                </div>
+                                <button class="btn btn-sm btn-primary" onclick="showFinancialModal()">
+                                    View Reports <span class="fas fa-arrow-right ms-1"></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card border-0 bg-light">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center mb-3">
+                                    <div class="bg-warning-subtle rounded-3 p-2 me-3">
+                                        <span class="fas fa-tools text-warning fs-6"></span>
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-0">Maintenance Reports</h6>
+                                        <p class="fs--1 mb-0 text-500">Service requests & efficiency</p>
+                                    </div>
+                                </div>
+                                <p class="text-600 fs--1 mb-3">Service requests, completion rates, response times, and operational efficiency</p>
+                                
+                                <!-- Maintenance Metrics -->
+                                <div class="row g-2 mb-3">
+                                    <div class="col-6">
+                                        <div class="text-center p-2 bg-white rounded">
+                                            <h6 class="mb-1 text-warning">{{ maintenance_requests_count }}</h6>
+                                            <small class="text-muted">Total Requests</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="text-center p-2 bg-white rounded">
+                                            <h6 class="mb-1 text-success">{{ completion_rate|floatformat:1 }}%</h6>
+                                            <small class="text-muted">Completion Rate</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="d-flex gap-2 mb-3">
+                                    <span class="badge bg-warning-subtle text-warning">
+                                        <span class="fas fa-clock me-1"></span>Response Times
+                                    </span>
+                                    <span class="badge bg-success-subtle text-success">
+                                        <span class="fas fa-check-circle me-1"></span>Completion Rates
+                                    </span>
+                                </div>
+                                <button class="btn btn-sm btn-primary" onclick="showMaintenanceModal()">
+                                    View Reports <span class="fas fa-arrow-right ms-1"></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card border-0 bg-light">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center mb-3">
+                                    <div class="bg-primary-subtle rounded-3 p-2 me-3">
+                                        <span class="fas fa-home text-primary fs-6"></span>
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-0">Property Reports</h6>
+                                        <p class="fs--1 mb-0 text-500">Occupancy & performance</p>
+                                    </div>
+                                </div>
+                                <p class="text-600 fs--1 mb-3">Occupancy rates, property performance, tenant satisfaction, and market analysis</p>
+                                
+                                <!-- Property Metrics -->
+                                <div class="row g-2 mb-3">
+                                    <div class="col-6">
+                                        <div class="text-center p-2 bg-white rounded">
+                                            <h6 class="mb-1 text-primary">{{ occupancy_rate|floatformat:1 }}%</h6>
+                                            <small class="text-muted">Occupancy Rate</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="text-center p-2 bg-white rounded">
+                                            <h6 class="mb-1 text-info">{{ avg_rent_amount|floatformat:0 }} Tsh</h6>
+                                            <small class="text-muted">Avg Rent</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="d-flex gap-2 mb-3">
+                                    <span class="badge bg-primary-subtle text-primary">
+                                        <span class="fas fa-users me-1"></span>Occupancy Rates
+                                    </span>
+                                    <span class="badge bg-info-subtle text-info">
+                                        <span class="fas fa-star me-1"></span>Performance Metrics
+                                    </span>
+                                </div>
+                                <button class="btn btn-sm btn-primary" onclick="showPropertyModal()">
+                                    View Reports <span class="fas fa-arrow-right ms-1"></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card border-0 bg-light">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center mb-3">
+                                    <div class="bg-info-subtle rounded-3 p-2 me-3">
+                                        <span class="fas fa-chart-bar text-info fs-6"></span>
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-0">Analytics Dashboard</h6>
+                                        <p class="fs--1 mb-0 text-500">Business intelligence & KPIs</p>
+                                    </div>
+                                </div>
+                                <p class="text-600 fs--1 mb-3">Business intelligence, trend analysis, predictive insights, and KPI tracking</p>
+                                
+                                <!-- Analytics Metrics -->
+                                <div class="row g-2 mb-3">
+                                    <div class="col-6">
+                                        <div class="text-center p-2 bg-white rounded">
+                                            <h6 class="mb-1 text-info">{{ total_revenue_ytd|floatformat:0 }} Tsh</h6>
+                                            <small class="text-muted">YTD Revenue</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="text-center p-2 bg-white rounded">
+                                            <h6 class="mb-1 {% if revenue_growth >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                                {% if revenue_growth >= 0 %}+{% endif %}{{ revenue_growth|floatformat:1 }}%
+                                            </h6>
+                                            <small class="text-muted">Growth Rate</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="d-flex gap-2 mb-3">
+                                    <span class="badge bg-info-subtle text-info">
+                                        <span class="fas fa-trending-up me-1"></span>Trend Analysis
+                                    </span>
+                                    <span class="badge bg-primary-subtle text-primary">
+                                        <span class="fas fa-bullseye me-1"></span>KPI Tracking
+                                    </span>
+                                </div>
+                                <button class="btn btn-sm btn-primary" onclick="showAnalyticsModal()">
+                                    View Reports <span class="fas fa-arrow-right ms-1"></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    <!-- Recent Activity -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center">
+                        <span class="fas fa-history text-info me-2"></span>
+                        <h5 class="mb-0">Recent Activity</h5>
+                    </div>
+                    <a href="#" class="btn btn-link btn-sm" onclick="showRecentActivityModal()">View All</a>
+                </div>
+            </div>
+            <div class="card-body">
+            {% if recent_reports %}
+                    <div class="list-group list-group-flush">
+                    {% for report in recent_reports %}
+                        <div class="list-group-item px-0 py-3">
+                            <div class="d-flex align-items-center">
+                                <div class="flex-shrink-0 me-3">
+                                    <div class="bg-{% if report.status == 'completed' %}success{% elif report.status == 'failed' %}danger{% else %}warning{% endif %}-subtle rounded-3 p-2">
+                                        <span class="fas fa-file-alt text-{% if report.status == 'completed' %}success{% elif report.status == 'failed' %}danger{% else %}warning{% endif %} fs-7"></span>
+                            </div>
+                        </div>
+                                <div class="flex-grow-1">
+                                    <h6 class="mb-1">{{ report.title }}</h6>
+                                    <p class="fs--1 mb-0 text-500">
+                                        <span class="fas fa-calendar-alt me-1"></span>
+                                        {{ report.created_at|date:"M d, Y" }} • 
+                                        <span class="fas fa-clock me-1"></span>
+                                {{ report.created_at|date:"H:i" }}
+                            </p>
+                        </div>
+                                <div class="flex-shrink-0">
+                                    <span class="badge bg-{% if report.status == 'completed' %}success{% elif report.status == 'failed' %}danger{% else %}warning{% endif %}-subtle text-{% if report.status == 'completed' %}success{% elif report.status == 'failed' %}danger{% else %}warning{% endif %}">
+                                {{ report.get_status_display|default:"Pending" }}
+                            </span>
+                        </div>
+                            </div>
+                            {% if report.status == 'completed' %}
+                            <div class="mt-2">
+                                <button class="btn btn-sm btn-outline-primary me-2" onclick="downloadReport({{ report.id }})">
+                                    <span class="fas fa-download me-1"></span>Download
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="viewReport({{ report.id }})">
+                                    <span class="fas fa-eye me-1"></span>View
+                                </button>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <div class="bg-light rounded-3 p-3 mb-3 d-inline-block">
+                            <span class="fas fa-chart-bar text-500 fs-2"></span>
+                </div>
+                        <h6 class="mb-2">No Reports Generated Yet</h6>
+                        <p class="text-500 fs--1 mb-3">Start creating insightful reports to track your business performance</p>
+                        <a href="{% url 'reports:generate' %}" class="btn btn-sm">
+                            <span class="fas fa-plus-circle me-2"></span>Generate Your First Report
+                        </a>
+                    </div>
+                {% endif %}
+                </div>
+        </div>
+    </div>
+</div>
+
+<!-- Financial Reports Modal -->
+<div class="modal fade" id="financialModal" tabindex="-1" aria-labelledby="financialModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="financialModalLabel">
+                    <i class="fas fa-chart-line text-success me-2"></i>Financial Reports
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Date Filter Section -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0">Filter Financial Data</h6>
+                    </div>
+                    <div class="card-body">
+                        <form id="financialFilterForm">
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">Report Period</label>
+                                    <select class="form-select" id="reportPeriod" onchange="updateDateInputs()">
+                                        <option value="daily">Daily Report</option>
+                                        <option value="monthly" selected>Monthly Report</option>
+                                        <option value="yearly">Yearly Report</option>
+                                        <option value="custom">Custom Range</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" id="dateLabel">Select Month</label>
+                                    <input type="month" class="form-control" id="dateInput" value="{{ current_month }}">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Actions</label>
+                                    <div class="d-grid">
+                                        <button type="button" class="btn btn-primary" onclick="generateFinancialReport()">
+                                            <i class="fas fa-chart-line me-2"></i>Generate Report
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Financial Summary Cards -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <div class="card border-0 bg-light">
+                            <div class="card-body text-center">
+                                <h4 class="text-success" id="totalRevenue">{{ total_rent_collected|floatformat:0 }} Tsh</h4>
+                                <p class="text-muted mb-0">Total Revenue</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-0 bg-light">
+                            <div class="card-body text-center">
+                                <h4 class="text-info" id="maintenanceCosts">{{ maintenance_costs|floatformat:0 }} Tsh</h4>
+                                <p class="text-muted mb-0">Maintenance Costs</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-0 bg-light">
+                            <div class="card-body text-center">
+                                <h4 class="text-warning" id="netIncome">0 Tsh</h4>
+                                <p class="text-muted mb-0">Net Income</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card border-0 bg-light">
+                            <div class="card-body text-center">
+                                <h4 class="text-primary" id="profitMargin">0%</h4>
+                                <p class="text-muted mb-0">Profit Margin</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Revenue Trends Table -->
+                <div class="mt-4">
+                    <h6>Revenue Trends</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm" id="revenueTable">
+                            <thead>
+                                <tr>
+                                    <th>Period</th>
+                                    <th>Revenue (Tsh)</th>
+                                    <th>Costs (Tsh)</th>
+                                    <th>Net Income (Tsh)</th>
+                                    <th>Margin %</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for month_data in monthly_revenue %}
+                                <tr>
+                                    <td>{{ month_data.month }}</td>
+                                    <td>{{ month_data.amount|floatformat:0 }}</td>
+                                    <td>0</td>
+                                    <td>{{ month_data.amount|floatformat:0 }}</td>
+                                    <td>100%</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Loading Indicator -->
+                <div id="financialLoading" class="text-center py-4" style="display: none;">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Generating financial report...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-success" onclick="generateExcelReport()">
+                    <i class="fas fa-file-excel me-2"></i>Export to Excel
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Maintenance Reports Modal -->
+<div class="modal fade" id="maintenanceModal" tabindex="-1" aria-labelledby="maintenanceModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="maintenanceModalLabel">
+                    <i class="fas fa-tools text-warning me-2"></i>Maintenance Reports
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="card border-0 bg-light">
+                            <div class="card-body text-center">
+                                <h4 class="text-warning">{{ maintenance_requests_count }}</h4>
+                                <p class="text-muted mb-0">Total Requests</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card border-0 bg-light">
+                            <div class="card-body text-center">
+                                <h4 class="text-success">{{ completion_rate|floatformat:1 }}%</h4>
+                                <p class="text-muted mb-0">Completion Rate</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card border-0 bg-light">
+                            <div class="card-body text-center">
+                                <h4 class="text-info">{{ avg_response_time|floatformat:1 }}h</h4>
+                                <p class="text-muted mb-0">Avg Response Time</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-4">
+                    <h6>Maintenance Performance</h6>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6 class="card-title">Service Efficiency</h6>
+                                    <div class="progress mb-2">
+                                        <div class="progress-bar bg-success" style="width: {{ completion_rate }}%"></div>
+                                    </div>
+                                    <small class="text-muted">{{ completion_rate|floatformat:1 }}% completion rate</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6 class="card-title">Response Time</h6>
+                                    <p class="mb-0">Average response time: <strong>{{ avg_response_time|floatformat:1 }} hours</strong></p>
+                                    <small class="text-muted">Based on completed requests</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Maintenance by Property Type -->
+                <div class="mt-4">
+                    <h6>Maintenance Requests by Property Type</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Property Type</th>
+                                    <th>Requests</th>
+                                    <th>Percentage</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in maintenance_by_property_with_percentages %}
+                                <tr>
+                                    <td>{{ item.property_type }}</td>
+                                    <td>{{ item.count }}</td>
+                                    <td>{{ item.percentage }}%</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="3" class="text-center text-muted">No maintenance requests found</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <a href="{% url 'reports:maintenance' %}" class="btn btn-primary">View Detailed Report</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Property Reports Modal -->
+<div class="modal fade" id="propertyModal" tabindex="-1" aria-labelledby="propertyModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="propertyModalLabel">
+                    <i class="fas fa-home text-primary me-2"></i>Property Reports
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="card border-0 bg-light">
+                            <div class="card-body text-center">
+                                <h4 class="text-primary">{{ occupancy_rate|floatformat:1 }}%</h4>
+                                <p class="text-muted mb-0">Occupancy Rate</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card border-0 bg-light">
+                            <div class="card-body text-center">
+                                <h4 class="text-info">{{ avg_rent_amount|floatformat:0 }} Tsh</h4>
+                                <p class="text-muted mb-0">Average Rent</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card border-0 bg-light">
+                            <div class="card-body text-center">
+                                <h4 class="text-success">{{ total_properties }}</h4>
+                                <p class="text-muted mb-0">Total Properties</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-4">
+                    <h6>Property Performance</h6>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6 class="card-title">Occupancy Status</h6>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span>Available: {{ available_properties }}</span>
+                                        <span>Rented: {{ rented_properties }}</span>
+                                    </div>
+                                    <div class="progress">
+                                        <div class="progress-bar bg-primary" style="width: {{ occupancy_rate }}%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6 class="card-title">Rental Performance</h6>
+                                    <p class="mb-1">Average Rent: <strong>{{ avg_rent_amount|floatformat:0 }} Tsh</strong></p>
+                                    <p class="mb-0">Total Properties: <strong>{{ total_properties }}</strong></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Property Type Distribution -->
+                <div class="mt-4">
+                    <h6>Property Distribution</h6>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6 class="card-title">By Property Type</h6>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm mb-0">
+                                            <tbody>
+                                                {% for prop_type, count in property_type_distribution.items %}
+                                                <tr>
+                                                    <td>{{ prop_type }}</td>
+                                                    <td class="text-end">{{ count }}</td>
+                                                </tr>
+                                                {% empty %}
+                                                <tr>
+                                                    <td colspan="2" class="text-center text-muted">No properties found</td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6 class="card-title">By Region</h6>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm mb-0">
+                                            <tbody>
+                                                {% for region, count in region_distribution.items %}
+                                                <tr>
+                                                    <td>{{ region }}</td>
+                                                    <td class="text-end">{{ count }}</td>
+                                                </tr>
+                                                {% empty %}
+                                                <tr>
+                                                    <td colspan="2" class="text-center text-muted">No regions found</td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Analytics Dashboard Modal -->
+<div class="modal fade" id="analyticsModal" tabindex="-1" aria-labelledby="analyticsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="analyticsModalLabel">
+                    <i class="fas fa-chart-bar text-info me-2"></i>Analytics Dashboard
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="card border-0 bg-light">
+                            <div class="card-body text-center">
+                                <h4 class="text-info">{{ total_revenue_ytd|floatformat:0 }} Tsh</h4>
+                                <p class="text-muted mb-0">Year-to-Date Revenue</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card border-0 bg-light">
+                            <div class="card-body text-center">
+                                <h4 class="{% if revenue_growth >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                    {% if revenue_growth >= 0 %}+{% endif %}{{ revenue_growth|floatformat:1 }}%
+                                </h4>
+                                <p class="text-muted mb-0">Revenue Growth</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-4">
+                    <h6>Business Intelligence & KPIs</h6>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6 class="card-title">Revenue Trends</h6>
+                                    <p class="mb-1">Current Month: <strong>{% for month_data in monthly_revenue %}{% if forloop.last %}{{ month_data.amount|floatformat:0 }}{% endif %}{% empty %}0{% endfor %} Tsh</strong></p>
+                                    <p class="mb-0">Growth Rate: <strong class="{% if revenue_growth >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                        {% if revenue_growth >= 0 %}+{% endif %}{{ revenue_growth|floatformat:1 }}%
+                                    </strong></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6 class="card-title">Key Performance Indicators</h6>
+                                    <ul class="list-unstyled mb-0">
+                                        <li>• Total Properties: <strong>{{ total_properties }}</strong></li>
+                                        <li>• Occupancy Rate: <strong>{{ occupancy_rate|floatformat:1 }}%</strong></li>
+                                        <li>• Maintenance Requests: <strong>{{ maintenance_requests_count }}</strong></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Additional KPIs -->
+                <div class="mt-4">
+                    <h6>Financial Performance</h6>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Payment Collection</h6>
+                                    <h4 class="text-success">{{ payment_collection_rate|floatformat:1 }}%</h4>
+                                    <small class="text-muted">{{ paid_invoices }} of {{ total_invoices }} invoices paid</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Overdue Invoices</h6>
+                                    <h4 class="text-danger">{{ overdue_invoices }}</h4>
+                                    <small class="text-muted">Requires attention</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <h6 class="card-title">Maintenance Efficiency</h6>
+                                    <h4 class="text-warning">{{ maintenance_efficiency.completion_rate|floatformat:1 }}%</h4>
+                                    <small class="text-muted">{{ maintenance_efficiency.total_requests }} requests</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Property Performance -->
+                <div class="mt-4">
+                    <h6>Property Performance Analysis</h6>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6 class="card-title">Average Rent by Property Type</h6>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm mb-0">
+                                            <tbody>
+                                                {% for prop_type, avg_rent in avg_rent_by_type.items %}
+                                                <tr>
+                                                    <td>{{ prop_type }}</td>
+                                                    <td class="text-end">{{ avg_rent|floatformat:0 }} Tsh</td>
+                                                </tr>
+                                                {% empty %}
+                                                <tr>
+                                                    <td colspan="2" class="text-center text-muted">No data available</td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6 class="card-title">Occupancy Trends</h6>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm mb-0">
+                                            <tbody>
+                                                {% for trend in occupancy_trends %}
+                                                <tr>
+                                                    <td>{{ trend.month }}</td>
+                                                    <td class="text-end">{{ trend.occupancy_rate|floatformat:1 }}%</td>
+                                                </tr>
+                                                {% empty %}
+                                                <tr>
+                                                    <td colspan="2" class="text-center text-muted">No trend data available</td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity Modal -->
+<div class="modal fade" id="recentActivityModal" tabindex="-1" aria-labelledby="recentActivityModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="recentActivityModalLabel">
+                    <i class="fas fa-history text-info me-2"></i>Recent Activity - All Reports
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                {% if recent_reports %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Report Title</th>
+                                    <th>Status</th>
+                                    <th>Format</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for report in recent_reports %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="bg-{% if report.status == 'completed' %}success{% elif report.status == 'failed' %}danger{% else %}warning{% endif %}-subtle rounded-3 p-2 me-3">
+                                                <span class="fas fa-file-alt text-{% if report.status == 'completed' %}success{% elif report.status == 'failed' %}danger{% else %}warning{% endif %} fs-7"></span>
+                                            </div>
+                                            <div>
+                                                <h6 class="mb-0">{{ report.title }}</h6>
+                                                <small class="text-muted">{{ report.start_date|date:"M d, Y" }} - {{ report.end_date|date:"M d, Y" }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-{% if report.status == 'completed' %}success{% elif report.status == 'failed' %}danger{% else %}warning{% endif %}-subtle text-{% if report.status == 'completed' %}success{% elif report.status == 'failed' %}danger{% else %}warning{% endif %}">
+                                            {{ report.get_status_display|default:"Pending" }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info-subtle text-info">{{ report.get_format_display }}</span>
+                                    </td>
+                                    <td>
+                                        <div>
+                                            <strong>{{ report.created_at|date:"M j, Y" }}</strong><br>
+                                            <small class="text-muted">{{ report.created_at|date:"g:i A" }}</small>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {% if report.status == 'completed' %}
+                                        <div class="btn-group" role="group">
+                                            <button class="btn btn-sm btn-outline-primary" onclick="downloadReport({{ report.id }})">
+                                                <i class="fas fa-download"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-secondary" onclick="viewReport({{ report.id }})">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                        </div>
+                                        {% else %}
+                                        <span class="text-muted">Not available</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <div class="bg-light rounded-3 p-4 mb-3 d-inline-block">
+                            <span class="fas fa-chart-bar text-500 fs-1"></span>
+                        </div>
+                        <h5 class="mb-2">No Reports Generated Yet</h5>
+                        <p class="text-muted mb-3">Start creating insightful reports to track your business performance</p>
+                        <a href="{% url 'reports:generate' %}" class="btn btn-primary">
+                            <span class="fas fa-plus-circle me-2"></span>Generate Your First Report
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <a href="{% url 'reports:generate' %}" class="btn btn-primary">Generate New Report</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Report functions
+function downloadReport(reportId) {
+    // Create a download link for the report
+    const downloadUrl = `/reports/download/${reportId}/`;
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = '';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function viewReport(reportId) {
+    // Open report in a new window/tab
+    const viewUrl = `/reports/view/${reportId}/`;
+    window.open(viewUrl, '_blank');
+}
+
+// Modal functions
+function showFinancialModal() {
+    const modal = new bootstrap.Modal(document.getElementById('financialModal'));
+    modal.show();
+}
+
+function showMaintenanceModal() {
+    const modal = new bootstrap.Modal(document.getElementById('maintenanceModal'));
+    modal.show();
+}
+
+function showPropertyModal() {
+    const modal = new bootstrap.Modal(document.getElementById('propertyModal'));
+    modal.show();
+}
+
+function showAnalyticsModal() {
+    const modal = new bootstrap.Modal(document.getElementById('analyticsModal'));
+    modal.show();
+}
+
+function showRecentActivityModal() {
+    const modal = new bootstrap.Modal(document.getElementById('recentActivityModal'));
+    modal.show();
+}
+
+// Financial Report Functions
+function updateDateInputs() {
+    const period = document.getElementById('reportPeriod').value;
+    const dateInput = document.getElementById('dateInput');
+    const dateLabel = document.getElementById('dateLabel');
+    
+    switch(period) {
+        case 'daily':
+            dateInput.type = 'date';
+            dateLabel.textContent = 'Select Date';
+            break;
+        case 'monthly':
+            dateInput.type = 'month';
+            dateLabel.textContent = 'Select Month';
+            break;
+        case 'yearly':
+            dateInput.type = 'number';
+            dateInput.min = '2020';
+            dateInput.max = '2030';
+            dateLabel.textContent = 'Select Year';
+            break;
+        case 'custom':
+            dateInput.type = 'date';
+            dateLabel.textContent = 'Start Date';
+            // Add end date input if needed
+            break;
+    }
+}
+
+function generateFinancialReport() {
+    const period = document.getElementById('reportPeriod').value;
+    const dateValue = document.getElementById('dateInput').value;
+    
+    if (!dateValue) {
+        alert('Please select a date');
+        return;
+    }
+    
+    // Show loading indicator
+    document.getElementById('financialLoading').style.display = 'block';
+    
+    // Make AJAX request to generate report
+    fetch('/reports/generate-financial/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            period: period,
+            date: dateValue
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        // Update the financial data
+        updateFinancialData(data);
+        document.getElementById('financialLoading').style.display = 'none';
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        document.getElementById('financialLoading').style.display = 'none';
+        alert('Error generating report');
+    });
+}
+
+function generateExcelReport() {
+    const period = document.getElementById('reportPeriod').value;
+    const dateValue = document.getElementById('dateInput').value;
+    
+    if (!dateValue) {
+        alert('Please select a date');
+        return;
+    }
+    
+    // Create download link for Excel report
+    const params = new URLSearchParams({
+        period: period,
+        date: dateValue,
+        format: 'excel'
+    });
+    
+    window.open(`/reports/financial-excel/?${params}`, '_blank');
+}
+
+function updateFinancialData(data) {
+    document.getElementById('totalRevenue').textContent = data.total_revenue + ' Tsh';
+    document.getElementById('maintenanceCosts').textContent = data.maintenance_costs + ' Tsh';
+    document.getElementById('netIncome').textContent = data.net_income + ' Tsh';
+    document.getElementById('profitMargin').textContent = data.profit_margin + '%';
+    
+    // Update table
+    const tbody = document.querySelector('#revenueTable tbody');
+    tbody.innerHTML = '';
+    
+    data.revenue_data.forEach(item => {
+        const row = tbody.insertRow();
+        row.innerHTML = `
+            <td>${item.period}</td>
+            <td>${item.revenue}</td>
+            <td>${item.costs}</td>
+            <td>${item.net_income}</td>
+            <td>${item.margin}%</td>
+        `;
+    });
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Initialize any charts or additional functionality
+document.addEventListener('DOMContentLoaded', function() {
+    // Add any initialization code here
+    console.log('Reports Dashboard loaded');
+});
+</script>
+{% endblock %}

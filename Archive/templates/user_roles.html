@@ -1,0 +1,177 @@
+{% extends 'accounts/base.html' %}
+
+{% block title %}Manage User Roles - {{ user_obj.username }}{% endblock %}
+
+{% block page_title %}User Role Management{% endblock %}
+
+{% block header_title %}Manage Roles - {{ user_obj.get_full_name|default:user_obj.username }}{% endblock %}
+
+{% block content %}
+<div class="user-roles-container">
+  <!-- Messages -->
+  {% if messages %}
+    <div class="messages">
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+          {{ message }}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <!-- Header -->
+  <div class="form-header">
+    <h1>Manage User Roles</h1>
+    <a href="{% url 'accounts:user_list' %}" class="back-btn btn-primary">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+        <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Back to Users
+    </a>
+  </div>
+
+  <!-- User Information -->
+  <div class="user-info">
+    <div class="user-profile">
+      <div class="user-avatar">
+        {{ user_obj.get_full_name.0|default:user_obj.username.0|upper }}
+      </div>
+      <div class="user-details">
+        <h2>{{ user_obj.get_full_name|default:user_obj.username }}</h2>
+        <div class="email">{{ user_obj.email|default:"No email provided" }}</div>
+      </div>
+    </div>
+    
+    <div class="user-meta">
+      <span>Joined: {{ user_obj.date_joined|date:"M d, Y" }}</span>
+      <span>Last Login: {{ user_obj.last_login|date:"M d, Y H:i"|default:"Never" }}</span>
+      <span>Status: {% if user_obj.is_active %}Active{% else %}Inactive{% endif %}</span>
+    </div>
+  </div>
+
+  <!-- Current Roles -->
+  <div class="current-roles">
+    <div class="section-header">
+      <h3>Current Roles</h3>
+    </div>
+    <div class="roles-list">
+      {% for role in current_roles %}
+        <span class="role-badge">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+            <path d="M9 12l2 2 4-4M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          {{ role.role.name }}
+        </span>
+      {% empty %}
+        <span class="role-badge no-roles">No roles assigned</span>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Role Assignment Form -->
+  <form method="post" class="roles-form">
+    {% csrf_token %}
+    
+    <div class="available-roles">
+      <div class="section-header">
+        <h3>Available Roles</h3>
+        <div>
+          Select roles to assign to this user
+        </div>
+      </div>
+      
+      <div class="roles-grid">
+        {% for role in available_roles %}
+          <div class="role-item" data-role-id="{{ role.id }}">
+            <input type="checkbox" 
+                   class="role-checkbox"
+                   id="role_{{ role.id }}" 
+                   name="roles" 
+                   value="{{ role.id }}"
+                   {% for current_role in current_roles %}
+                     {% if current_role.role.id == role.id %}checked{% endif %}
+                   {% endfor %}>
+            <div class="role-info">
+              <div class="role-name">{{ role.name }}</div>
+              <div class="role-description">
+                {{ role.description|default:"No description provided."|truncatewords:15 }}
+              </div>
+              <div class="role-permissions-count">
+                {{ role.permissions.count }} permission{{ role.permissions.count|pluralize }}
+              </div>
+            </div>
+          </div>
+        {% empty %}
+          <div>
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+              <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zM6 11c1.66 0 3-1.34 3-3S7.66 5 6 5 3 6.34 3 8s1.34 3 3 3zM6 13c-2.33 0-7 1.17-7 3.5V20h14v-3.5C13 14.17 8.33 13 6 13zM16 13c-.29 0-.62.02-.97.05 1.16.84 1.97 1.95 1.97 3.45V20h6v-3.5c0-2.33-4.67-3.5-6-3.5z" fill="currentColor"/>
+            </svg>
+            <div>No roles available to assign</div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Form Actions -->
+    <div class="form-actions">
+      <a href="{% url 'accounts:user_list' %}" class="btn btn-primary-cancel">Cancel</a>
+      <button type="submit" class="btn btn-primary-submit">Update User Roles</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const roleItems = document.querySelectorAll('.role-item');
+    const checkboxes = document.querySelectorAll('.role-checkbox');
+    
+    // Update UI based on checkbox state
+    function updateRoleItemUI(item, checkbox) {
+      if (checkbox.checked) {
+        item.classList.add('selected');
+      } else {
+        item.classList.remove('selected');
+      }
+    }
+    
+    // Initialize UI for pre-selected roles
+    checkboxes.forEach((checkbox) => {
+      const item = checkbox.closest('.role-item');
+      updateRoleItemUI(item, checkbox);
+    });
+    
+    // Handle role item clicks
+    roleItems.forEach((item) => {
+      const checkbox = item.querySelector('.role-checkbox');
+      
+      item.addEventListener('click', function(e) {
+        if (e.target !== checkbox) {
+          checkbox.checked = !checkbox.checked;
+          updateRoleItemUI(item, checkbox);
+        }
+      });
+      
+      checkbox.addEventListener('change', function() {
+        updateRoleItemUI(item, checkbox);
+      });
+    });
+    
+    // Form submission confirmation
+    const form = document.querySelector('.roles-form');
+    form.addEventListener('submit', function(e) {
+      const selectedRoles = document.querySelectorAll('.role-checkbox:checked');
+      const username = '{{ user_obj.username }}';
+      
+      if (selectedRoles.length === 0) {
+        const confirmed = confirm(`Are you sure you want to remove all roles from ${username}?`);
+        if (!confirmed) {
+          e.preventDefault();
+          return false;
+        }
+      }
+    });
+  });
+</script>
+{% endblock %}

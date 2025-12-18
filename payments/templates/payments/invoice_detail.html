@@ -1,0 +1,130 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+{% load currency_filters %}
+
+{% block title %}Invoice #{{ invoice.id }} - Maisha{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <div class="row flex-between-center">
+          <div class="col">
+            <h5 class="mb-0">Invoice #{{ invoice.id }}</h5>
+            <p class="text-muted mb-0">Invoice Details</p>
+          </div>
+          <div class="col-auto">
+            <a href="{% url 'payments:invoice_list' %}" class="btn btn-secondary">
+              <i class="fas fa-arrow-left me-2"></i>Back to List
+            </a>
+            {% if user.is_staff %}
+            <a href="{% url 'payments:invoice_edit' invoice.id %}" class="btn btn-primary ms-2">
+              <i class="fas fa-edit me-2"></i>Edit Invoice
+            </a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="row">
+          <div class="col-md-6">
+            <h6 class="text-500 mb-3">Invoice Information</h6>
+            <table class="table table-sm">
+              <tr>
+                <td><strong>Invoice ID:</strong></td>
+                <td>#{{ invoice.id }}</td>
+              </tr>
+              <tr>
+                <td><strong>Tenant:</strong></td>
+                <td>{{ invoice.tenant.get_full_name|default:invoice.tenant.username }}</td>
+              </tr>
+              <tr>
+                <td><strong>Email:</strong></td>
+                <td>{{ invoice.tenant.email }}</td>
+              </tr>
+              <tr>
+                <td><strong>Amount:</strong></td>
+                <td class="fw-bold text-success">{{ invoice.amount|currency_tzs }}</td>
+              </tr>
+              <tr>
+                <td><strong>Due Date:</strong></td>
+                <td>{{ invoice.due_date|date:"F d, Y" }}</td>
+              </tr>
+              <tr>
+                <td><strong>Status:</strong></td>
+                <td>
+                  {% if invoice.status == 'paid' %}
+                  <span class="badge bg-success">Paid</span>
+                  {% elif invoice.status == 'cancelled' %}
+                  <span class="badge bg-secondary">Cancelled</span>
+                  {% else %}
+                  <span class="badge bg-warning">Unpaid</span>
+                  {% endif %}
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Created:</strong></td>
+                <td>{{ invoice.created_at|date:"F d, Y g:i A" }}</td>
+              </tr>
+            </table>
+          </div>
+          <div class="col-md-6">
+            <h6 class="text-500 mb-3">Related Information</h6>
+            <table class="table table-sm">
+              {% if invoice.lease_id %}
+              <tr>
+                <td><strong>Lease ID:</strong></td>
+                <td>#{{ invoice.lease_id }}</td>
+              </tr>
+              {% endif %}
+              {% if invoice.booking_id %}
+              <tr>
+                <td><strong>Booking ID:</strong></td>
+                <td>#{{ invoice.booking_id }}</td>
+              </tr>
+              {% endif %}
+            </table>
+          </div>
+        </div>
+        
+        {% if payments %}
+        <hr>
+        <h6 class="text-500 mb-3">Related Payments</h6>
+        <div class="table-responsive">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>Payment ID</th>
+                <th>Amount</th>
+                <th>Date</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for payment in payments %}
+              <tr>
+                <td>#{{ payment.id }}</td>
+                <td>{{ payment.amount|currency_tzs }}</td>
+                <td>{{ payment.paid_date|date:"F d, Y"|default:payment.created_at|date:"F d, Y" }}</td>
+                <td>
+                  {% if payment.status == 'successful' %}
+                  <span class="badge bg-success">Successful</span>
+                  {% elif payment.status == 'pending' %}
+                  <span class="badge bg-warning">Pending</span>
+                  {% else %}
+                  <span class="badge bg-danger">Failed</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

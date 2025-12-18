@@ -1,0 +1,202 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}Create Lodge Booking{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="page-title-box">
+                <div class="page-title-right">
+                    <ol class="breadcrumb m-0">
+                        <li class="breadcrumb-item"><a href="{% url 'properties:dashboard' %}">Properties</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'properties:lodge_dashboard' %}">Lodge Management</a></li>
+                        <li class="breadcrumb-item active">Create Booking</li>
+                    </ol>
+                </div>
+                <h4 class="page-title">Create Lodge Booking</h4>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-mountain me-2"></i>New Lodge Booking
+                    </h5>
+                    <p class="text-muted mb-0">Lodge: <strong>{{ selected_property.title }}</strong></p>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <!-- Customer Information -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary mb-3">
+                                    <i class="fas fa-user me-2"></i>Customer Information
+                                </h6>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">First Name *</label>
+                                <input type="text" class="form-control" name="first_name" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Last Name *</label>
+                                <input type="text" class="form-control" name="last_name" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Email *</label>
+                                <input type="email" class="form-control" name="email" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Phone Number *</label>
+                                <input type="tel" class="form-control" name="phone" required>
+                            </div>
+                        </div>
+
+                        <!-- Booking Details -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary mb-3">
+                                    <i class="fas fa-calendar me-2"></i>Booking Details
+                                </h6>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Check-in Date *</label>
+                                <input type="date" class="form-control" name="check_in_date" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Check-out Date *</label>
+                                <input type="date" class="form-control" name="check_out_date" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Number of Guests *</label>
+                                <input type="number" class="form-control" name="number_of_guests" min="1" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Room Type</label>
+                                <select class="form-control" name="room_type">
+                                    <option value="">Select Room Type</option>
+                                    <option value="Standard">Standard Room</option>
+                                    <option value="Deluxe">Deluxe Room</option>
+                                    <option value="Suite">Suite</option>
+                                    <option value="Family">Family Room</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Room Number</label>
+                                <select class="form-control" name="room_number">
+                                    <option value="">Select Room</option>
+                                    {% for room in available_rooms %}
+                                        <option value="{{ room.room_number }}">Room {{ room.room_number }} - {{ room.room_type }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Special Requests</label>
+                                <textarea class="form-control" name="special_requests" rows="3" placeholder="Any special requests or requirements"></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Pricing -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary mb-3">
+                                    <i class="fas fa-dollar-sign me-2"></i>Pricing
+                                </h6>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Total Amount *</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">Tsh</span>
+                                    <input type="number" class="form-control" name="total_amount" step="0.01" min="0" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Payment Method</label>
+                                <select class="form-control" name="payment_method">
+                                    <option value="">Select Payment Method</option>
+                                    <option value="cash">Cash</option>
+                                    <option value="card">Credit/Debit Card</option>
+                                    <option value="bank_transfer">Bank Transfer</option>
+                                    <option value="mobile_money">Mobile Money</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-2"></i>Create Booking
+                                    </button>
+                                    <a href="{% url 'properties:lodge_bookings' %}" class="btn btn-secondary">
+                                        <i class="fas fa-times me-2"></i>Cancel
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Set minimum date to today
+    const today = new Date().toISOString().split('T')[0];
+    document.querySelector('input[name="check_in_date"]').min = today;
+    document.querySelector('input[name="check_out_date"]').min = today;
+    
+    // Update check-out date minimum when check-in date changes
+    document.querySelector('input[name="check_in_date"]').addEventListener('change', function() {
+        const checkOutInput = document.querySelector('input[name="check_out_date"]');
+        checkOutInput.min = this.value;
+        if (checkOutInput.value && checkOutInput.value <= this.value) {
+            checkOutInput.value = '';
+        }
+    });
+    
+    // Auto-calculate total amount based on room type and duration
+    const roomTypeSelect = document.querySelector('select[name="room_type"]');
+    const checkInInput = document.querySelector('input[name="check_in_date"]');
+    const checkOutInput = document.querySelector('input[name="check_out_date"]');
+    const totalAmountInput = document.querySelector('input[name="total_amount"]');
+    
+    function calculateTotal() {
+        const roomType = roomTypeSelect.value;
+        const checkIn = new Date(checkInInput.value);
+        const checkOut = new Date(checkOutInput.value);
+        
+        if (roomType && checkIn && checkOut && checkOut > checkIn) {
+            const nights = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
+            let ratePerNight = 0;
+            
+            switch(roomType) {
+                case 'Standard': ratePerNight = 80; break;
+                case 'Deluxe': ratePerNight = 120; break;
+                case 'Suite': ratePerNight = 200; break;
+                case 'Family': ratePerNight = 150; break;
+            }
+            
+            if (ratePerNight > 0) {
+                totalAmountInput.value = (ratePerNight * nights).toFixed(2);
+            }
+        }
+    }
+    
+    roomTypeSelect.addEventListener('change', calculateTotal);
+    checkInInput.addEventListener('change', calculateTotal);
+    checkOutInput.addEventListener('change', calculateTotal);
+});
+</script>
+{% endblock %}

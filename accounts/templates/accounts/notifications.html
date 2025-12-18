@@ -1,0 +1,495 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}Notifications - MAISHA Property Management{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">
+            <i class="fas fa-bell me-2"></i>Notifications
+            {% if unread_count > 0 %}
+            <span class="badge bg-danger ms-2">{{ unread_count }}</span>
+            {% endif %}
+          </h5>
+          <div class="d-flex gap-2">
+            <a href="?read=unread" class="btn btn-sm btn-outline-warning {% if current_read_filter == 'unread' %}active{% endif %}">
+              <i class="fas fa-envelope me-1"></i>Unread
+            </a>
+            <a href="?read=read" class="btn btn-sm btn-outline-success {% if current_read_filter == 'read' %}active{% endif %}">
+              <i class="fas fa-envelope-open me-1"></i>Read
+            </a>
+            <a href="{% url 'accounts:notifications_list' %}" class="btn btn-sm btn-outline-primary">
+              <i class="fas fa-list me-1"></i>All
+            </a>
+            <button class="btn btn-sm btn-primary" id="markAllReadBtn">
+              <i class="fas fa-check-double me-1"></i>Mark All Read
+            </button>
+          </div>
+        </div>
+        <div class="card-body">
+          {% if notifications.object_list %}
+          <div class="list-group">
+            {% for notification in notifications.object_list %}
+            <div class="list-group-item {% if not notification.is_read %}list-group-item-warning{% endif %}" data-notification-id="{{ notification.id }}">
+              <div class="d-flex justify-content-between align-items-start">
+                <div class="flex-grow-1">
+                  <div class="d-flex align-items-center mb-2">
+                    <h6 class="mb-0 me-2">
+                      {% if notification.notification_type == 'password_reset' %}
+                        <i class="fas fa-key text-warning me-2"></i>
+                      {% elif notification.notification_type == 'user_approval' %}
+                        <i class="fas fa-user-check text-success me-2"></i>
+                      {% elif notification.notification_type == 'payment' %}
+                        <i class="fas fa-money-bill text-info me-2"></i>
+                      {% elif notification.notification_type == 'complaint' %}
+                        <i class="fas fa-exclamation-triangle text-danger me-2"></i>
+                      {% elif notification.notification_type == 'maintenance' %}
+                        <i class="fas fa-tools text-primary me-2"></i>
+                      {% else %}
+                        <i class="fas fa-bell text-secondary me-2"></i>
+                      {% endif %}
+                      {{ notification.title }}
+                    </h6>
+                    {% if not notification.is_read %}
+                    <span class="badge bg-warning text-dark">New</span>
+                    {% endif %}
+                  </div>
+                  <p class="mb-2 text-muted">{{ notification.message }}</p>
+                  <div class="d-flex align-items-center text-muted small">
+                    <span class="me-3">
+                      <i class="fas fa-clock me-1"></i>{{ notification.get_time_since }}
+                    </span>
+                    {% if notification.related_user %}
+                    <span class="me-3">
+                      <i class="fas fa-user me-1"></i>{{ notification.related_user.get_full_name|default:notification.related_user.username }}
+                    </span>
+                    {% endif %}
+                    {% if notification.notification_type == 'password_reset' and notification.related_user %}
+                    <a href="{% url 'accounts:user_profile' notification.related_user.id %}" class="text-primary me-3">
+                      <i class="fas fa-eye me-1"></i>View User
+                    </a>
+                    <button class="btn btn-sm btn-outline-primary reset-password-from-notification" 
+                            data-user-id="{{ notification.related_user.id }}"
+                            data-notification-id="{{ notification.id }}">
+                      <i class="fas fa-key me-1"></i>Reset Password
+                    </button>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="dropdown">
+                  <button class="btn btn-sm btn-link text-muted" type="button" data-bs-toggle="dropdown">
+                    <i class="fas fa-ellipsis-v"></i>
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end">
+                    {% if not notification.is_read %}
+                    <li>
+                      <a class="dropdown-item mark-read-action" href="#" data-notification-id="{{ notification.id }}">
+                        <i class="fas fa-envelope-open me-2"></i>Mark as Read
+                      </a>
+                    </li>
+                    {% endif %}
+                    <li>
+                      <a class="dropdown-item text-danger delete-notification-action" href="#" data-notification-id="{{ notification.id }}">
+                        <i class="fas fa-trash me-2"></i>Delete
+                      </a>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          
+          <!-- Pagination -->
+          {% if notifications.has_other_pages %}
+          <nav aria-label="Notifications pagination" class="mt-4">
+            <ul class="pagination justify-content-center">
+              {% if notifications.has_previous %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ notifications.previous_page_number }}{% if current_type %}&type={{ current_type }}{% endif %}{% if current_read_filter %}&read={{ current_read_filter }}{% endif %}">Previous</a>
+              </li>
+              {% endif %}
+              
+              {% for num in notifications.paginator.page_range %}
+              {% if notifications.number == num %}
+              <li class="page-item active">
+                <span class="page-link">{{ num }}</span>
+              </li>
+              {% elif num > notifications.number|add:'-3' and num < notifications.number|add:'3' %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ num }}{% if current_type %}&type={{ current_type }}{% endif %}{% if current_read_filter %}&read={{ current_read_filter }}{% endif %}">{{ num }}</a>
+              </li>
+              {% endif %}
+              {% endfor %}
+              
+              {% if notifications.has_next %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ notifications.next_page_number }}{% if current_type %}&type={{ current_type }}{% endif %}{% if current_read_filter %}&read={{ current_read_filter }}{% endif %}">Next</a>
+              </li>
+              {% endif %}
+            </ul>
+          </nav>
+          {% endif %}
+          {% else %}
+          <div class="text-center py-5">
+            <i class="fas fa-bell-slash fa-3x text-muted mb-3"></i>
+            <h5 class="text-muted">No notifications found</h5>
+            <p class="text-muted">
+              {% if current_read_filter == 'unread' %}
+                No unread notifications. <a href="{% url 'accounts:notifications_list' %}">View all notifications</a>
+              {% elif current_read_filter == 'read' %}
+                No read notifications. <a href="{% url 'accounts:notifications_list' %}">View all notifications</a>
+              {% else %}
+                You're all caught up!
+              {% endif %}
+            </p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Get CSRF token from cookie or meta tag
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+                      document.querySelector('meta[name=csrf-token]')?.content ||
+                      getCookie('csrftoken') || '';
+    
+    if (!csrfToken) {
+        console.warn('CSRF token not found!');
+    }
+    
+    // Mark notification as read
+    document.querySelectorAll('.mark-read-action').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const notificationId = this.dataset.notificationId;
+            
+            fetch(`/api/notifications/${notificationId}/mark-read/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrfToken,
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'same-origin'
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Mark as read response:', data);
+                if (data.success) {
+                    const item = document.querySelector(`[data-notification-id="${notificationId}"]`);
+                    if (item) {
+                        item.classList.remove('list-group-item-warning');
+                        const badge = item.querySelector('.badge');
+                        if (badge) badge.remove();
+                        const markReadBtn = item.querySelector('.mark-read-action');
+                        if (markReadBtn) markReadBtn.closest('li').remove();
+                    }
+                    
+                    // Update sidebar badge immediately
+                    // Always fetch fresh count to ensure accuracy
+                    console.log('Mark as read successful, updating badge...');
+                    setTimeout(function() {
+                        // Fetch fresh count from API to ensure accuracy
+                        fetch('/api/notifications/count/')
+                            .then(response => response.json())
+                            .then(countData => {
+                                console.log('Fresh count from API:', countData);
+                                if (countData.success !== false) {
+                                    const unreadCount = parseInt(countData.count) || 0;
+                                    console.log('Updating badge with unread count:', unreadCount);
+                                    
+                                    const badge = document.getElementById('notificationBadge');
+                                    if (badge) {
+                                        if (unreadCount > 0) {
+                                            badge.innerHTML = unreadCount.toString();
+                                            badge.style.display = 'inline-block';
+                                            badge.style.visibility = 'visible';
+                                            badge.style.opacity = '1';
+                                            console.log('Badge updated: showing', unreadCount);
+                                        } else {
+                                            badge.innerHTML = '0';
+                                            badge.style.display = 'none';
+                                            console.log('Badge hidden: count is 0');
+                                        }
+                                    } else {
+                                        console.error('Badge element not found!');
+                                    }
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error fetching fresh count:', error);
+                            });
+                    }, 150);
+                } else {
+                    alert(data.message || 'Failed to mark notification as read');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred');
+            });
+        });
+    });
+    
+    // Delete notification
+    document.querySelectorAll('.delete-notification-action').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            if (!confirm('Are you sure you want to delete this notification?')) {
+                return;
+            }
+            
+            const notificationId = this.dataset.notificationId;
+            
+            fetch(`/api/notifications/${notificationId}/delete/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrfToken,
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'same-origin'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const item = document.querySelector(`[data-notification-id="${notificationId}"]`);
+                    if (item) {
+                        item.style.transition = 'opacity 0.3s';
+                        item.style.opacity = '0';
+                        setTimeout(() => item.remove(), 300);
+                    }
+                    // Update sidebar badge count immediately
+                    updateSidebarBadge();
+                } else {
+                    alert(data.message || 'Failed to delete notification');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred');
+            });
+        });
+    });
+    
+    // Mark all as read
+    document.getElementById('markAllReadBtn')?.addEventListener('click', function() {
+        if (!confirm('Mark all notifications as read?')) {
+            return;
+        }
+        
+        fetch('/api/notifications/mark-all-read/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken,
+                'Content-Type': 'application/json',
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => {
+            console.log('Mark all read response status:', response.status);
+            console.log('Mark all read response headers:', response.headers);
+            if (!response.ok) {
+                // Try to get error message from response
+                return response.text().then(text => {
+                    console.error('Error response text:', text);
+                    try {
+                        const errorData = JSON.parse(text);
+                        throw new Error(errorData.message || 'HTTP error: ' + response.status);
+                    } catch (e) {
+                        throw new Error('HTTP error: ' + response.status + ' - ' + text);
+                    }
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Mark all read response data:', data);
+            if (data && data.success) {
+                // Update sidebar badge immediately
+                if (window.updateSidebarBadge) {
+                    window.updateSidebarBadge();
+                } else {
+                    // Fallback: direct update
+                    const badge = document.getElementById('notificationBadge');
+                    if (badge) {
+                        badge.style.display = 'none';
+                    }
+                }
+                // Show success message
+                alert(data.message || 'All notifications marked as read');
+                // Reload after a short delay to show the update
+                setTimeout(() => {
+                    location.reload();
+                }, 500);
+            } else {
+                alert(data?.message || 'Failed to mark all as read');
+            }
+        })
+        .catch(error => {
+            console.error('Error marking all as read:', error);
+            alert('An error occurred: ' + (error.message || error));
+        });
+    });
+    
+    // Reset password from notification
+    document.querySelectorAll('.reset-password-from-notification').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const userId = this.dataset.userId;
+            const notificationId = this.dataset.notificationId;
+            
+            if (!confirm('Reset password to DefaultPass@12 for this user?')) {
+                return;
+            }
+            
+                    fetch(`/api/users/${userId}/reset-password/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrfToken,
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'same-origin'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Password reset successfully! New password: ' + (data.default_password || 'DefaultPass@12'));
+                    
+                    // Mark notification as read
+                    fetch(`/api/notifications/${notificationId}/mark-read/`, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': csrfToken,
+                            'Content-Type': 'application/json',
+                        },
+                        credentials: 'same-origin'
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Update sidebar badge immediately after marking as read
+                            updateSidebarBadge();
+                        }
+                    })
+                    .catch(error => console.error('Error marking notification as read:', error));
+                } else {
+                    alert(data.message || 'Failed to reset password');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred');
+            });
+        });
+    });
+    
+    // Function to update badge directly with a count value (faster, no API call)
+    // Make it globally accessible so it can be called from anywhere
+    window.updateBadgeDirectly = function(count) {
+        const badge = document.getElementById('notificationBadge');
+        if (badge) {
+            const unreadCount = parseInt(count) || 0;
+            console.log('Updating badge directly with count:', unreadCount);
+            
+            // Update badge content and visibility
+            // CRITICAL: Only hide when count is 0, stay visible when count > 0
+            if (unreadCount > 0) {
+                // Show badge with count - ensure it stays visible
+                badge.innerHTML = unreadCount.toString();
+                badge.style.display = 'inline-block';
+                badge.style.visibility = 'visible';
+                badge.style.opacity = '1';
+                console.log('Sidebar badge updated: showing count', unreadCount);
+            } else {
+                // Hide badge ONLY when count is exactly 0
+                badge.innerHTML = '0';
+                badge.style.display = 'none';
+                console.log('Sidebar badge hidden: count is 0');
+            }
+        } else {
+            console.warn('Badge element not found in DOM');
+        }
+    };
+    
+    // Function to update sidebar badge count by fetching from API (can be called from anywhere)
+    // Make it globally accessible
+    window.updateSidebarBadge = function() {
+        console.log('Updating sidebar badge from API...');
+        fetch('/api/notifications/count/')
+            .then(response => {
+                console.log('Badge count API response status:', response.status);
+                return response.json();
+            })
+            .then(data => {
+                console.log('Badge count API response data:', data);
+                if (data.success !== false) {
+                    // Get unread count (not total count)
+                    const count = parseInt(data.count) || 0;
+                    if (window.updateBadgeDirectly) {
+                        window.updateBadgeDirectly(count);
+                    } else {
+                        // Fallback if function not available
+                        const badge = document.getElementById('notificationBadge');
+                        if (badge) {
+                            if (count > 0) {
+                                badge.innerHTML = count.toString();
+                                badge.style.display = 'inline-block';
+                            } else {
+                                badge.style.display = 'none';
+                            }
+                        }
+                    }
+                } else {
+                    console.warn('Badge count API returned success=false:', data);
+                }
+            })
+            .catch(error => {
+                console.error('Error updating sidebar badge:', error);
+            });
+    };
+    
+    // Legacy function name for backward compatibility
+    function updateNotificationCount() {
+        if (window.updateSidebarBadge) {
+            window.updateSidebarBadge();
+        }
+    }
+    
+    // Force refresh badge on page load (in case of stale data)
+    // Update immediately and then again after a short delay
+    if (window.updateSidebarBadge) {
+        window.updateSidebarBadge();
+    }
+    setTimeout(function() {
+        if (window.updateSidebarBadge) {
+            window.updateSidebarBadge();
+        }
+    }, 500);
+});
+</script>
+{% endblock %}
+

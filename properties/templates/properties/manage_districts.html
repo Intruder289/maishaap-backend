@@ -1,0 +1,530 @@
+{% extends "accounts/base.html" %}
+{% load static %}
+
+{% block title %}Manage Districts{% endblock %}
+{% block page_title %}Manage Districts{% endblock %}
+{% block page_description %}Configure property districts and locations{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'properties:property_list' %}">Properties</a></li>
+<li class="breadcrumb-item active">Configure Property</li>
+<li class="breadcrumb-item active">Districts</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-lg-8">
+    <!-- Districts List -->
+    <div class="card">
+      <div class="card-header bg-warning text-dark">
+        <div class="row flex-between-center">
+          <div class="col-auto">
+            <h5 class="mb-0">Districts 
+              <span class="badge bg-primary-subtle text-primary ms-2">{{ paginator.count }}</span>
+            </h5>
+          </div>
+          <div class="col-auto">
+            <div class="d-flex align-items-center gap-2">
+              <div class="input-group input-group-sm" style="width: 260px;">
+                <input type="search" class="form-control" id="district-search" placeholder="Search districts..." value="{{ search_query|default:'' }}">
+                <button class="btn btn-outline-secondary" id="district-clear">Clear</button>
+              </div>
+              <label class="form-label mb-0">Items per page:</label>
+              <select class="form-select form-select-sm" id="pageSizeSelect" onchange="changePageSize()" style="width: auto;">
+                <option value="5" {% if current_page_size == 5 %}selected{% endif %}>5</option>
+                <option value="10" {% if current_page_size == 10 %}selected{% endif %}>10</option>
+                <option value="25" {% if current_page_size == 25 %}selected{% endif %}>25</option>
+                <option value="50" {% if current_page_size == 50 %}selected{% endif %}>50</option>
+                <option value="100" {% if current_page_size == 100 %}selected{% endif %}>100</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0">
+            <thead class="bg-light">
+              <tr>
+                <th class="border-0">Name</th>
+                <th class="border-0">Region</th>
+                <th class="border-0">Description</th>
+                <th class="border-0">Properties</th>
+                <th class="border-0">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for district in districts %}
+              <tr>
+                <td>
+                  <h6 class="mb-0">{{ district.name }}</h6>
+                </td>
+                <td>
+                  <span class="badge bg-secondary-subtle text-secondary">{{ district.region.name }}</span>
+                </td>
+                <td class="text-600">
+                  {% if district.description %}
+                    {{ district.description|truncatechars:50 }}
+                  {% else %}
+                    <span class="text-muted">No description</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <span class="badge bg-info-subtle text-info">{{ district.properties.count }}</span>
+                </td>
+                <td>
+                  <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                      <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                    <ul class="dropdown-menu">
+                      <li>
+                        <a class="dropdown-item" href="#" onclick="editDistrict({{ district.id }}, '{{ district.name|escapejs }}', {{ district.region.id }}, '{{ district.description|default_if_none:''|escapejs }}')">
+                          <i class="fas fa-edit me-2"></i>Edit
+                        </a>
+                      </li>
+                      <li>
+                        <a class="dropdown-item text-danger" href="#" onclick="deleteDistrict({{ district.id }}, '{{ district.name }}')">
+                          <i class="fas fa-trash me-2"></i>Delete
+                        </a>
+                      </li>
+                    </ul>
+                  </div>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="5" class="text-center text-600 py-5">
+                  <div class="py-4">
+                    <i class="fas fa-map-marker-alt fs-1 text-300 mb-3"></i>
+                    <h5>No districts found</h5>
+                    <p class="text-600">Get started by adding your first district.</p>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      
+      <!-- Pagination Controls -->
+      {% if page_obj.has_other_pages %}
+      <div class="card-footer bg-white border-0 py-3">
+        <div class="row align-items-center">
+          <div class="col-md-6">
+            <small class="text-muted">
+              Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ paginator.count }} districts
+            </small>
+          </div>
+          <div class="col-md-6">
+            <nav aria-label="Districts pagination">
+              <ul class="pagination pagination-sm justify-content-end mb-0">
+                {% if page_obj.has_previous %}
+                  <li class="page-item">
+                    <a class="page-link" href="?page=1{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}">
+                      <i class="fas fa-angle-double-left"></i>
+                    </a>
+                  </li>
+                  <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}">
+                      <i class="fas fa-angle-left"></i>
+                    </a>
+                  </li>
+                {% endif %}
+                
+                {% for num in page_obj.paginator.page_range %}
+                  {% if page_obj.number == num %}
+                    <li class="page-item active">
+                      <span class="page-link">{{ num }}</span>
+                    </li>
+                  {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                    <li class="page-item">
+                      <a class="page-link" href="?page={{ num }}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}">{{ num }}</a>
+                    </li>
+                  {% endif %}
+                {% endfor %}
+                
+                {% if page_obj.has_next %}
+                  <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}">
+                      <i class="fas fa-angle-right"></i>
+                    </a>
+                  </li>
+                  <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}">
+                      <i class="fas fa-angle-double-right"></i>
+                    </a>
+                  </li>
+                {% endif %}
+              </ul>
+            </nav>
+          </div>
+        </div>
+      </div>
+      {% else %}
+      <!-- Item Count for single page -->
+      <div class="card-footer bg-white border-0 py-3">
+        <small class="text-muted">Showing {{ paginator.count }} districts</small>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  
+  <div class="col-lg-4">
+    <!-- Add District Form -->
+    <div class="card">
+      <div class="card-header">
+        <h5 class="mb-0">
+          <i class="fas fa-plus-circle me-2"></i>Add New District
+        </h5>
+      </div>
+      <div class="card-body">
+        <form method="post" id="districtForm">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label for="id_region" class="form-label">Region *</label>
+            <select class="form-control" id="id_region" name="region" required>
+              <option value="">Select Region</option>
+              {% for region in regions %}
+              <option value="{{ region.id }}">{{ region.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="id_name" class="form-label">District Name *</label>
+            <input type="text" class="form-control" id="id_name" name="name" placeholder="Enter district name" required>
+          </div>
+          <div class="mb-3">
+            <label for="id_description" class="form-label">Description</label>
+            <textarea class="form-control" id="id_description" name="description" rows="3" placeholder="Enter district description (optional)"></textarea>
+          </div>
+          <div class="d-grid">
+            <button type="submit" class="btn btn-primary">
+              <i class="fas fa-save me-2"></i>Save District
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit District Modal -->
+<div class="modal fade" id="editDistrictModal" tabindex="-1" aria-labelledby="editDistrictModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-warning text-dark">
+        <h5 class="modal-title" id="editDistrictModalLabel">Edit District</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="editDistrictForm">
+          {% csrf_token %}
+          <input type="hidden" id="edit_district_id" name="district_id">
+          <div class="mb-3">
+            <label for="edit_district_region" class="form-label">Region *</label>
+            <select class="form-control" id="edit_district_region" name="region" required>
+              <option value="">Select Region</option>
+              {% for region in regions %}
+              <option value="{{ region.id }}">{{ region.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="edit_district_name" class="form-label">District Name *</label>
+            <input type="text" class="form-control" id="edit_district_name" name="name" required>
+          </div>
+          <div class="mb-3">
+            <label for="edit_district_description" class="form-label">Description</label>
+            <textarea class="form-control" id="edit_district_description" name="description" rows="3"></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="saveEditDistrict()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Page size change function
+function changePageSize() {
+    const pageSize = document.getElementById('pageSizeSelect').value;
+    const currentUrl = new URL(window.location);
+    currentUrl.searchParams.set('page_size', pageSize);
+    currentUrl.searchParams.delete('page'); // Reset to first page
+    window.location.href = currentUrl.toString();
+}
+
+// Search functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('district-search');
+    const clearBtn = document.getElementById('district-clear');
+    let searchTimeout;
+    
+    if (searchInput) {
+        // Search on Enter key or after 500ms of typing
+        searchInput.addEventListener('keyup', function(e) {
+            clearTimeout(searchTimeout);
+            if (e.key === 'Enter') {
+                performSearch();
+            } else {
+                searchTimeout = setTimeout(performSearch, 500);
+            }
+        });
+    }
+    
+    if (clearBtn) {
+        clearBtn.addEventListener('click', function() {
+            if (searchInput) {
+                searchInput.value = '';
+            }
+            const currentUrl = new URL(window.location);
+            currentUrl.searchParams.delete('search');
+            currentUrl.searchParams.delete('page');
+            window.location.href = currentUrl.toString();
+        });
+    }
+    
+    function performSearch() {
+        const searchValue = searchInput.value.trim();
+        const currentUrl = new URL(window.location);
+        
+        if (searchValue) {
+            currentUrl.searchParams.set('search', searchValue);
+        } else {
+            currentUrl.searchParams.delete('search');
+        }
+        currentUrl.searchParams.delete('page'); // Reset to first page
+        window.location.href = currentUrl.toString();
+    }
+});
+
+function editDistrict(id, name, regionId, description) {
+    document.getElementById('edit_district_id').value = id;
+    document.getElementById('edit_district_name').value = name;
+    document.getElementById('edit_district_region').value = regionId;
+    document.getElementById('edit_district_description').value = description || '';
+    
+    const modal = new bootstrap.Modal(document.getElementById('editDistrictModal'));
+    modal.show();
+}
+
+function saveEditDistrict() {
+    const form = document.getElementById('editDistrictForm');
+    const formData = new FormData(form);
+    const districtId = formData.get('district_id');
+    
+    // Validate district ID
+    if (!districtId) {
+        alert('Error: District ID is missing. Please try again.');
+        return;
+    }
+    
+    // Validate required fields
+    const name = formData.get('name');
+    const region = formData.get('region');
+    if (!name || !name.trim()) {
+        alert('Error: District name is required.');
+        return;
+    }
+    if (!region) {
+        alert('Error: Region is required.');
+        return;
+    }
+    
+    // Prepare JSON data
+    const jsonData = {
+        name: name.trim(),
+        region: parseInt(region),
+        description: formData.get('description') || ''
+    };
+    
+    // Get CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    const csrftoken = getCookie('csrftoken') || document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+    
+    fetch('/api/v1/districts/' + districtId + '/', {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrftoken
+        },
+        body: JSON.stringify(jsonData)
+    })
+    .then(response => {
+        console.log('Response status:', response.status);
+        const contentType = response.headers.get('content-type');
+        
+        if (!response.ok) {
+            // Handle error responses
+            if (contentType && contentType.includes('application/json')) {
+                return response.json().then(err => {
+                    // DRF returns errors in different formats
+                    let errorMessage = 'Server error';
+                    if (err.detail) {
+                        errorMessage = err.detail;
+                    } else if (err.message) {
+                        errorMessage = err.message;
+                    } else if (err.error) {
+                        errorMessage = err.error;
+                    } else if (typeof err === 'object') {
+                        // Handle field-specific errors
+                        const fieldErrors = Object.keys(err).map(key => {
+                            if (Array.isArray(err[key])) {
+                                return `${key}: ${err[key].join(', ')}`;
+                            }
+                            return `${key}: ${err[key]}`;
+                        }).join('; ');
+                        errorMessage = fieldErrors || JSON.stringify(err);
+                    }
+                    throw new Error(errorMessage);
+                });
+            } else {
+                return response.text().then(text => {
+                    throw new Error('Server returned non-JSON response: ' + text.substring(0, 100));
+                });
+            }
+        }
+        
+        // Success response - DRF returns the updated object
+        if (contentType && contentType.includes('application/json')) {
+            return response.json();
+        } else {
+            // If not JSON, still treat as success (DRF might return empty response)
+            return { success: true };
+        }
+    })
+    .then(data => {
+        console.log('Success response:', data);
+        // DRF returns the updated district object on success (not {success: true})
+        // If we get here, the update was successful
+        // Close modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('editDistrictModal'));
+        if (modal) {
+            modal.hide();
+        }
+        // Reload page to show updated data
+        location.reload();
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        // Better error message handling
+        const errorMessage = error.message || error.toString() || 'Unknown error occurred';
+        alert('Error updating district: ' + errorMessage);
+    });
+}
+
+function deleteDistrict(id, name) {
+    if (confirm('Are you sure you want to delete the district "' + name + '"? This action cannot be undone.')) {
+        // Get CSRF token
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+        const csrftoken = getCookie('csrftoken') || document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+        
+        fetch('/api/v1/districts/' + id + '/', {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken || ''
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => {
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                return response.text().then(text => {
+                    throw new Error('Server returned non-JSON response. This might be an authentication or permission error.');
+                });
+            }
+            if (!response.ok) {
+                return response.json().then(err => {
+                    throw new Error(err.message || 'Server error');
+                }).catch(() => {
+                    throw new Error('Server returned error status: ' + response.status);
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error deleting district: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while deleting the district: ' + error.message);
+        });
+    }
+}
+
+// Initialize Select2 on district management dropdowns
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize Select2 on add form region dropdown
+    if (typeof jQuery !== 'undefined' && jQuery.fn.select2) {
+        const addRegionSelect = jQuery('#id_region');
+        if (addRegionSelect.length && !addRegionSelect.hasClass('select2-hidden-accessible')) {
+            addRegionSelect.select2({
+                theme: 'bootstrap-5',
+                width: '100%',
+                allowClear: true,
+                minimumResultsForSearch: 3,
+                placeholder: 'Select Region'
+            });
+        }
+    }
+    
+    // Initialize Select2 when edit modal is shown
+    const editModal = document.getElementById('editDistrictModal');
+    if (editModal) {
+        editModal.addEventListener('shown.bs.modal', function() {
+            if (typeof jQuery !== 'undefined' && jQuery.fn.select2) {
+                const editRegionSelect = jQuery('#edit_district_region');
+                if (editRegionSelect.length && !editRegionSelect.hasClass('select2-hidden-accessible')) {
+                    editRegionSelect.select2({
+                        theme: 'bootstrap-5',
+                        width: '100%',
+                        allowClear: true,
+                        minimumResultsForSearch: 3,
+                        placeholder: 'Select Region'
+                    });
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

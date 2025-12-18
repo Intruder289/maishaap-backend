@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Room Management Test</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</head>
+<body>
+    <div class="container mt-5">
+        <h2>Room Management Modal Test</h2>
+        
+        <!-- Test buttons -->
+        <div class="mb-3">
+            <button class="btn btn-primary" onclick="testViewRoom()">Test View Room</button>
+            <button class="btn btn-warning" onclick="testEditRoom()">Test Edit Room</button>
+            <button class="btn btn-info" onclick="testManageStatus()">Test Manage Status</button>
+            <button class="btn btn-danger" onclick="testDeleteRoom()">Test Delete Room</button>
+        </div>
+        
+        <!-- Test modals -->
+        <div class="modal fade" id="roomDetailsModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Room Details</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p><strong>Room Number:</strong> <span id="modalRoomNumber">-</span></p>
+                        <p><strong>Room Type:</strong> <span id="modalRoomType">-</span></p>
+                        <p><strong>Capacity:</strong> <span id="modalCapacity">-</span></p>
+                        <p><strong>Bed Type:</strong> <span id="modalBedType">-</span></p>
+                        <p><strong>Base Rate:</strong> <span id="modalBaseRate">-</span></p>
+                        <p><strong>Status:</strong> <span id="modalStatus">-</span></p>
+                        <p><strong>Floor:</strong> <span id="modalFloorNumber">-</span></p>
+                        <p><strong>Amenities:</strong> <span id="modalAmenities">-</span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="modal fade" id="editRoomModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Edit Room</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="editRoomForm">
+                            <input type="hidden" id="editRoomId" value="1">
+                            <div class="mb-3">
+                                <label class="form-label">Room Number</label>
+                                <input type="text" class="form-control" id="editRoomNumber" value="101">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Room Type</label>
+                                <input type="text" class="form-control" id="editRoomType" value="Deluxe">
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="modal fade" id="manageStatusModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Manage Status</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="manageStatusForm">
+                            <input type="hidden" id="statusRoomId" value="1">
+                            <div class="mb-3">
+                                <label class="form-label">Room Number</label>
+                                <input type="text" class="form-control" id="statusRoomNumber" value="101" readonly>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Current Status</label>
+                                <input type="text" class="form-control" id="currentStatus" value="Available" readonly>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">New Status</label>
+                                <select class="form-control" id="newStatus">
+                                    <option value="available">Available</option>
+                                    <option value="occupied">Occupied</option>
+                                    <option value="maintenance">Maintenance</option>
+                                </select>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="modal fade" id="deleteRoomModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-danger text-white">
+                        <h5 class="modal-title">Delete Room</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Are you sure you want to delete room <strong id="deleteRoomNumber">101</strong>?</p>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="confirmDelete">
+                            <label class="form-check-label" for="confirmDelete">
+                                I understand this action cannot be undone
+                            </label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-danger" id="confirmDeleteBtn" disabled>Delete Room</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Define Tsh as jQuery alias
+        var Tsh = $;
+        
+        // Test functions
+        function testViewRoom() {
+            console.log('Testing View Room Modal');
+            $('#modalRoomNumber').text('101');
+            $('#modalRoomType').text('Deluxe Room');
+            $('#modalCapacity').text('2');
+            $('#modalBedType').text('King');
+            $('#modalBaseRate').text('Tsh150.00');
+            $('#modalStatus').text('Available');
+            $('#modalFloorNumber').text('Floor 1');
+            $('#modalAmenities').text('WiFi, TV, Air Conditioning');
+            $('#roomDetailsModal').modal('show');
+        }
+        
+        function testEditRoom() {
+            console.log('Testing Edit Room Modal');
+            $('#editRoomModal').modal('show');
+        }
+        
+        function testManageStatus() {
+            console.log('Testing Manage Status Modal');
+            $('#manageStatusModal').modal('show');
+        }
+        
+        function testDeleteRoom() {
+            console.log('Testing Delete Room Modal');
+            $('#deleteRoomModal').modal('show');
+        }
+        
+        // Handle delete confirmation checkbox
+        $(document).on('change', '#confirmDelete', function() {
+            $('#confirmDeleteBtn').prop('disabled', !$(this).is(':checked'));
+        });
+        
+        console.log('Test page loaded successfully');
+    </script>
+</body>
+</html>

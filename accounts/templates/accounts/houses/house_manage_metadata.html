@@ -1,0 +1,209 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}Manage House Settings{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+  <div class="row mb-4-inner">
+    <div class="brand-icon">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+        <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+        <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+      </svg>
+    </div>
+    <div class="row mb-4-meta">
+      <h1 class="h2 mb-2">House Settings</h1>
+      <p class="page-sub">Manage property types, regions, and amenities</p>
+    </div>
+  </div>
+  <div class="row mb-4-actions">
+    <a href="{% url 'accounts:houses_list' %}" class="btn btn-primary-secondary">← Back to Houses</a>
+  </div>
+</div>
+
+<div>
+  
+  <!-- Property Types -->
+  <div class="meta-card">
+    <div class="meta-card-header">
+      <h3>Property Types</h3>
+      <span class="badge badge-blue">{{ property_types.count }} type{{ property_types.count|pluralize }}</span>
+    </div>
+    
+    <!-- Add New Property Type -->
+    <form method="post" class="form-panel">
+      {% csrf_token %}
+      <input type="hidden" name="form_type" value="property_type">
+      <div>
+        <div>
+          {{ property_type_form.name.label_tag }}
+          {{ property_type_form.name }}
+        </div>
+        <div>
+          {{ property_type_form.description.label_tag }}
+          {{ property_type_form.description }}
+        </div>
+        <button type="submit" class="btn btn-primary-primary">Add Property Type</button>
+      </div>
+    </form>
+    
+    <!-- Existing Property Types -->
+    <div class="meta-list">
+      {% for property_type in property_types %}
+      <div class="list-item">
+        <div class="list-item-main">
+          <div class="list-title">{{ property_type.name }}</div>
+          {% if property_type.description %}
+          <div class="list-sub">{{ property_type.description|truncatechars:50 }}</div>
+          {% endif %}
+        </div>
+        <div class="list-actions">
+          <div class="muted">{{ property_type.properties.count }} properties</div>
+          <form method="post" action="{% url 'accounts:delete_property_type' property_type.pk %}" class="inline-form" onsubmit="return confirm('Are you sure you want to delete {{ property_type.name }}? This action cannot be undone.');">
+            {% csrf_token %}
+            <button type="submit" class="link-delete" title="Delete">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6"/>
+              </svg>
+            </button>
+          </form>
+        </div>
+      </div>
+      {% empty %}
+      <div class="text-center py-6">No property types yet. Add the first one above.</div>
+      {% endfor %}
+    </div>
+  </div>
+  
+  <!-- Regions -->
+  <div class="meta-card">
+    <div class="meta-card-header">
+      <h3>Regions</h3>
+      <span class="badge badge-green">{{ regions.count }} region{{ regions.count|pluralize }}</span>
+    </div>
+    
+    <!-- Add New Region -->
+    <form method="post" class="form-panel">
+      {% csrf_token %}
+      <input type="hidden" name="form_type" value="region">
+      <div>
+        <div>
+          {{ region_form.name.label_tag }}
+          {{ region_form.name }}
+        </div>
+        <div>
+          {{ region_form.description.label_tag }}
+          {{ region_form.description }}
+        </div>
+        <button type="submit" class="btn btn-primary-primary">Add Region</button>
+      </div>
+    </form>
+    
+    <!-- Existing Regions -->
+    <div class="meta-list">
+      {% for region in regions %}
+      <div class="list-item">
+        <div class="list-item-main">
+          <div class="list-title">{{ region.name }}</div>
+          {% if region.description %}
+          <div class="list-sub">{{ region.description|truncatechars:50 }}</div>
+          {% endif %}
+        </div>
+        <div class="list-actions">
+          <div class="muted">{{ region.properties.count }} properties</div>
+          <form method="post" action="{% url 'accounts:delete_region' region.pk %}" class="inline-form" onsubmit="return confirm('Are you sure you want to delete {{ region.name }}? This action cannot be undone.');">
+            {% csrf_token %}
+            <button type="submit" class="link-delete" title="Delete">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6"/>
+              </svg>
+            </button>
+          </form>
+        </div>
+      </div>
+      {% empty %}
+      <div class="text-center py-6">No regions yet. Add the first one above.</div>
+      {% endfor %}
+    </div>
+  </div>
+  
+  <!-- Amenities -->
+  <div class="meta-card meta-card-wide">
+    <div class="meta-card-header">
+      <h3>Amenities</h3>
+      <span class="badge badge-yellow">{{ amenities.count }} amenit{{ amenities.count|pluralize:"y,ies" }}</span>
+    </div>
+    
+    <!-- Add New Amenity -->
+    <form method="post" class="form-panel">
+      {% csrf_token %}
+      <input type="hidden" name="form_type" value="amenity">
+      <div>
+        <div>
+          {{ amenity_form.name.label_tag }}
+          {{ amenity_form.name }}
+        </div>
+        <div>
+          {{ amenity_form.description.label_tag }}
+          {{ amenity_form.description }}
+        </div>
+        <div>
+          {{ amenity_form.icon.label_tag }}
+          {{ amenity_form.icon }}
+        </div>
+        <button type="submit" class="btn btn-primary-primary">Add Amenity</button>
+      </div>
+    </form>
+    
+    <!-- Existing Amenities -->
+    <div class="amenities-grid">
+      {% for amenity in amenities %}
+      <div class="amenity-item">
+        <div class="amenity-icon">{% if amenity.icon %}{{ amenity.icon }}{% else %}🏠{% endif %}</div>
+        <div class="amenity-main">
+          <div class="list-title">{{ amenity.name }}</div>
+          {% if amenity.description %}
+          <div class="list-sub">{{ amenity.description|truncatechars:30 }}</div>
+          {% endif %}
+        </div>
+        <form method="post" action="{% url 'accounts:delete_amenity' amenity.pk %}" class="inline-form" onsubmit="return confirm('Are you sure you want to delete {{ amenity.name }}? This action cannot be undone.');">
+          {% csrf_token %}
+          <button type="submit" class="link-delete" title="Delete">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6"/>
+            </svg>
+          </button>
+        </form>
+      </div>
+      {% empty %}
+      <div class="text-center py-6">No amenities yet. Add the first one above.</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Quick Start Guide -->
+<div>
+  <h3>Quick Start Guide</h3>
+  <div>
+    <div>
+      <h4>1. Set Up Property Types</h4>
+      <p>Add different types like Apartment, House, Studio, etc.</p>
+    </div>
+    <div>
+      <h4>2. Define Regions</h4>
+      <p>Create location categories for better organization.</p>
+    </div>
+    <div>
+      <h4>3. Add Amenities</h4>
+      <p>Include features like WiFi, Parking, Gym, etc.</p>
+    </div>
+    <div>
+      <h4>4. Create Properties</h4>
+      <p>Start adding your properties with these settings.</p>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

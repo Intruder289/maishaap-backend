@@ -1,0 +1,132 @@
+<form method="post" action="{% url 'properties:api_booking_edit' booking.id %}">
+    {% csrf_token %}
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-calendar me-2"></i>Rental Period
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Check-in Date</label>
+                        <input type="date" class="form-control" name="check_in_date" value="{{ booking.check_in_date|date:'Y-m-d' }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Check-out Date</label>
+                        <input type="date" class="form-control" name="check_out_date" value="{{ booking.check_out_date|date:'Y-m-d' }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Number of Guests</label>
+                        <input type="number" class="form-control" name="number_of_guests" value="{{ booking.number_of_guests }}" min="1" required>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-dollar-sign me-2"></i>Financial Details
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Total Amount (Tsh)</label>
+                        <input type="number" class="form-control" name="total_amount" value="{{ booking.total_amount }}" step="0.01" min="0" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Current Payment Status</label>
+                        <div class="form-control-plaintext">
+                            {% if booking.payment_status == 'paid' %}
+                                <span class="badge bg-success">Paid</span>
+                            {% elif booking.payment_status == 'partial' %}
+                                <span class="badge bg-warning">Partial</span>
+                            {% elif booking.payment_status == 'overdue' %}
+                                <span class="badge bg-danger">Overdue</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Pending</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Paid Amount (Tsh)</label>
+                        <div class="form-control-plaintext">{{ booking.paid_amount|floatformat:0 }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-3">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-sticky-note me-2"></i>Special Requests & Notes
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Special Requests</label>
+                        <textarea class="form-control" name="special_requests" rows="4" placeholder="Any special requests or notes...">{{ booking.special_requests }}</textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-3">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-info-circle me-2"></i>Booking Information
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-2">
+                        <div class="col-sm-4"><strong>Reference:</strong></div>
+                        <div class="col-sm-8">{{ booking.booking_reference }}</div>
+                    </div>
+                    <div class="row mb-2">
+                        <div class="col-sm-4"><strong>Customer:</strong></div>
+                        <div class="col-sm-8">{{ booking.customer.full_name }}</div>
+                    </div>
+                    <div class="row mb-2">
+                        <div class="col-sm-4"><strong>Property:</strong></div>
+                        <div class="col-sm-8">{{ booking.property_obj.title }}</div>
+                    </div>
+                    <div class="row mb-2">
+                        <div class="col-sm-4"><strong>Created:</strong></div>
+                        <div class="col-sm-8">{{ booking.created_at|date:"M d, Y H:i" }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i>Important Notes
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Please note:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Changing dates may affect the total amount</li>
+                            <li>Payment status will be recalculated automatically</li>
+                            <li>All changes are logged for audit purposes</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>

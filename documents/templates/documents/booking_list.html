@@ -1,0 +1,123 @@
+﻿{% extends "accounts/base.html" %}
+{% load static %}
+{% load humanize %}
+{% load humanize %}
+
+{% block title %}Booking Management - Maisha{% endblock %}
+
+{% block content %}
+
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        {% comment %} <div class="orange-icon">
+            <i class="fas fa-calendar-check"></i>
+        </div> {% endcomment %}
+        <div>
+            <h1 class="h2 mb-2">Booking Management</h1>
+            <p class="text-body-emphasis">Manage property bookings and guest reservations with ease</p>
+        </div>
+    </div>
+    <!-- Bookings Table -->
+    <div class="card mb-6">
+        <div>
+            <div>
+                <i class="fas fa-list-alt"></i>
+                <div>
+                    <h3>Booking Reservations</h3>
+                    <p>{{ booking_list|length|default:0 }} total booking{{ booking_list|pluralize }} found</p>
+                </div>
+            </div>
+        </div>
+        
+        {% if booking_list %}
+        <div>
+            <table class="professional-table">
+                <thead>
+                    <tr>
+                        <th>Guest</th>
+                        <th>Property</th>
+                        <th>Check-in</th>
+                        <th>Check-out</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for booking in booking_list %}
+                    <tr>
+                        <td>
+                            <div>
+                                <strong>{{ booking.guest_name|default:"N/A" }}</strong>
+                                <br>
+                                <small>{{ booking.guest_email|default:"No email" }}</small>
+                            </div>
+                        </td>
+                        <td>
+                            <div>
+                                <strong>{{ booking.property_name|default:"N/A" }}</strong>
+                                <br>
+                                <small>{{ booking.property_address|default:"No address" }}</small>
+                            </div>
+                        </td>
+                        <td>{{ booking.check_in_date|date:"M d, Y"|default:"N/A" }}</td>
+                        <td>{{ booking.check_out_date|date:"M d, Y"|default:"N/A" }}</td>
+                        <td>
+                            <strong>
+                                TZS {{ booking.total_amount|floatformat:0|intcomma|default:"0" }}
+                            </strong>
+                        </td>
+                        <td>
+                            {% if booking.status == 'confirmed' %}
+                            <span>
+                                <i class="fas fa-check-circle"></i> Confirmed
+                            </span>
+                            {% elif booking.status == 'pending' %}
+                            <span>
+                                <i class="fas fa-clock"></i> Pending
+                            </span>
+                            {% elif booking.status == 'cancelled' %}
+                            <span>
+                                <i class="fas fa-times-circle"></i> Cancelled
+                            </span>
+                            {% else %}
+                            <span>
+                                <i class="fas fa-question-circle"></i> Unknown
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div>
+                                <button class="btn btn-primary" onclick="alert('View booking details for {{ booking.guest_name }}')">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                {% if user.is_staff %}
+                                <button onclick="alert('Edit booking for {{ booking.guest_name }}')">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div>
+            <div>
+                <i class="fas fa-calendar-check"></i>
+            </div>
+            <h3>No Bookings Found</h3>
+            <p>There are currently no booking reservations to display.</p>
+            {% if user.is_staff %}
+            <button class="btn btn-primary" onclick="alert('Create new booking functionality coming soon!')">
+                <i class="fas fa-plus-circle"></i>Create Your First Booking
+            </button>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

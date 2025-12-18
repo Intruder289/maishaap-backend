@@ -1,0 +1,269 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Invoice {{ invoice.invoice_number }} - Maisha{% endblock %}
+
+{% block content %}
+<!-- FontAwesome Icons -->
+
+<div class="container-fluid">
+    <!-- Professional Page Header -->
+    <div class="row mb-4">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'rent:dashboard' %}">Rent</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'rent:invoice_list' %}">Invoices</a></li>
+                <li class="breadcrumb-item active">{{ invoice.invoice_number }}</li>
+            </ol>
+        </nav>
+        <div>
+            <div>
+                <h1 class="h2 mb-2">
+                    <i class="fas fa-file-invoice"></i>
+                    Invoice {{ invoice.invoice_number }}
+                </h1>
+                <div>
+                    {% if invoice.status == 'paid' %}
+                        <span class="badge status-paid">Paid</span>
+                    {% elif invoice.is_overdue %}
+                        <span class="badge status-overdue">Overdue</span>
+                    {% else %}
+                        <span class="badge status-pending">{{ invoice.get_status_display }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div>
+                {% if invoice.balance_due > 0 %}
+                <a href="{% url 'rent:record_payment' invoice.id %}" class="btn btn-primary">
+                    <i class="fas fa-money-bill"></i>Record Payment
+                </a>
+                {% endif %}
+                {% if user.is_staff %}
+                <div class="dropdown">
+                    <button class="btn btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-cog"></i>Actions
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#">
+                            <i class="fas fa-print"></i>Print Invoice
+                        </a></li>
+                        <li><a class="dropdown-item" href="#">
+                            <i class="fas fa-envelope"></i>Send Email
+                        </a></li>
+                        <li><hr></li>
+                        <li><a class="dropdown-item" href="#">
+                            <i class="fas fa-times"></i>Cancel Invoice
+                        </a></li>
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Invoice Details -->
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 py-3">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5 class="mb-0 fw-bold">Invoice Details</h5>
+                        </div>
+                        <div class="col-md-6 text-md-end">
+                            {% if invoice.status == 'paid' %}
+                                <span class="badge bg-success fs-6">{{ invoice.get_status_display }}</span>
+                            {% elif invoice.status == 'overdue' %}
+                                <span class="badge bg-danger fs-6">{{ invoice.get_status_display }}</span>
+                            {% elif invoice.status == 'sent' %}
+                                <span class="badge bg-primary fs-6">{{ invoice.get_status_display }}</span>
+                            {% else %}
+                                <span class="badge bg-secondary fs-6">{{ invoice.get_status_display }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <h6 class="text-muted text-uppercase small mb-2">Tenant Information</h6>
+                            <div class="fw-bold">{{ invoice.tenant.get_full_name|default:invoice.tenant.username }}</div>
+                            <div class="text-muted">{{ invoice.tenant.email }}</div>
+                            {% if invoice.tenant.profile.phone %}
+                            <div class="text-muted">{{ invoice.tenant.profile.phone }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-muted text-uppercase small mb-2">Property Information</h6>
+                            <div class="fw-bold">{{ invoice.lease.property_ref.name }}</div>
+                            <div class="text-muted">{{ invoice.lease.property_ref.address }}</div>
+                            <div class="text-muted">{{ invoice.lease.property_ref.get_property_type_display }}</div>
+                        </div>
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <h6 class="text-muted text-uppercase small mb-2">Invoice Date</h6>
+                            <div class="fw-medium">{{ invoice.invoice_date|date:"M d, Y" }}</div>
+                        </div>
+                        <div class="col-md-4">
+                            <h6 class="text-muted text-uppercase small mb-2">Due Date</h6>
+                            <div class="fw-medium {% if invoice.is_overdue %}text-danger{% endif %}">
+                                {{ invoice.due_date|date:"M d, Y" }}
+                            </div>
+                            {% if invoice.is_overdue %}
+                            <small class="text-danger">{{ invoice.days_overdue }} days overdue</small>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-4">
+                            <h6 class="text-muted text-uppercase small mb-2">Billing Period</h6>
+                            <div class="fw-medium">{{ invoice.period_start|date:"M d" }} - {{ invoice.period_end|date:"M d, Y" }}</div>
+                        </div>
+                    </div>
+
+                    <!-- Invoice Items -->
+                    <div class="table-responsive">
+                        <table class="table table-borderless">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th class="py-3">Description</th>
+                                    <th class="py-3 text-end">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="py-3">
+                                        <div class="fw-medium">Monthly Rent</div>
+                                        <small class="text-muted">{{ invoice.period_start|date:"F Y" }}</small>
+                                    </td>
+                                    <td class="py-3 text-end fw-medium">${{ invoice.base_rent|floatformat:2|intcomma }}</td>
+                                </tr>
+                                {% if invoice.late_fee > 0 %}
+                                <tr>
+                                    <td class="py-3">
+                                        <div class="fw-medium text-danger">Late Fee</div>
+                                        <small class="text-muted">Payment overdue charge</small>
+                                    </td>
+                                    <td class="py-3 text-end fw-medium text-danger">${{ invoice.late_fee|floatformat:2|intcomma }}</td>
+                                </tr>
+                                {% endif %}
+                                {% if invoice.other_charges > 0 %}
+                                <tr>
+                                    <td class="py-3">
+                                        <div class="fw-medium">Other Charges</div>
+                                        <small class="text-muted">Additional fees</small>
+                                    </td>
+                                    <td class="py-3 text-end fw-medium">${{ invoice.other_charges|floatformat:2|intcomma }}</td>
+                                </tr>
+                                {% endif %}
+                                {% if invoice.discount > 0 %}
+                                <tr>
+                                    <td class="py-3">
+                                        <div class="fw-medium text-success">Discount</div>
+                                        <small class="text-muted">Applied discount</small>
+                                    </td>
+                                    <td class="py-3 text-end fw-medium text-success">-${{ invoice.discount|floatformat:2|intcomma }}</td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                            <tfoot class="border-top">
+                                <tr>
+                                    <td class="py-3"><strong>Total Amount</strong></td>
+                                    <td class="py-3 text-end"><strong class="fs-5">Tsh {{ invoice.total_amount|floatformat:2|intcomma }}</strong></td>
+                                </tr>
+                                {% if invoice.amount_paid > 0 %}
+                                <tr>
+                                    <td class="py-2 text-success">Amount Paid</td>
+                                    <td class="py-2 text-end text-success">-Tsh {{ invoice.amount_paid|floatformat:2|intcomma }}</td>
+                                </tr>
+                                <tr class="bg-light">
+                                    <td class="py-3"><strong>Balance Due</strong></td>
+                                    <td class="py-3 text-end"><strong class="fs-5 {% if invoice.balance_due > 0 %}text-danger{% else %}text-success{% endif %}">${{ invoice.balance_due|floatformat:2|intcomma }}</strong></td>
+                                </tr>
+                                {% endif %}
+                            </tfoot>
+                        </table>
+                    </div>
+
+                    {% if invoice.notes %}
+                    <div class="mt-4 p-3 bg-light rounded">
+                        <h6 class="text-muted text-uppercase small mb-2">Notes</h6>
+                        <p class="mb-0">{{ invoice.notes|linebreaks }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Payment History Sidebar -->
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 py-3">
+                    <h5 class="mb-0 fw-bold">Payment History</h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if payments %}
+                        {% for payment in payments %}
+                        <div class="p-3 {% if not forloop.last %}border-bottom{% endif %}">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div>
+                                    <div class="fw-bold text-success">Tsh {{ payment.amount|floatformat:2|intcomma }}</div>
+                                    <small class="text-muted">{{ payment.payment_date|date:"M d, Y" }}</small>
+                                </div>
+                                <span class="badge bg-{% if payment.status == 'completed' %}success{% elif payment.status == 'pending' %}warning{% else %}secondary{% endif %}">
+                                    {{ payment.get_status_display }}
+                                </span>
+                            </div>
+                            <div class="small text-muted">
+                                <div><strong>Method:</strong> {{ payment.get_payment_method_display }}</div>
+                                {% if payment.reference_number %}
+                                <div><strong>Reference:</strong> {{ payment.reference_number }}</div>
+                                {% endif %}
+                                {% if payment.recorded_by %}
+                                <div><strong>Recorded by:</strong> {{ payment.recorded_by.get_full_name|default:payment.recorded_by.username }}</div>
+                                {% endif %}
+                            </div>
+                            {% if payment.notes %}
+                            <div class="mt-2 small text-muted">
+                                <em>{{ payment.notes }}</em>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="p-4 text-center text-muted">
+                            <i class="fas fa-receipt fs-1 mb-3 opacity-25"></i>
+                            <p class="mb-0">No payments recorded</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card border-0 shadow-sm mt-3">
+                <div class="card-header bg-white border-0 py-3">
+                    <h6 class="mb-0 fw-bold">Quick Actions</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        {% if invoice.balance_due > 0 %}
+                        <a href="{% url 'rent:record_payment' invoice.id %}" class="btn btn-success">
+                            <i class="fas fa-money-bill me-2"></i>Record Payment
+                        </a>
+                        {% endif %}
+                        <button class="btn btn-outline-primary" onclick="window.print()">
+                            <i class="fas fa-print me-2"></i>Print Invoice
+                        </button>
+                        {% if user.is_staff %}
+                        <button class="btn btn-outline-info">  
+                            <i class="fas fa-envelope me-2"></i>Send Reminder
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

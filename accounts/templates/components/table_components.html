@@ -1,0 +1,334 @@
+{% load static %}
+
+<!-- Reusable Table Components -->
+<!-- Include this template in all table pages -->
+
+<!-- Table Search Component -->
+<div class="table-search-component mb-3">
+  <div class="row g-3 align-items-center">
+    <div class="col-md-8">
+      <div class="position-relative">
+        <input class="form-control pe-5 ajax-search" 
+               type="search" 
+               placeholder="Search {{ search_placeholder|default:'items' }}..." 
+               data-search-url="{{ search_url }}"
+               data-target-table="{{ table_id }}">
+        <span class="position-absolute top-50 end-0 translate-middle-y me-3">
+          <i class="fas fa-search text-400"></i>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Standard Table Structure -->
+<div class="card">
+  <div class="card-header">
+    <div class="row flex-between-center">
+      <div class="col-auto">
+        <h5 class="mb-0">{{ table_title|default:'Items' }} 
+          <span class="badge bg-primary-subtle text-primary ms-2" id="item-count">{{ total_count|default:0 }}</span>
+        </h5>
+      </div>
+    </div>
+  </div>
+  
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm table-hover mb-0" id="{{ table_id|default:'data-table' }}">
+        <thead class="bg-200">
+          <tr>
+            {% block table_headers %}{% endblock %}
+          </tr>
+        </thead>
+        <tbody id="table-body">
+          {% block table_body %}{% endblock %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  
+  <!-- Standard Pagination -->
+  {% include 'components/pagination.html' %}
+</div>
+
+<!-- Standard Dropdown Actions Template -->
+<div class="dropdown-actions-template" style="display: none;">
+  <div class="dropdown">
+    <button class="btn btn-link text-600 btn-sm dropdown-toggle dropdown-caret-none" type="button" data-bs-toggle="dropdown">
+      <span class="fas fa-ellipsis-h"></span>
+    </button>
+    <ul class="dropdown-menu">
+      <li><a class="dropdown-item" href="#" data-action="view"><i class="fas fa-eye me-2"></i>View</a></li>
+      <li><a class="dropdown-item" href="#" data-action="edit"><i class="fas fa-edit me-2"></i>Edit</a></li>
+      <li><hr class="dropdown-divider"></li>
+      <li><a class="dropdown-item text-warning" href="#" data-action="toggle-status"><i class="fas fa-toggle-on me-2"></i>Toggle Status</a></li>
+      <li><a class="dropdown-item text-danger" href="#" data-action="delete"><i class="fas fa-trash me-2"></i>Delete</a></li>
+    </ul>
+  </div>
+</div>
+
+<!-- AJAX Loading Indicator -->
+<div class="ajax-loading" style="display: none; text-align: center; padding: 20px;">
+  <div class="spinner-border text-primary" role="status">
+    <span class="visually-hidden">Loading...</span>
+  </div>
+  <p class="mt-2 text-muted">Loading...</p>
+</div>
+
+<!-- Empty State Template -->
+<div class="text-center py-6-template" style="display: none;">
+  <tr>
+    <td colspan="100%" class="text-center py-5">
+      <div class="text-600">
+        <span class="fas fa-inbox fs-1 mb-3 d-block"></span>
+        <h5 class="mb-2">No {{ item_name|default:'items' }} found</h5>
+        <p class="mb-0 text-muted">{{ empty_message|default:'No data available at the moment.' }}</p>
+      </div>
+    </td>
+  </tr>
+</div>
+
+<!-- JavaScript for Table Functionality -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize table functionality
+    initializeTableComponents();
+});
+
+function initializeTableComponents() {
+    // AJAX Search functionality
+    const searchInputs = document.querySelectorAll('.ajax-search');
+    searchInputs.forEach(input => {
+        let searchTimeout;
+        input.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                performAjaxSearch(this);
+            }, 500);
+        });
+    });
+
+    // Filter functionality
+    const filters = document.querySelectorAll('.table-filter');
+    filters.forEach(filter => {
+        filter.addEventListener('change', function() {
+            performAjaxFilter(this);
+        });
+    });
+
+    // Dropdown actions
+    initializeDropdownActions();
+}
+
+function performAjaxSearch(input) {
+    const searchUrl = input.dataset.searchUrl;
+    const tableId = input.dataset.targetTable;
+    const query = input.value;
+    
+    if (!searchUrl || !tableId) return;
+    
+    showLoading();
+    
+    fetch(`${searchUrl}?search=${encodeURIComponent(query)}`, {
+        method: 'GET',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        updateTableBody(tableId, data);
+        updateItemCount(data.total_count);
+        hideLoading();
+    })
+    .catch(error => {
+        console.error('Search error:', error);
+        hideLoading();
+    });
+}
+
+function performAjaxFilter(filter) {
+    const filterType = filter.dataset.filterType;
+    const filterValue = filter.value;
+    const table = filter.closest('.card').querySelector('table');
+    const tableId = table.id;
+    
+    // Get current search value
+    const searchInput = document.querySelector(`[data-target-table="${tableId}"]`);
+    const searchValue = searchInput ? searchInput.value : '';
+    
+    showLoading();
+    
+    // Build filter URL
+    const params = new URLSearchParams();
+    if (searchValue) params.append('search', searchValue);
+    if (filterValue) params.append(filterType, filterValue);
+    
+    const searchUrl = searchInput ? searchInput.dataset.searchUrl : window.location.pathname;
+    
+    fetch(`${searchUrl}?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        updateTableBody(tableId, data);
+        updateItemCount(data.total_count);
+        hideLoading();
+    })
+    .catch(error => {
+        console.error('Filter error:', error);
+        hideLoading();
+    });
+}
+
+function updateTableBody(tableId, data) {
+    const tbody = document.getElementById('table-body');
+    if (!tbody) return;
+    
+    if (data.items && data.items.length > 0) {
+        tbody.innerHTML = data.html;
+    } else {
+        tbody.innerHTML = '<tr><td colspan="100%" class="text-center py-5"><div class="text-600"><span class="fas fa-inbox fs-1 mb-3 d-block"></span><h5 class="mb-2">No items found</h5><p class="mb-0 text-muted">No data matches your search criteria.</p></div></td></tr>';
+    }
+}
+
+function updateItemCount(count) {
+    const countElement = document.getElementById('item-count');
+    if (countElement) {
+        countElement.textContent = count;
+    }
+}
+
+function showLoading() {
+    const loading = document.querySelector('.ajax-loading');
+    if (loading) {
+        loading.style.display = 'block';
+    }
+}
+
+function hideLoading() {
+    const loading = document.querySelector('.ajax-loading');
+    if (loading) {
+        loading.style.display = 'none';
+    }
+}
+
+function initializeDropdownActions() {
+    // Handle dropdown action clicks
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('[data-action]')) {
+            e.preventDefault();
+            const action = e.target.closest('[data-action]').dataset.action;
+            const row = e.target.closest('tr');
+            const itemId = row.dataset.itemId;
+            
+            handleDropdownAction(action, itemId, row);
+        }
+    });
+}
+
+function handleDropdownAction(action, itemId, row) {
+    switch(action) {
+        case 'view':
+            window.location.href = `/view/${itemId}/`;
+            break;
+        case 'edit':
+            window.location.href = `/edit/${itemId}/`;
+            break;
+        case 'toggle-status':
+            toggleItemStatus(itemId, row);
+            break;
+        case 'delete':
+            deleteItem(itemId, row);
+            break;
+    }
+}
+
+function toggleItemStatus(itemId, row) {
+    if (confirm('Are you sure you want to change the status of this item?')) {
+        fetch(`/api/v1/toggle-status/${itemId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCSRFToken(),
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Update status badge in the row
+                const statusBadge = row.querySelector('.badge');
+                if (statusBadge) {
+                    statusBadge.className = `badge ${data.new_status_class}`;
+                    statusBadge.textContent = data.new_status_text;
+                }
+                showNotification('Status updated successfully', 'success');
+            } else {
+                showNotification('Failed to update status', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showNotification('An error occurred', 'error');
+        });
+    }
+}
+
+function deleteItem(itemId, row) {
+    if (confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
+        fetch(`/api/v1/delete/${itemId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCSRFToken(),
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                row.remove();
+                showNotification('Item deleted successfully', 'success');
+                updateItemCount(parseInt(document.getElementById('item-count').textContent) - 1);
+            } else {
+                showNotification('Failed to delete item', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showNotification('An error occurred', 'error');
+        });
+    }
+}
+
+function getCSRFToken() {
+    return document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+           document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || '';
+}
+
+function showNotification(message, type = 'info') {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show position-fixed`;
+    notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    notification.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.remove();
+        }
+    }, 5000);
+}
+</script>
+

@@ -1,0 +1,240 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Rent Payments - Maisha{% endblock %}
+
+{% block content %}
+<!-- FontAwesome Icons -->
+
+<div class="container-fluid">
+    <!-- Professional Page Header -->
+    <div class="row mb-4">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="h2 mb-2">
+                    <span>Tsh</span>
+                    Rent Payments
+                </h1>
+                <p class="text-body-emphasis">
+                    Track and manage all rental payment transactions
+                </p>
+            </div>
+            <div>
+                <a href="{% url 'rent:invoice_list' %}" class="btn btn-primary">
+                    <i class="fas fa-file-invoice"></i>
+                    View Invoices
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard-Style Statistics Cards -->
+    <div class="stats-grid">
+        <div class="stat-card success" 
+             data-trend="up"
+             data-card-type="collected"
+             tabindex="0"
+             role="button"
+             aria-label="View collected payments details">
+            <div class="stat-icon revenue">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+            </div>
+            <div class="stat-info">
+                <h3>Tsh {{ total_collected|floatformat:0|intcomma|default:"0" }}</h3>
+                <p>Total Collected</p>
+                <span class="stat-change positive">This Month</span>
+            </div>
+        </div>
+
+        <div class="stat-card warning" 
+             data-trend="{% if pending_count > 5 %}up{% elif pending_count == 0 %}down{% else %}stable{% endif %}"
+             data-card-type="pending"
+             tabindex="0"
+             role="button"
+             aria-label="View pending payments">
+            <div class="stat-icon payment">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15h2v2h-2zm0-8h2v6h-2z"/>
+                </svg>
+            </div>
+            <div class="stat-info">
+                <h3>{{ pending_count|default:"0" }}</h3>
+                <p>Pending Payments</p>
+                <span class="stat-change {% if pending_count > 5 %}negative{% elif pending_count == 0 %}positive{% else %}neutral{% endif %}">Awaiting Processing</span>
+            </div>
+        </div>
+
+        <div class="stat-card" 
+             data-trend="stable"
+             data-card-type="transactions"
+             tabindex="0"
+             role="button"
+             aria-label="View all transactions">
+            <div class="stat-icon booking">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/>
+                </svg>
+            </div>
+            <div class="stat-info">
+                <h3>{{ total_payments|default:"0" }}</h3>
+                <p>Total Transactions</p>
+                <span class="stat-change neutral">All Time</span>
+            </div>
+        </div>
+
+        <div class="stat-card" 
+             data-trend="stable"
+             data-card-type="average"
+             tabindex="0"
+             role="button"
+             aria-label="View average payment amount">
+            <div class="stat-icon lease">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+                </svg>
+            </div>
+            <div class="stat-info">
+                <h3>Tsh {{ average_payment|floatformat:0|intcomma }}</h3>
+                <p>Average Payment</p>
+                <span class="stat-change neutral">Per Transaction</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Professional Payments Table -->
+    <div class="card mb-6">
+        <div>
+            <h3>
+                <i class="fas fa-clock"></i>
+                Recent Payments
+            </h3>
+        </div>
+        
+        {% if page_obj %}
+        <div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Tenant</th>
+                        <th>Property</th>
+                        <th>Amount</th>
+                        <th>Method</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for payment in page_obj %}
+                    <tr onmouseover="this.style.background='#fef7f0'" onmouseout="this.style.background='white'">
+                        <td>
+                            <div>
+                                {{ payment.payment_date|date:"M d, Y" }}
+                            </div>
+                            <small>
+                                {{ payment.payment_date|date:"g:i A" }}
+                            </small>
+                        </td>
+                        <td>
+                            <div>
+                                {{ payment.tenant.get_full_name|default:payment.tenant.username }}
+                            </div>
+                            <small>
+                                {{ payment.tenant.email }}
+                            </small>
+                        </td>
+                        <td>
+                            <div>
+                                {{ payment.lease.property_ref.name }}
+                            </div>
+                        </td>
+                        <td>
+                            <div>
+                                Tsh {{ payment.amount|floatformat:0|intcomma }}
+                            </div>
+                        </td>
+                        <td>
+                            <div>
+                                {{ payment.get_payment_method_display }}
+                            </div>
+                        </td>
+                        <td>
+                            {% if payment.status == 'completed' %}
+                                <span class="badge status-completed">Completed</span>
+                            {% elif payment.status == 'pending' %}
+                                <span class="badge status-pending">Pending</span>
+                            {% else %}
+                                <span class="badge status-failed">Failed</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination (if needed) -->
+        {% if page_obj.has_other_pages %}
+        <div>
+            <div>
+                Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} payments
+            </div>
+            <nav>
+                <ul>
+                    {% if page_obj.has_previous %}
+                    <li>
+                        <a href="?page={{ page_obj.previous_page_number }}" 
+                          >
+                            Previous
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                    <li>
+                        <span>
+                            {{ num }}
+                        </span>
+                    </li>
+                    {% else %}
+                    <li>
+                        <a href="?page={{ num }}" 
+                          >
+                            {{ num }}
+                        </a>
+                    </li>
+                    {% endif %}
+                    {% endfor %}
+                    
+                    {% if page_obj.has_next %}
+                    <li>
+                        <a href="?page={{ page_obj.next_page_number }}" 
+                          >
+                            Next
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+        
+        {% else %}
+        <div>
+            <div>Tsh</div>
+            <h3>No payments found</h3>
+            <p>
+                No payment records have been created yet.
+            </p>
+            <a href="{% url 'rent:invoice_list' %}" class="btn btn-primary">
+                <i class="fas fa-file-invoice"></i>
+                View Invoices
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

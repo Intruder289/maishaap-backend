@@ -1,0 +1,170 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Create Customer{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="page-title-box">
+                <div class="page-title-right">
+                    <ol class="breadcrumb m-0">
+                        <li class="breadcrumb-item"><a href="{% url 'properties:dashboard' %}">Properties</a></li>
+                        <li class="breadcrumb-item active">Create Customer</li>
+                    </ol>
+                </div>
+                <h4 class="page-title">Create Customer</h4>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-user-plus me-2"></i>New Customer
+                    </h5>
+                    <p class="text-muted mb-0">Add a new customer to the system</p>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <!-- Personal Information -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary mb-3">
+                                    <i class="fas fa-user me-2"></i>Personal Information
+                                </h6>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">First Name *</label>
+                                <input type="text" class="form-control" name="first_name" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Last Name *</label>
+                                <input type="text" class="form-control" name="last_name" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Email *</label>
+                                <input type="email" class="form-control" name="email" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Phone Number *</label>
+                                <input type="tel" class="form-control" name="phone" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Gender</label>
+                                <select class="form-control" name="gender">
+                                    <option value="">Select Gender</option>
+                                    <option value="male">Male</option>
+                                    <option value="female">Female</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Date of Birth</label>
+                                <input type="date" class="form-control" name="date_of_birth">
+                            </div>
+                        </div>
+
+                        <!-- Address Information -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary mb-3">
+                                    <i class="fas fa-map-marker-alt me-2"></i>Address Information
+                                </h6>
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label">Address</label>
+                                <textarea class="form-control" name="address" rows="2"></textarea>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">City</label>
+                                <input type="text" class="form-control" name="city">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Country</label>
+                                <input type="text" class="form-control" name="country">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Postal Code</label>
+                                <input type="text" class="form-control" name="postal_code">
+                            </div>
+                        </div>
+
+                        <!-- Identification -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary mb-3">
+                                    <i class="fas fa-id-card me-2"></i>Identification
+                                </h6>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">ID Type</label>
+                                <select class="form-control" name="id_type">
+                                    <option value="">Select ID Type</option>
+                                    <option value="Passport">Passport</option>
+                                    <option value="Driver's License">Driver's License</option>
+                                    <option value="National ID">National ID</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">ID Number</label>
+                                <input type="text" class="form-control" name="id_number">
+                            </div>
+                        </div>
+
+                        <!-- Emergency Contact -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary mb-3">
+                                    <i class="fas fa-phone me-2"></i>Emergency Contact
+                                </h6>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Emergency Contact Name</label>
+                                <input type="text" class="form-control" name="emergency_contact_name">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Emergency Contact Phone</label>
+                                <input type="tel" class="form-control" name="emergency_contact_phone">
+                            </div>
+                        </div>
+
+                        <!-- Additional Information -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary mb-3">
+                                    <i class="fas fa-sticky-note me-2"></i>Additional Information
+                                </h6>
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label">Notes</label>
+                                <textarea class="form-control" name="notes" rows="3" placeholder="Any additional notes about the customer"></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-2"></i>Create Customer
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" onclick="history.back()">
+                                        <i class="fas fa-times me-2"></i>Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

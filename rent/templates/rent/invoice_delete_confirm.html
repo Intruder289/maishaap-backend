@@ -1,0 +1,99 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}Delete Invoice{% endblock %}
+
+{% block page_title %}Delete Invoice{% endblock %}
+
+{% block page_actions %}
+<div class="d-flex align-items-center">
+  <a href="{% url 'rent:invoice_list' %}" class="btn btn-outline-secondary btn-sm me-2">
+    <span class="me-2" data-feather="arrow-left"></span>Back to Invoices
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header bg-danger">
+        <h5 class="card-title mb-0 text-white">
+          <i class="fas fa-exclamation-triangle me-2"></i>Confirm Invoice Deletion
+        </h5>
+      </div>
+      <div class="card-body">
+        <div class="alert alert-danger" role="alert">
+          <h6 class="alert-heading"><i class="fas fa-exclamation-triangle me-2"></i>Warning!</h6>
+          <p class="mb-0">You are about to permanently delete invoice <strong>#{{ invoice.invoice_number }}</strong>. This action cannot be undone and will also delete all associated payment records.</p>
+        </div>
+
+        <div class="mb-4">
+          <h6>Invoice Information:</h6>
+          <table class="table table-bordered">
+            <tbody>
+              <tr>
+                <th width="30%">Invoice Number:</th>
+                <td>{{ invoice.invoice_number }}</td>
+              </tr>
+              <tr>
+                <th>Tenant:</th>
+                <td>{{ invoice.tenant.get_full_name|default:invoice.tenant.username }}</td>
+              </tr>
+              <tr>
+                <th>Property:</th>
+                <td>{{ invoice.property.title|default:"N/A" }}</td>
+              </tr>
+              <tr>
+                <th>Amount:</th>
+                <td>{{ invoice.total_amount|floatformat:2 }} TZS</td>
+              </tr>
+              <tr>
+                <th>Due Date:</th>
+                <td>{{ invoice.due_date|date:"F d, Y" }}</td>
+              </tr>
+              <tr>
+                <th>Status:</th>
+                <td>
+                  {% if invoice.is_paid %}
+                    <span class="badge bg-success">Paid</span>
+                  {% else %}
+                    <span class="badge bg-warning">Unpaid</span>
+                  {% endif %}
+                </td>
+              </tr>
+              <tr>
+                <th>Created:</th>
+                <td>{{ invoice.created_at|date:"F d, Y" }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <form method="post">
+          {% csrf_token %}
+
+          {% if messages %}
+            {% for message in messages %}
+              <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              </div>
+            {% endfor %}
+          {% endif %}
+
+          <div class="d-flex justify-content-between mt-4">
+            <a href="{% url 'rent:invoice_list' %}" class="btn btn-secondary">
+              <i class="fas fa-times me-2"></i>Cancel
+            </a>
+            <button type="submit" class="btn btn-danger">
+              <i class="fas fa-trash me-2"></i>Confirm Deletion
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

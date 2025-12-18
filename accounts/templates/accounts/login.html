@@ -1,0 +1,625 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sign In - MAISHA Property Management</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        /* Cache buster: v2.0 - MAISHA Logo Colors */
+        body {
+            background: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        
+        /* Visual indicator that new template is loaded */
+        body::after {
+            content: "SOFTER MAISHA DESIGN LOADED!";
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: #FF8A65;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            font-weight: bold;
+            z-index: 9999;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        
+        .login-container {
+            min-height: 100vh;
+            display: flex;
+        }
+        
+        .left-column {
+            flex: 1;
+            background: linear-gradient(135deg, #FFB74D 0%, #FF8A65 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .left-column::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="20" cy="20" r="2" fill="rgba(255,255,255,0.1)"/><circle cx="80" cy="40" r="3" fill="rgba(255,255,255,0.1)"/><circle cx="40" cy="80" r="2" fill="rgba(255,255,255,0.1)"/><circle cx="90" cy="90" r="1" fill="rgba(255,255,255,0.1)"/></svg>') repeat;
+            animation: float 20s linear infinite;
+            z-index: 1;
+        }
+        
+        @keyframes float {
+            0% { transform: translateX(0) translateY(0); }
+            100% { transform: translateX(-50px) translateY(-50px); }
+        }
+        
+        .left-content {
+            position: relative;
+            z-index: 2;
+            text-align: center;
+            max-width: 400px;
+        }
+        
+        .logo-section {
+            margin-bottom: 40px;
+        }
+        
+        .logo-icon {
+            width: 120px;
+            height: 120px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+            padding: 10px;
+        }
+        
+        .logo-icon i {
+            font-size: 32px;
+            color: white;
+        }
+        
+        .brand-title {
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        .brand-subtitle {
+            font-size: 18px;
+            opacity: 0.9;
+            margin-bottom: 30px;
+        }
+        
+        .features-list {
+            text-align: left;
+            list-style: none;
+            padding: 0;
+        }
+        
+        .features-list li {
+            padding: 10px 0;
+            display: flex;
+            align-items: center;
+        }
+        
+        .features-list i {
+            margin-right: 15px;
+            font-size: 18px;
+            width: 20px;
+        }
+        
+        .right-column {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            background: white;
+        }
+        
+        .login-form-container {
+            width: 100%;
+            max-width: 400px;
+        }
+        
+        .form-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .form-header h1 {
+            font-size: 28px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        
+        .form-header p {
+            color: #666;
+            font-size: 16px;
+        }
+        
+        .form-floating {
+            margin-bottom: 20px;
+        }
+        
+        .form-floating .form-control {
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 15px 20px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        .form-floating .form-control:focus {
+            border-color: #FF8A65;
+            box-shadow: 0 0 0 0.2rem rgba(255, 138, 101, 0.25);
+        }
+        
+        .form-check {
+            margin-bottom: 20px;
+        }
+        
+        .form-check-input:checked {
+            background-color: #FF8A65;
+            border-color: #FF8A65;
+        }
+        
+        .btn-login {
+            background: #FF8A65;
+            border: none;
+            border-radius: 10px;
+            padding: 15px;
+            font-weight: 600;
+            font-size: 16px;
+            width: 100%;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-login:hover {
+            background: #FF7043;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 138, 101, 0.3);
+        }
+        
+        .forgot-password {
+            color: #FF8A65;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .forgot-password:hover {
+            text-decoration: underline;
+        }
+        
+        .alert {
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border: none;
+        }
+        
+        .contact-info {
+            text-align: center;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #e9ecef;
+        }
+        
+        .contact-info small {
+            color: #666;
+        }
+        
+        .contact-info a {
+            color: #FF8A65;
+            text-decoration: none;
+        }
+        
+        .contact-info a:hover {
+            text-decoration: underline;
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .login-container {
+                flex-direction: column;
+            }
+            
+            .left-column {
+                min-height: 40vh;
+                padding: 30px 20px;
+            }
+            
+            .brand-title {
+                font-size: 28px;
+            }
+            
+            .brand-subtitle {
+                font-size: 16px;
+            }
+            
+            .features-list {
+                display: none;
+            }
+            
+            .right-column {
+                padding: 30px 20px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .left-column {
+                min-height: 30vh;
+                padding: 20px;
+            }
+            
+            .right-column {
+                padding: 20px;
+            }
+            
+            .form-header h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+  </head>
+
+  <body>
+    <div class="login-container">
+        <!-- Left Column - Branding -->
+        <div class="left-column">
+            <div class="left-content">
+                <div class="logo-section">
+                    <div class="logo-icon">
+                        <img src="{% static 'accounts/img/logo.png' %}" alt="MAISHA Logo" style="width: 100%; height: 100%; object-fit: contain;">
+                    </div>
+                    <h1 class="brand-title">MAISHA</h1>
+                    <p class="brand-subtitle">Property Management System</p>
+                </div>
+                
+                <ul class="features-list">
+                    <li>
+                        <i class="fas fa-check-circle"></i>
+                        Complete Property Management
+                    </li>
+                    <li>
+                        <i class="fas fa-check-circle"></i>
+                        Real-time Booking System
+                    </li>
+                    <li>
+                        <i class="fas fa-check-circle"></i>
+                        Advanced Analytics
+                    </li>
+                    <li>
+                        <i class="fas fa-check-circle"></i>
+                        Multi-property Support
+                    </li>
+                </ul>
+          </div>
+        </div>
+        
+        <!-- Right Column - Login Form -->
+        <div class="right-column">
+            <div class="login-form-container">
+                <div class="form-header">
+                    <h1>Welcome Back</h1>
+                    <p>Sign in to your account</p>
+                </div>
+                
+          {% if messages %}
+            {% for message in messages %}
+              <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                            <i class="fas fa-{% if message.tags == 'error' %}exclamation-triangle{% elif message.tags == 'success' %}check-circle{% else %}info-circle{% endif %} me-2"></i>
+                {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+              </div>
+            {% endfor %}
+          {% endif %}
+
+          <form method="post" action="" novalidate>
+            {% csrf_token %}
+            
+            <div class="form-floating">
+              <input type="email" class="form-control" id="email" name="email" placeholder="name@example.com" required autofocus>
+              <label for="email">Email address</label>
+            </div>
+
+            <div class="form-floating">
+              <input type="password" class="form-control" id="password" name="password" placeholder="Password" required>
+              <label for="password">Password</label>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="remember" id="remember">
+                <label class="form-check-label" for="remember">
+                  Remember me
+                </label>
+              </div>
+                        <a href="#" class="forgot-password" data-bs-toggle="modal" data-bs-target="#forgotPasswordModal">Forgot password?</a>
+            </div>
+
+                    <button class="btn btn-primary btn-login" type="submit">
+              <i class="fas fa-sign-in-alt me-2"></i>Sign In
+            </button>
+          </form>
+          
+          <!-- Forgot Password Modal -->
+          <div class="modal fade" id="forgotPasswordModal" tabindex="-1" aria-labelledby="forgotPasswordModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title" id="forgotPasswordModalLabel">
+                    <i class="fas fa-key me-2"></i>Forgot Password
+                  </h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                  <p>Enter your email address and we'll send a password reset request to the administrator.</p>
+                  <form id="forgotPasswordForm">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                      <label for="resetEmail" class="form-label">Email Address</label>
+                      <input type="email" class="form-control" id="resetEmail" name="email" required placeholder="Enter your email">
+                    </div>
+                    <div id="forgotPasswordMessage" class="alert d-none"></div>
+                  </form>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                  <button type="button" class="btn btn-primary" id="submitForgotPassword">
+                    <i class="fas fa-paper-plane me-2"></i>Send Request
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+                
+                <div class="contact-info">
+                    <small>Don't have an account? <a href="#">Contact administrator</a></small>
+        </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Forgot Password Form Handler
+            const forgotPasswordForm = document.getElementById('forgotPasswordForm');
+            const submitForgotPasswordBtn = document.getElementById('submitForgotPassword');
+            const forgotPasswordMessage = document.getElementById('forgotPasswordMessage');
+            
+            // Check if elements exist
+            if (!forgotPasswordForm || !submitForgotPasswordBtn || !forgotPasswordMessage) {
+                console.warn('Forgot password form elements not found');
+                return;
+            }
+            
+            function submitForgotPassword() {
+                const email = document.getElementById('resetEmail').value.trim();
+                
+                if (!email) {
+                    forgotPasswordMessage.className = 'alert alert-danger';
+                    forgotPasswordMessage.textContent = 'Please enter your email address.';
+                    forgotPasswordMessage.classList.remove('d-none');
+                    return;
+                }
+                
+                submitForgotPasswordBtn.disabled = true;
+                submitForgotPasswordBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Sending...';
+                forgotPasswordMessage.classList.add('d-none');
+                
+                // Get CSRF token from form or meta tag
+                const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+                                 document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || 
+                                 '{{ csrf_token }}';
+                
+                if (!csrfToken) {
+                    forgotPasswordMessage.className = 'alert alert-danger';
+                    forgotPasswordMessage.textContent = 'Security token not found. Please refresh the page.';
+                    forgotPasswordMessage.classList.remove('d-none');
+                    submitForgotPasswordBtn.disabled = false;
+                    submitForgotPasswordBtn.innerHTML = '<i class="fas fa-paper-plane me-2"></i>Send Request';
+                    return;
+                }
+                
+                console.log('Submitting forgot password request for:', email);
+                
+                const url = '{% url "accounts:forgot_password" %}';
+                console.log('Sending request to:', url);
+                console.log('Email:', email);
+                console.log('CSRF Token:', csrfToken ? 'Found' : 'Missing');
+                
+                fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: 'email=' + encodeURIComponent(email),
+                    credentials: 'same-origin'
+                })
+                .then(response => {
+                    console.log('Response status:', response.status);
+                    console.log('Response headers:', response.headers);
+                    
+                    // Check if response is JSON
+                    const contentType = response.headers.get('content-type');
+                    if (!contentType || !contentType.includes('application/json')) {
+                        return response.text().then(text => {
+                            console.error('Non-JSON response:', text);
+                            throw new Error('Server returned non-JSON response: ' + text.substring(0, 100));
+                        });
+                    }
+                    
+                    if (!response.ok) {
+                        return response.json().then(data => {
+                            console.error('Error response:', data);
+                            throw new Error(data.message || 'Network response was not ok');
+                        });
+                    }
+                    
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Response data:', data);
+                    if (data.success) {
+                        forgotPasswordMessage.className = 'alert alert-success';
+                        forgotPasswordMessage.textContent = data.message;
+                        forgotPasswordMessage.classList.remove('d-none');
+                        document.getElementById('resetEmail').value = '';
+                        
+                        // Show success toast notification
+                        showToastNotification(data.message, 'success');
+                        
+                        // Close modal after 2 seconds
+                        setTimeout(() => {
+                            const modalElement = document.getElementById('forgotPasswordModal');
+                            if (modalElement) {
+                                const modal = bootstrap.Modal.getInstance(modalElement);
+                                if (modal) {
+                                    modal.hide();
+                                } else {
+                                    // If modal instance doesn't exist, create one and hide it
+                                    const newModal = new bootstrap.Modal(modalElement);
+                                    newModal.hide();
+                                }
+                            }
+                        }, 2000);
+                    } else {
+                        forgotPasswordMessage.className = 'alert alert-danger';
+                        forgotPasswordMessage.textContent = data.message || 'An error occurred. Please try again.';
+                        forgotPasswordMessage.classList.remove('d-none');
+                        showToastNotification(data.message || 'An error occurred', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Fetch error:', error);
+                    forgotPasswordMessage.className = 'alert alert-danger';
+                    forgotPasswordMessage.textContent = 'An error occurred: ' + error.message + '. Please try again.';
+                    forgotPasswordMessage.classList.remove('d-none');
+                    showToastNotification('An error occurred. Please try again.', 'error');
+                })
+                .finally(() => {
+                    submitForgotPasswordBtn.disabled = false;
+                    submitForgotPasswordBtn.innerHTML = '<i class="fas fa-paper-plane me-2"></i>Send Request';
+                });
+            }
+            
+            // Attach event listeners
+            if (submitForgotPasswordBtn) {
+                submitForgotPasswordBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('Send Request button clicked');
+                    submitForgotPassword();
+                });
+            }
+            
+            if (forgotPasswordForm) {
+                forgotPasswordForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('Form submitted');
+                    submitForgotPassword();
+                });
+            }
+            
+            // Toast notification function
+            function showToastNotification(message, type = 'info') {
+                // Remove existing toasts
+                const existingToasts = document.querySelectorAll('.toast-notification');
+                existingToasts.forEach(toast => toast.remove());
+                
+                // Create toast element
+                const toast = document.createElement('div');
+                toast.className = `toast-notification alert alert-${type === 'error' ? 'danger' : type === 'success' ? 'success' : 'info'} alert-dismissible fade show position-fixed`;
+                toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px; max-width: 400px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);';
+                
+                const iconClass = type === 'success' ? 'fas fa-check-circle' : 
+                                 type === 'error' ? 'fas fa-exclamation-circle' : 
+                                 'fas fa-info-circle';
+                
+                toast.innerHTML = `
+                    <div class="d-flex align-items-center">
+                        <i class="${iconClass} me-2"></i>
+                        <span>${message}</span>
+                        <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
+                    </div>
+                `;
+                
+                document.body.appendChild(toast);
+                
+                // Auto remove after 5 seconds
+                setTimeout(() => {
+                    if (toast.parentNode) {
+                        toast.style.opacity = '0';
+                        setTimeout(() => {
+                            if (toast.parentNode) {
+                                toast.remove();
+                            }
+                        }, 300);
+                    }
+                }, 5000);
+            }
+            
+            // Auto-dismiss alerts after 5 seconds
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(alert => {
+                setTimeout(() => {
+                    if (alert.parentNode) {
+                        alert.classList.add('fade');
+                        setTimeout(() => {
+                            if (alert.parentNode) {
+                                alert.remove();
+                            }
+                        }, 300);
+                    }
+                }, 5000);
+            });
+            
+            // Form validation
+            const form = document.querySelector('form');
+            const emailInput = document.getElementById('email');
+            const passwordInput = document.getElementById('password');
+            
+            form.addEventListener('submit', function(e) {
+                if (!emailInput.value || !passwordInput.value) {
+                    e.preventDefault();
+                    alert('Please fill in all required fields.');
+                }
+            });
+        });
+    </script>
+  </body>
+</html>

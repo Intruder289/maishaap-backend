@@ -1,0 +1,110 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}Deactivate Owner{% endblock %}
+
+{% block page_title %}Deactivate Owner{% endblock %}
+
+{% block page_actions %}
+<div class="d-flex align-items-center">
+  <a href="{% url 'accounts:owner_list' %}" class="btn btn-outline-secondary btn-sm me-2">
+    <span class="me-2" data-feather="arrow-left"></span>Back to Owners
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header bg-warning">
+        <h5 class="card-title mb-0 text-white">
+          <i class="fas fa-exclamation-triangle me-2"></i>Confirm Owner Deactivation
+        </h5>
+      </div>
+      <div class="card-body">
+        <div class="alert alert-warning" role="alert">
+          <h6 class="alert-heading"><i class="fas fa-exclamation-triangle me-2"></i>Warning!</h6>
+          <p class="mb-0">You are about to deactivate the owner account for <strong>{{ owner.get_full_name|default:owner.username }}</strong>. This action will prevent them from logging in and accessing the system.</p>
+        </div>
+
+        <div class="mb-4">
+          <h6>Owner Information:</h6>
+          <table class="table table-bordered">
+            <tbody>
+              <tr>
+                <th width="30%">Username:</th>
+                <td>{{ owner.username }}</td>
+              </tr>
+              <tr>
+                <th>Full Name:</th>
+                <td>{{ owner.get_full_name|default:"Not provided" }}</td>
+              </tr>
+              <tr>
+                <th>Email:</th>
+                <td>{{ owner.email }}</td>
+              </tr>
+              <tr>
+                <th>Phone:</th>
+                <td>{{ profile.phone|default:"Not provided" }}</td>
+              </tr>
+              <tr>
+                <th>Date Joined:</th>
+                <td>{{ owner.date_joined|date:"F d, Y" }}</td>
+              </tr>
+              <tr>
+                <th>Status:</th>
+                <td>
+                  {% if profile.is_deactivated %}
+                    <span class="badge bg-danger">Deactivated</span>
+                  {% else %}
+                    <span class="badge bg-success">Active</span>
+                  {% endif %}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <form method="post">
+          {% csrf_token %}
+          
+          <div class="mb-3">
+            <label for="reason" class="form-label">
+              Deactivation Reason <span class="text-danger">*</span>
+            </label>
+            <textarea 
+              class="form-control" 
+              id="reason" 
+              name="reason" 
+              rows="4" 
+              placeholder="Please provide a reason for deactivating this owner account (e.g., contract issues, policy violations, etc.)"
+              required
+            ></textarea>
+            <div class="form-text">This reason will be shown to the owner when they attempt to log in.</div>
+          </div>
+
+          {% if messages %}
+            {% for message in messages %}
+              <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              </div>
+            {% endfor %}
+          {% endif %}
+
+          <div class="d-flex justify-content-between mt-4">
+            <a href="{% url 'accounts:owner_list' %}" class="btn btn-secondary">
+              <i class="fas fa-times me-2"></i>Cancel
+            </a>
+            <button type="submit" class="btn btn-danger">
+              <i class="fas fa-ban me-2"></i>Confirm Deactivation
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

@@ -1,0 +1,37 @@
+<form method="post" action="{% url 'properties:customer_vip_status_modal' customer.id %}">
+    {% csrf_token %}
+    <div class="text-center">
+        <div class="mb-4">
+            <i class="fas fa-crown fa-3x {% if is_vip %}text-warning{% else %}text-muted{% endif %} mb-3"></i>
+            <h5>{{ customer.full_name }}</h5>
+            <p class="text-muted">Customer ID: {{ customer.id }}</p>
+        </div>
+        
+        {% if is_vip %}
+            <div class="alert alert-warning">
+                <i class="fas fa-crown me-2"></i>
+                <strong>VIP Customer</strong><br>
+                This customer currently has VIP status.
+            </div>
+            <p>Are you sure you want to remove VIP status from this customer?</p>
+        {% else %}
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                This customer does not currently have VIP status.
+            </div>
+            <p>Are you sure you want to grant VIP status to this customer?</p>
+        {% endif %}
+        
+        <div class="mt-4">
+            {% if is_vip %}
+                <button type="submit" class="btn btn-warning">
+                    <i class="fas fa-crown me-2"></i>Remove VIP Status
+                </button>
+            {% else %}
+                <button type="submit" class="btn btn-warning">
+                    <i class="fas fa-crown me-2"></i>Grant VIP Status
+                </button>
+            {% endif %}
+        </div>
+    </div>
+</form>

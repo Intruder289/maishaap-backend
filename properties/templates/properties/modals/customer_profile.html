@@ -1,0 +1,143 @@
+<div class="row">
+    <div class="col-md-4">
+        <div class="text-center mb-4">
+            <div class="avatar-lg bg-primary text-white rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3 fw-bold" style="width: 80px; height: 80px; font-size: 32px;">
+                {{ customer.first_name|first|upper }}{{ customer.last_name|first|upper }}
+            </div>
+            <h4>{{ customer.full_name }}</h4>
+            <p class="text-muted">Customer ID: {{ customer.id }}</p>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">Contact Information</h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <strong>Email:</strong><br>
+                    <i class="fas fa-envelope me-2"></i>{{ customer.email }}
+                </div>
+                <div class="mb-3">
+                    <strong>Phone:</strong><br>
+                    <i class="fas fa-phone me-2"></i>{{ customer.phone }}
+                </div>
+                {% if customer.address %}
+                <div class="mb-3">
+                    <strong>Address:</strong><br>
+                    <i class="fas fa-map-marker-alt me-2"></i>{{ customer.address }}
+                </div>
+                {% endif %}
+                {% if customer.city %}
+                <div class="mb-3">
+                    <strong>City:</strong><br>
+                    {{ customer.city }}
+                </div>
+                {% endif %}
+                {% if customer.country %}
+                <div class="mb-3">
+                    <strong>Country:</strong><br>
+                    {{ customer.country }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8">
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card bg-primary text-white">
+                    <div class="card-body text-center">
+                        <h3 class="mb-0">{{ bookings.count }}</h3>
+                        <p class="mb-0">
+                            {% if property_type == 'lodge' %}Lodge Bookings
+                            {% elif property_type == 'hotel' %}Hotel Stays
+                            {% else %}Venue Events{% endif %}
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-success text-white">
+                    <div class="card-body text-center">
+                        <h3 class="mb-0">Tsh {{ total_spent|floatformat:0 }}</h3>
+                        <p class="mb-0">
+                            {% if property_type == 'lodge' %}Total Spent (Lodge)
+                            {% elif property_type == 'hotel' %}Total Spent (Hotel)
+                            {% else %}Total Spent (Venues){% endif %}
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-info text-white">
+                    <div class="card-body text-center">
+                        <h3 class="mb-0">
+                            {% if last_booking %}
+                                {{ last_booking.check_out_date|date:"M d" }}
+                            {% else %}
+                                Never
+                            {% endif %}
+                        </h3>
+                        <p class="mb-0">Last Visit</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    {% if property_type == 'lodge' %}Recent Lodge Bookings
+                    {% elif property_type == 'hotel' %}Recent Hotel Stays
+                    {% else %}Recent Venue Events{% endif %}
+                </h6>
+            </div>
+            <div class="card-body">
+                {% if bookings %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Property</th>
+                                    <th>Check-in</th>
+                                    <th>Check-out</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for booking in bookings|slice:":5" %}
+                                <tr>
+                                    <td>{{ booking.property_obj.title }}</td>
+                                    <td>{{ booking.check_in_date|date:"M d, Y" }}</td>
+                                    <td>{{ booking.check_out_date|date:"M d, Y" }}</td>
+                                    <td>Tsh {{ booking.total_amount|floatformat:0 }}</td>
+                                    <td>
+                                        <span class="badge bg-{% if booking.booking_status == 'confirmed' %}success{% elif booking.booking_status == 'pending' %}warning{% else %}secondary{% endif %}">
+                                            {{ booking.get_booking_status_display }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted">No bookings found.</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        {% if customer.notes %}
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0">Notes</h6>
+            </div>
+            <div class="card-body">
+                <p class="mb-0">{{ customer.notes }}</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>

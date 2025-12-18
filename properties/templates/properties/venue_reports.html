@@ -1,0 +1,391 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Venue Reports{% endblock %}
+
+{% block content %}
+            <!-- Page Header -->
+<div class="row g-3 mb-4 align-items-center justify-content-between">
+    <div class="col-auto">
+        <div class="d-flex align-items-center">
+            <h2 class="mb-0">Venue Reports</h2>
+                </div>
+                </div>
+            </div>
+            
+<!-- Statistics Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+        <div class="card h-100">
+                        <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="bg-primary-subtle rounded-3 p-3">
+                            <span class="fas fa-building text-primary fs-7"></span>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-1">Total Venues</h6>
+                        <h4 class="mb-0">{{ total_venues|default:0 }}</h4>
+                        <p class="fs--1 mb-0 text-500">Active venue properties</p>
+                    </div>
+                </div>
+                                </div>
+                                </div>
+                            </div>
+
+    <div class="col-6 col-lg-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="bg-success-subtle rounded-3 p-3">
+                            <span class="fas fa-chart-line text-success fs-7"></span>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-1">Monthly Revenue</h6>
+                        <h4 class="mb-0">{{ monthly_revenue|floatformat:0 }} Tsh</h4>
+                        <p class="fs--1 mb-0 text-500">Current month income</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+    <div class="col-6 col-lg-3">
+        <div class="card h-100">
+                        <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="bg-info-subtle rounded-3 p-3">
+                            <span class="fas fa-calendar-check text-info fs-7"></span>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-1">Total Events</h6>
+                        <h4 class="mb-0">{{ total_events|default:0 }}</h4>
+                        <p class="fs--1 mb-0 text-500">Events booked</p>
+                    </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+    <div class="col-6 col-lg-3">
+        <div class="card h-100">
+                        <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="bg-warning-subtle rounded-3 p-3">
+                            <span class="fas fa-users text-warning fs-7"></span>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-1">Active Customers</h6>
+                        <h4 class="mb-0">{{ active_customers|default:0 }}</h4>
+                        <p class="fs--1 mb-0 text-500">Venue customers</p>
+                    </div>
+                        </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+<!-- Main Content -->
+<div class="row g-3">
+    <!-- Report Generation Form -->
+    <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="d-flex align-items-center">
+                                <span class="fas fa-chart-pie text-primary me-2"></span>
+                                <h5 class="mb-0">Generate Venue Reports</h5>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <form id="reportForm" onsubmit="generateReport(event)">
+                                <div class="row g-3">
+                                    <!-- Report Type -->
+                                    <div class="col-md-6">
+                                        <label for="reportType" class="form-label">Report Type *</label>
+                                        <select class="form-select" id="reportType" required>
+                                            <option value="">Select Report Type</option>
+                                            <option value="monthly">Monthly Financial Report</option>
+                                            <option value="quarterly">Quarterly Performance Report</option>
+                                            <option value="yearly">Yearly Summary Report</option>
+                                            <option value="event">Event Management Report</option>
+                                            <option value="utilization">Venue Utilization Report</option>
+                                            <option value="financial">Comprehensive Financial Report</option>
+                                            <option value="customer">Customer Analytics Report</option>
+                                            <option value="revenue">Revenue Analysis Report</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Date Range Type -->
+                                    <div class="col-md-6">
+                                        <label for="dateRangeType" class="form-label">Date Range Type *</label>
+                                        <select class="form-select" id="dateRangeType" onchange="toggleCustomDateRange()" required>
+                                            <option value="">Select Date Range</option>
+                                            <option value="this_month">This Month</option>
+                                            <option value="last_month">Last Month</option>
+                                            <option value="this_quarter">This Quarter</option>
+                                            <option value="last_quarter">Last Quarter</option>
+                                            <option value="this_year">This Year</option>
+                                            <option value="last_year">Last Year</option>
+                                            <option value="custom">Custom Date Range</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Custom Date Range (Hidden by default) -->
+                                    <div class="col-md-6" id="customDateRange" style="display: none;">
+                                        <label for="startDate" class="form-label">Start Date *</label>
+                                        <input type="date" class="form-control" id="startDate">
+                                    </div>
+                                    <div class="col-md-6" id="customDateRangeEnd" style="display: none;">
+                                        <label for="endDate" class="form-label">End Date *</label>
+                                        <input type="date" class="form-control" id="endDate">
+                </div>
+                
+                                    <!-- Venue Selection -->
+                <div class="col-md-6">
+                                        <label for="venueSelection" class="form-label">Venue Selection *</label>
+                                        <select class="form-select" id="venueSelection" onchange="toggleVenueFilter()" required>
+                                            <option value="all">All Venue Properties</option>
+                                            <option value="selected">Selected Venues Only</option>
+                                            <option value="available">Available Venues Only</option>
+                                            <option value="booked">Booked Venues Only</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Export Format -->
+                                    <div class="col-md-6">
+                                        <label for="format" class="form-label">Export Format *</label>
+                                        <select class="form-select" id="format" required>
+                                            <option value="excel">Excel Workbook</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Venue Filter (if needed) -->
+                                    <div class="col-12" id="venueFilterSection" style="display: none;">
+                                        <label class="form-label">Select Specific Venues</label>
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" id="selectAllVenues" onchange="toggleAllVenues()">
+                                                    <label class="form-check-label" for="selectAllVenues">
+                                                        Select All Venues
+                                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                                        <div class="row mt-2" id="venueCheckboxes">
+                                            <!-- Venues will be loaded dynamically -->
+                </div>
+            </div>
+            
+                                    <!-- Generate Button -->
+                                    <div class="col-12">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <button type="button" class="btn btn-secondary" onclick="resetForm()">
+                                                <i class="fas fa-undo me-2"></i>Reset Form
+                                </button>
+                                            <button type="submit" class="btn btn-primary btn-lg">
+                                                <i class="fas fa-download me-2"></i>Generate Report
+                                </button>
+                            </div>
+                                    </div>
+                                </div>
+                            </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Venue data for dynamic loading
+const venueProperties = [
+    {% for property in venue_properties %}
+    {
+        id: {{ property.id }},
+        title: "{{ property.title }}",
+        address: "{{ property.address }}",
+        capacity: {{ property.capacity|default:0 }},
+        status: "{% with property.bookings.all|first as first_booking %}{{ first_booking.booking_status|default:'available' }}{% endwith %}"
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+];
+
+// Toggle custom date range fields
+function toggleCustomDateRange() {
+    const dateRangeType = document.getElementById('dateRangeType').value;
+    const customDateRange = document.getElementById('customDateRange');
+    const customDateRangeEnd = document.getElementById('customDateRangeEnd');
+    
+    if (dateRangeType === 'custom') {
+        customDateRange.style.display = 'block';
+        customDateRangeEnd.style.display = 'block';
+        document.getElementById('startDate').required = true;
+        document.getElementById('endDate').required = true;
+    } else {
+        customDateRange.style.display = 'none';
+        customDateRangeEnd.style.display = 'none';
+        document.getElementById('startDate').required = false;
+        document.getElementById('endDate').required = false;
+    }
+}
+
+// Toggle venue filter section
+function toggleVenueFilter() {
+    const venueSelection = document.getElementById('venueSelection').value;
+    const venueFilterSection = document.getElementById('venueFilterSection');
+    
+    if (venueSelection === 'selected') {
+        venueFilterSection.style.display = 'block';
+        loadVenueCheckboxes();
+    } else {
+        venueFilterSection.style.display = 'none';
+    }
+}
+
+// Load venue checkboxes dynamically
+function loadVenueCheckboxes() {
+    const container = document.getElementById('venueCheckboxes');
+    container.innerHTML = '';
+    
+    venueProperties.forEach(venue => {
+        const col = document.createElement('div');
+        col.className = 'col-md-6 col-lg-4';
+        col.innerHTML = `
+            <div class="form-check">
+                <input class="form-check-input venue-checkbox" type="checkbox" value="${venue.id}" id="venue_${venue.id}">
+                <label class="form-check-label" for="venue_${venue.id}">
+                    <strong>${venue.title}</strong><br>
+                    <small class="text-muted">${venue.address}</small>
+                </label>
+            </div>
+        `;
+        container.appendChild(col);
+    });
+}
+
+// Toggle all venues checkbox
+function toggleAllVenues() {
+    const selectAll = document.getElementById('selectAllVenues');
+    const checkboxes = document.querySelectorAll('.venue-checkbox');
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAll.checked;
+    });
+}
+
+// Reset form
+function resetForm() {
+    document.getElementById('reportForm').reset();
+    document.getElementById('customDateRange').style.display = 'none';
+    document.getElementById('customDateRangeEnd').style.display = 'none';
+    document.getElementById('venueFilterSection').style.display = 'none';
+    document.getElementById('startDate').required = false;
+    document.getElementById('endDate').required = false;
+}
+
+// Generate report function
+function generateReport(event) {
+    event.preventDefault();
+    
+    const reportType = document.getElementById('reportType').value;
+    const dateRangeType = document.getElementById('dateRangeType').value;
+    const venueSelection = document.getElementById('venueSelection').value;
+    const format = document.getElementById('format').value || 'excel';
+    
+    // Validation
+    if (!reportType || !dateRangeType) {
+        alert('Please select report type and date range');
+        return;
+    }
+    
+    // Handle custom date range
+    let dateRange = dateRangeType;
+    if (dateRangeType === 'custom') {
+        const startDate = document.getElementById('startDate').value;
+        const endDate = document.getElementById('endDate').value;
+        
+        if (!startDate || !endDate) {
+            alert('Please select start and end dates for custom range');
+            return;
+        }
+        
+        if (new Date(startDate) > new Date(endDate)) {
+            alert('Start date cannot be after end date');
+            return;
+        }
+        
+        dateRange = `custom_${startDate}_${endDate}`;
+    }
+    
+    // Handle venue selection
+    let venues = 'all';
+    if (venueSelection === 'selected') {
+        const selectedVenues = Array.from(document.querySelectorAll('.venue-checkbox:checked'))
+            .map(checkbox => checkbox.value);
+        
+        if (selectedVenues.length === 0) {
+            alert('Please select at least one venue');
+            return;
+        }
+        
+        venues = selectedVenues.join(',');
+    } else if (venueSelection === 'available') {
+        venues = 'available';
+    } else if (venueSelection === 'booked') {
+        venues = 'booked';
+    }
+    
+    // Show loading indicator
+    const button = event.target.querySelector('button[type="submit"]') || event.target;
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Generating...';
+    button.disabled = true;
+    
+    // Create download URL with parameters
+    const params = new URLSearchParams({
+        type: reportType,
+        range: dateRange,
+        venues: venues,
+        format: format
+    });
+    
+    // Create download link
+    const downloadUrl = `/properties/venue/reports/export/?${params}`;
+    
+    // Create temporary link element for download
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = `venue_${reportType}_report_${dateRangeType}.xlsx`;
+    link.style.display = 'none';
+    
+    // Add to DOM, click, and remove
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Reset button after a short delay
+    setTimeout(() => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+        
+        // Show success message
+        alert(`Report exported successfully! Type: ${reportType}, Range: ${dateRangeType}, Format: ${format}`);
+    }, 1000);
+}
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Venue Reports page loaded');
+    console.log('Available venues:', venueProperties.length);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,201 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Record Payment - Maisha{% endblock %}
+
+{% block content %}
+<!-- FontAwesome Icons -->
+
+<div class="container-fluid">
+    <!-- Professional Page Header -->
+    <div class="card mb-6">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'rent:dashboard' %}">Rent</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'rent:invoice_list' %}">Invoices</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'rent:invoice_detail' invoice.id %}">{{ invoice.invoice_number }}</a></li>
+                <li class="breadcrumb-item active">Record Payment</li>
+            </ol>
+        </nav>
+        <h1>
+            <i class="fas fa-dollar-sign"></i>
+            Record Payment
+        </h1>
+        <p>
+            Record a new payment for {{ invoice.invoice_number }}
+        </p>
+    </div>
+
+    <div>
+        <!-- Payment Form -->
+        <div class="card mb-6">
+            <div>
+                <h3>
+                    <i class="fas fa-credit-card"></i>
+                    Payment Information
+                </h3>
+            </div>
+            <div>
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div>
+                        <div>
+                            <label for="{{ form.amount.id_for_label }}">
+                                Payment Amount <span>*</span>
+                            </label>
+                            {{ form.amount }}
+                            {% if form.amount.errors %}
+                                <div>{{ form.amount.errors.0 }}</div>
+                            {% endif %}
+                            <div>
+                                Outstanding balance: <span>Tsh {{ invoice.balance_due|floatformat:0|intcomma }}</span>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label for="{{ form.payment_method.id_for_label }}">
+                                Payment Method <span>*</span>
+                            </label>
+                            {{ form.payment_method }}
+                            {% if form.payment_method.errors %}
+                                <div>{{ form.payment_method.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <div>
+                            <label for="{{ form.reference_number.id_for_label }}">
+                                Reference Number
+                            </label>
+                            {{ form.reference_number }}
+                            {% if form.reference_number.errors %}
+                                <div>{{ form.reference_number.errors.0 }}</div>
+                            {% endif %}
+                            <div>Check number, transaction ID, etc.</div>
+                        </div>
+                        
+                        <div>
+                            <label for="{{ form.transaction_id.id_for_label }}">
+                                Transaction ID
+                            </label>
+                            {{ form.transaction_id }}
+                            {% if form.transaction_id.errors %}
+                                <div>{{ form.transaction_id.errors.0 }}</div>
+                            {% endif %}
+                            <div>Payment processor transaction ID</div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label for="{{ form.notes.id_for_label }}">
+                            Payment Notes
+                        </label>
+                        {{ form.notes }}
+                        {% if form.notes.errors %}
+                            <div>{{ form.notes.errors.0 }}</div>
+                        {% endif %}
+                        <div>Additional information about this payment</div>
+                    </div>
+                    
+                    <div>
+                        <a href="{% url 'rent:invoice_detail' invoice.id %}">
+                            <i class="fas fa-times"></i>Cancel
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-check"></i>Record Payment
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Invoice Summary Sidebar -->
+        <div class="card mb-6">
+            <div>
+                <h3>
+                    <i class="fas fa-file-invoice"></i>
+                    Invoice Summary
+                </h3>
+            </div>
+            <div>
+                <div>
+                    <div>
+                        <span>Invoice #:</span>
+                        <span>{{ invoice.invoice_number }}</span>
+                    </div>
+                    <div>
+                        <span>Tenant:</span>
+                        <span>{{ invoice.tenant.get_full_name|default:invoice.tenant.username }}</span>
+                    </div>
+                    <div>
+                        <span>Property:</span>
+                        <span>{{ invoice.lease.property_ref.name }}</span>
+                    </div>
+                    <div>
+                        <span>Due Date:</span>
+                        <span class="{% if invoice.is_overdue %}text-danger{% else %}text-dark{% endif %}">
+                            {{ invoice.due_date|date:"M d, Y" }}
+                        </span>
+                    </div>
+                    {% if invoice.is_overdue %}
+                    <div>
+                        <small><i class="fas fa-exclamation-triangle"></i>{{ invoice.days_overdue }} days overdue</small>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div>
+                    <div>
+                        <div>
+                            <span>Total Amount:</span>
+                            <span>Tsh {{ invoice.total_amount|floatformat:0|intcomma }}</span>
+                        </div>
+                        <div>
+                            <span>Amount Paid:</span>
+                            <span>Tsh {{ invoice.amount_paid|floatformat:0|intcomma }}</span>
+                        </div>
+                        <div>
+                            <span>Balance Due:</span>
+                            <span>Tsh {{ invoice.balance_due|floatformat:0|intcomma }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Amount Buttons Card -->
+        <div class="card mb-6">
+            <div>
+                <h4>
+                    <i class="fas fa-calculator"></i>
+                    Quick Amounts
+                </h4>
+            </div>
+            <div>
+                <div>
+                    <button type="button" class="btn btn-primary" onclick="setAmount('{{ invoice.balance_due }}')">
+                        Full Balance (Tsh {{ invoice.balance_due|floatformat:0|intcomma }})
+                    </button>
+                    <button type="button" onclick="setAmount('{{ invoice.base_rent }}')">
+                        Base Rent (Tsh {{ invoice.base_rent|floatformat:0|intcomma }})
+                    </button>
+                    {% if invoice.balance_due != invoice.base_rent %}
+                    <button type="button" onclick="setAmount('{{ invoice.base_rent|floatformat:2|div:2 }}')">
+                        Half Payment (Tsh {{ invoice.base_rent|floatformat:0|div:2|intcomma }})
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function setAmount(amount) {
+    document.getElementById('id_amount').value = parseFloat(amount).toFixed(2);
+}
+</script>
+{% endblock %}

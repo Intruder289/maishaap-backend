@@ -1,0 +1,168 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}Create Venue Booking{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="page-title-box">
+                <div class="page-title-right">
+                    <ol class="breadcrumb m-0">
+                        <li class="breadcrumb-item"><a href="{% url 'properties:dashboard' %}">Properties</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'properties:venue_dashboard' %}">Venue Management</a></li>
+                        <li class="breadcrumb-item active">Create Booking</li>
+                    </ol>
+                </div>
+                <h4 class="page-title">Create Venue Booking</h4>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-calendar-alt me-2"></i>New Venue Booking
+                    </h5>
+                    <p class="text-muted mb-0">Venue: <strong>{{ selected_property.title }}</strong></p>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <!-- Customer Information -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary mb-3">
+                                    <i class="fas fa-user me-2"></i>Customer Information
+                                </h6>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">First Name *</label>
+                                <input type="text" class="form-control" name="first_name" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Last Name *</label>
+                                <input type="text" class="form-control" name="last_name" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Email *</label>
+                                <input type="email" class="form-control" name="email" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Phone Number *</label>
+                                <input type="tel" class="form-control" name="phone" required>
+                            </div>
+                        </div>
+
+                        <!-- Event Details -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary mb-3">
+                                    <i class="fas fa-calendar me-2"></i>Event Details
+                                </h6>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Event Start Date *</label>
+                                <input type="date" class="form-control" name="check_in_date" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Event End Date *</label>
+                                <input type="date" class="form-control" name="check_out_date" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Expected Guests *</label>
+                                <input type="number" class="form-control" name="number_of_guests" min="1" required>
+                                <div class="form-text">Venue capacity: {{ selected_property.capacity }} people</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Event Type</label>
+                                <select class="form-control" name="event_type">
+                                    <option value="">Select Event Type</option>
+                                    <option value="Wedding">Wedding</option>
+                                    <option value="Conference">Conference</option>
+                                    <option value="Meeting">Meeting</option>
+                                    <option value="Birthday Party">Birthday Party</option>
+                                    <option value="Corporate Event">Corporate Event</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Pricing -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary mb-3">
+                                    <i class="fas fa-dollar-sign me-2"></i>Pricing
+                                </h6>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Total Amount *</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">Tsh</span>
+                                    <input type="number" class="form-control" name="total_amount" step="0.01" min="0" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Special Requirements</label>
+                                <textarea class="form-control" name="special_requirements" rows="3" placeholder="Any special setup, catering, or other requirements"></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-2"></i>Create Booking
+                                    </button>
+                                    <a href="{% url 'properties:venue_bookings' %}" class="btn btn-secondary">
+                                        <i class="fas fa-times me-2"></i>Cancel
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Set minimum date to today
+    const today = new Date().toISOString().split('T')[0];
+    document.querySelector('input[name="check_in_date"]').min = today;
+    document.querySelector('input[name="check_out_date"]').min = today;
+    
+    // Update end date minimum when start date changes
+    document.querySelector('input[name="check_in_date"]').addEventListener('change', function() {
+        const endDateInput = document.querySelector('input[name="check_out_date"]');
+        endDateInput.min = this.value;
+        if (endDateInput.value && endDateInput.value <= this.value) {
+            endDateInput.value = '';
+        }
+    });
+    
+    // Check capacity
+    const capacity = {{ selected_property.capacity|default:0 }};
+    const guestsInput = document.querySelector('input[name="number_of_guests"]');
+    if (capacity > 0) {
+        guestsInput.max = capacity;
+        guestsInput.addEventListener('input', function() {
+            if (parseInt(this.value) > capacity) {
+                this.setCustomValidity(`Maximum capacity is Tsh{capacity} people`);
+            } else {
+                this.setCustomValidity('');
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

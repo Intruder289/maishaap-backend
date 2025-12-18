@@ -1,0 +1,71 @@
+<form method="post" action="{% url 'properties:customer_edit_modal' customer.id %}">
+    {% csrf_token %}
+    <div class="row g-3">
+        <div class="col-md-6">
+            <label class="form-label">First Name *</label>
+            <input type="text" class="form-control" name="first_name" value="{{ customer.first_name }}" required>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Last Name *</label>
+            <input type="text" class="form-control" name="last_name" value="{{ customer.last_name }}" required>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Email *</label>
+            <input type="email" class="form-control" name="email" value="{{ customer.email }}" required>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Phone Number *</label>
+            <input type="tel" class="form-control" name="phone" value="{{ customer.phone }}" required>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Gender</label>
+            <select class="form-control" name="gender">
+                <option value="">Select Gender</option>
+                <option value="male" {% if customer.gender == 'male' %}selected{% endif %}>Male</option>
+                <option value="female" {% if customer.gender == 'female' %}selected{% endif %}>Female</option>
+                <option value="other" {% if customer.gender == 'other' %}selected{% endif %}>Other</option>
+            </select>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Date of Birth</label>
+            <input type="date" class="form-control" name="date_of_birth" value="{{ customer.date_of_birth|date:'Y-m-d' }}">
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">ID Type</label>
+            <select class="form-control" name="id_type">
+                <option value="">Select ID Type</option>
+                <option value="passport" {% if customer.id_type == 'passport' %}selected{% endif %}>Passport</option>
+                <option value="drivers_license" {% if customer.id_type == 'drivers_license' %}selected{% endif %}>Driver's License</option>
+                <option value="national_id" {% if customer.id_type == 'national_id' %}selected{% endif %}>National ID</option>
+            </select>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">ID Number</label>
+            <input type="text" class="form-control" name="id_number" value="{{ customer.id_number }}">
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Country</label>
+            <input type="text" class="form-control" name="country" value="{{ customer.country }}">
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">City</label>
+            <input type="text" class="form-control" name="city" value="{{ customer.city }}">
+        </div>
+        <div class="col-12">
+            <label class="form-label">Address</label>
+            <textarea class="form-control" name="address" rows="2">{{ customer.address }}</textarea>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Emergency Contact Name</label>
+            <input type="text" class="form-control" name="emergency_contact_name" value="{{ customer.emergency_contact_name }}">
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Emergency Contact Phone</label>
+            <input type="tel" class="form-control" name="emergency_contact_phone" value="{{ customer.emergency_contact_phone }}">
+        </div>
+        <div class="col-12">
+            <label class="form-label">Notes</label>
+            <textarea class="form-control" name="notes" rows="3" placeholder="Additional notes about the customer...">{{ customer.notes }}</textarea>
+        </div>
+    </div>
+</form>

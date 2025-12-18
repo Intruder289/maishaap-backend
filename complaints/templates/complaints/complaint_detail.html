@@ -1,0 +1,294 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Complaint #{{ complaint.id }} - {{ complaint.title }}{% endblock %}
+
+{% block extra_head %}
+
+{% endblock %}
+
+{% block content %}
+<div class="clean-container">
+    <!-- Clean Page Header -->
+    <div class="row mb-4">
+        <div class="header-content">
+            <div class="header-left">
+                <div class="complaint-id">#{{ complaint.id }}</div>
+                <h1 class="complaint-title">{{ complaint.title }}</h1>
+                <div class="breadcrumb">
+                    <a href="{% url 'complaints:complaint_list' %}">← Back to Complaints</a>
+                </div>
+            </div>
+            <div class="header-actions">
+                {% if user.is_staff %}
+                    <button type="button" class="btn btn-link text-600 btn btn-primary-sm dropdown-toggle dropdown-caret-none btn btn-primary-primary primary" data-bs-toggle="modal" data-bs-target="#statusModal">
+                        Update Status
+                    </button>
+                    <button type="button" class="btn btn-link text-600 btn btn-primary-sm dropdown-toggle dropdown-caret-none btn btn-primary-primary secondary" data-bs-toggle="modal" data-bs-target="#responseModal">
+                        Add Response
+                    </button>
+                {% endif %}
+                <button class="btn btn-link text-600 btn btn-primary-sm dropdown-toggle dropdown-caret-none btn btn-primary-primary outline" onclick="window.print()">
+                    Print
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Overview -->
+    <div class="status-grid">
+        <div class="status-item priority-{{ complaint.priority }}">
+            <div class="status-label">Priority</div>
+            <div class="status-value">{{ complaint.get_priority_display }}</div>
+        </div>
+        <div class="status-item status-{{ complaint.status }}">
+            <div class="status-label">Status</div>
+            <div class="status-value">{{ complaint.get_status_display }}</div>
+        </div>
+        <div class="status-item">
+            <div class="status-label">Category</div>
+            <div class="status-value">{{ complaint.get_category_display }}</div>
+        </div>
+        <div class="status-item">
+            <div class="status-label">Created</div>
+            <div class="status-value">{{ complaint.created_at|date:"M d, Y" }}</div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Left Column -->
+        <div class="content-left">
+            <!-- Complaint Details -->
+            <div class="info-card">
+                <h3>Complaint Details</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>Submitted By</label>
+                        <div class="user-info">
+                            <div class="user-name">{{ complaint.user.get_full_name|default:complaint.user.username }}</div>
+                            <div class="user-email">{{ complaint.user.email|default:"No email" }}</div>
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <label>Created Date</label>
+                        <div class="info-value">{{ complaint.created_at|date:"M d, Y g:i A" }}</div>
+                    </div>
+                    <div class="info-item">
+                        <label>Last Updated</label>
+                        <div class="info-value">{{ complaint.updated_at|date:"M d, Y g:i A" }}</div>
+                    </div>
+                    {% if complaint.property %}
+                    <div class="info-item">
+                        <label>Property</label>
+                        <div class="info-value">{{ complaint.property.name }}</div>
+                    </div>
+                    {% endif %}
+                    {% if complaint.rating %}
+                    <div class="info-item">
+                        <label>Rating</label>
+                        <div class="rating-stars">
+                            {% for i in "12345" %}
+                                {% if forloop.counter <= complaint.rating %}
+                                    <span class="star filled">★</span>
+                                {% else %}
+                                    <span class="star">☆</span>
+                                {% endif %}
+                            {% endfor %}
+                            <span class="rating-text">{{ complaint.rating }}/5</span>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Description -->
+            <div class="info-card">
+                <h3>Description</h3>
+                <div class="description-text">
+                    {{ complaint.description|linebreaks }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column -->
+        <div class="content-right">
+            <!-- Responses -->
+            <div class="info-card">
+                <div class="card-header">
+                    <h3>Communication History</h3>
+                    {% if user.is_staff %}
+                    <button type="button" class="btn btn-link text-600 btn btn-primary-sm dropdown-toggle dropdown-caret-none btn btn-primary-primary small" data-bs-toggle="modal" data-bs-target="#responseModal">
+                        Add Response
+                    </button>
+                    {% endif %}
+                </div>
+                
+                {% if responses %}
+                    <div class="responses-list">
+                        {% for response in responses %}
+                        <div class="response-item">
+                            <div class="response-header">
+                                <div class="responder-name">{{ response.responder.get_full_name|default:response.responder.username }}</div>
+                                <div class="response-date">{{ response.created_at|date:"M d, Y g:i A" }}</div>
+                            </div>
+                            <div class="response-type">{{ response.get_response_type_display }}</div>
+                            <div class="response-message">{{ response.message|linebreaks }}</div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="no-responses">
+                        <p>No responses yet.</p>
+                        {% if user.is_staff %}
+                        <button type="button" class="btn btn-link text-600 btn btn-primary-sm dropdown-toggle dropdown-caret-none btn btn-primary-primary primary" data-bs-toggle="modal" data-bs-target="#responseModal">
+                            Add First Response
+                        </button>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Clean Status Update Modal -->
+{% if user.is_staff %}
+    <div class="modal fade" id="statusModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="post" action="{% url 'complaints:complaint_update_status' complaint.pk %}">
+                    {% csrf_token %}
+                    <div class="modal-header">
+                        <h5 class="modal-title">Update Status</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="current-status-section">
+                            <label class="form-label">Current Status</label>
+                            <div class="current-status-display status-{{ complaint.status }}">
+                                {{ complaint.get_status_display }}
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="status" class="form-label">New Status</label>
+                            <select name="status" id="status" class="form-select" required>
+                                {% for value, label in complaint.STATUS_CHOICES %}
+                                    <option value="{{ value }}" {% if complaint.status == value %}selected{% endif %}>
+                                        {{ label }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <!-- Reason field - shown when current status is resolved and new status is different -->
+                        <div class="form-group" id="status-change-reason-group" style="display: none;">
+                            <label for="status_change_reason" class="form-label">
+                                Reason for Status Change <span class="text-danger">*</span>
+                            </label>
+                            <textarea name="status_change_reason" id="status_change_reason" class="form-control" rows="4" 
+                                placeholder="Please provide a reason for changing the status from Resolved..."></textarea>
+                            <small class="form-text text-muted">
+                                A reason is required when changing status from Resolved to ensure proper tracking.
+                            </small>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-link text-600 btn btn-primary-sm dropdown-toggle dropdown-caret-none btn btn-primary-primary outline" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-link text-600 btn btn-primary-sm dropdown-toggle dropdown-caret-none btn btn-primary-primary primary">Update Status</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Clean Response Modal -->
+    <div class="modal fade" id="responseModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <form method="post" action="{% url 'complaints:add_complaint_response' complaint.pk %}">
+                    {% csrf_token %}
+                    <div class="modal-header">
+                        <h5 class="modal-title">Add Response</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-row">
+                            <div class="form-group half-width">
+                                <label for="response_type" class="form-label">Response Type</label>
+                                <select name="response_type" id="response_type" class="form-select">
+                                    <option value="user">Response to User</option>
+                                    <option value="internal">Internal Note</option>
+                                    <option value="update">Status Update</option>
+                                </select>
+                            </div>
+                            <div class="form-group half-width">
+                                <label class="form-label">Visibility</label>
+                                <div class="checkbox-wrapper">
+                                    <input type="checkbox" name="is_visible_to_user" id="is_visible_to_user" checked>
+                                    <label for="is_visible_to_user" class="checkbox-label">Visible to user</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="message" class="form-label">Message</label>
+                            <textarea name="message" id="message" class="form-textarea" rows="5" required placeholder="Enter your response message here..."></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-link text-600 btn btn-primary-sm dropdown-toggle dropdown-caret-none btn btn-primary-primary outline" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-link text-600 btn btn-primary-sm dropdown-toggle dropdown-caret-none btn btn-primary-primary primary">Send Response</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endif %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const statusSelect = document.getElementById('status');
+    const reasonGroup = document.getElementById('status-change-reason-group');
+    const reasonField = document.getElementById('status_change_reason');
+    const currentStatus = '{{ complaint.status }}';
+    const form = statusSelect ? statusSelect.closest('form') : null;
+    
+    if (statusSelect && reasonGroup && currentStatus === 'resolved') {
+        // Show/hide reason field based on status selection
+        function toggleReasonField() {
+            const newStatus = statusSelect.value;
+            if (newStatus !== 'resolved') {
+                reasonGroup.style.display = 'block';
+                reasonField.setAttribute('required', 'required');
+            } else {
+                reasonGroup.style.display = 'none';
+                reasonField.removeAttribute('required');
+                reasonField.value = '';
+            }
+        }
+        
+        // Check on page load
+        toggleReasonField();
+        
+        // Check on status change
+        statusSelect.addEventListener('change', toggleReasonField);
+        
+        // Validate before form submission
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                const newStatus = statusSelect.value;
+                if (currentStatus === 'resolved' && newStatus !== 'resolved') {
+                    if (!reasonField.value.trim()) {
+                        e.preventDefault();
+                        alert('Please provide a reason for changing the status from Resolved.');
+                        reasonField.focus();
+                        return false;
+                    }
+                }
+            });
+        }
+    }
+});
+</script>
+
+{% endblock %}

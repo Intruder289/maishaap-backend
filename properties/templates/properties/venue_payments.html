@@ -1,0 +1,1153 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}Venue Payments{% endblock %}
+
+{% block content %}
+<!-- Toast Container -->
+<div class="position-fixed top-0 end-0 p-3" style="z-index: 9999;">
+    <div id="toastContainer"></div>
+</div>
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <!-- Page Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="mb-1">
+                        <i class="fas fa-calendar-alt text-primary me-2"></i>Venue Payments
+                    </h2>
+                    <p class="text-muted mb-0">Track venue payments, deposits, and event transactions</p>
+                </div>
+                <div>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#recordPaymentModal">
+                        <i class="fas fa-plus me-2"></i>Record Payment
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Payment Stats -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-0">Tsh{{ total_amount|floatformat:0 }}</h4>
+                                    <p class="mb-0">Total Revenue</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-dollar-sign fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-0">{{ total_payments }}</h4>
+                                    <p class="mb-0">Total Payments</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-chart-line fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-0">{{ paid_bookings }}</h4>
+                                    <p class="mb-0">Paid Bookings</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-check-circle fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-0">{{ payments|length }}</h4>
+                                    <p class="mb-0">Active Records</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-list fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Filter Section -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Search</label>
+                            <input type="text" class="form-control" id="paymentSearch" placeholder="Search payments...">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Payment Method</label>
+                            <select class="form-select" id="methodFilter">
+                                <option value="">All Methods</option>
+                                <option value="cash">Cash</option>
+                                <option value="card">Card</option>
+                                <option value="mobile_money">Mobile Money</option>
+                                <option value="bank_transfer">Bank Transfer</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Payment Type</label>
+                            <select class="form-select" id="typeFilter">
+                                <option value="">All Types</option>
+                                <option value="deposit">Deposit</option>
+                                <option value="partial">Partial</option>
+                                <option value="full">Full Payment</option>
+                                <option value="refund">Refund</option>
+                                <option value="catering">Catering</option>
+                                <option value="equipment">Equipment</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Date Range</label>
+                            <select class="form-select" id="dateFilter">
+                                <option value="">All Time</option>
+                                <option value="today">Today</option>
+                                <option value="week">This Week</option>
+                                <option value="month">This Month</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">&nbsp;</label>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-outline-secondary" onclick="clearFilters()">
+                                    <i class="fas fa-times me-1"></i>Clear
+                                </button>
+                                <button class="btn btn-outline-primary" onclick="exportPayments()">
+                                    <i class="fas fa-download me-1"></i>Export
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Payments Table -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="row flex-between-center">
+                        <div class="col">
+                            <h6 class="mb-2">Venue Payment Records</h6>
+                            <h5 class="mb-0">Manage venue payments and track transactions</h5>
+                        </div>
+                        <div class="col-auto">
+                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#recordPaymentModal">
+                                <span class="fas fa-plus me-2"></span>Record Payment
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0" id="paymentsTable">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Payment</th>
+                                    <th>Booking</th>
+                                    <th>Customer</th>
+                                    <th>Amount</th>
+                                    <th>Method</th>
+                                    <th>Type</th>
+                                    <th>Status</th>
+                                    <th>Date</th>
+                                    <th>Recorded By</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for payment in payments %}
+                                <tr data-payment-id="{{ payment.id }}">
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3 fw-bold">
+                                                {{ payment.id }}
+                                            </div>
+                                            <div>
+                                                <strong>
+                                                    <a href="#" class="text-decoration-none" onclick="openViewModal({{ payment.id }})">
+                                                        Payment #{{ payment.id }}
+                                                    </a>
+                                                </strong>
+                                                <div class="text-muted small">{{ payment.transaction_reference|default:"No reference" }}</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <i class="fas fa-calendar text-muted me-2"></i>
+                                            <div>
+                                                <div class="fw-bold">{{ payment.booking.booking_reference }}</div>
+                                                <div class="text-muted small">{{ payment.booking.property_obj.title|truncatechars:30 }}</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <i class="fas fa-user text-muted me-2"></i>
+                                            <div>
+                                                <div class="fw-bold">{{ payment.booking.customer.full_name }}</div>
+                                                <div class="text-muted small">{{ payment.booking.customer.email }}</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <strong>Tsh{{ payment.amount|floatformat:2 }}</strong>
+                                    </td>
+                                    <td>
+                                        {% if payment.payment_method == 'cash' %}
+                                        <span class="badge bg-success">{{ payment.get_payment_method_display }}</span>
+                                        {% elif payment.payment_method == 'card' %}
+                                        <span class="badge bg-info">{{ payment.get_payment_method_display }}</span>
+                                        {% elif payment.payment_method == 'mobile_money' %}
+                                        <span class="badge bg-warning">{{ payment.get_payment_method_display }}</span>
+                                        {% elif payment.payment_method == 'bank_transfer' %}
+                                        <span class="badge bg-primary">{{ payment.get_payment_method_display }}</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">{{ payment.get_payment_method_display }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if payment.payment_type == 'full' %}
+                                        <span class="badge bg-success">{{ payment.get_payment_type_display }}</span>
+                                        {% elif payment.payment_type == 'partial' %}
+                                        <span class="badge bg-warning">{{ payment.get_payment_type_display }}</span>
+                                        {% elif payment.payment_type == 'deposit' %}
+                                        <span class="badge bg-info">{{ payment.get_payment_type_display }}</span>
+                                        {% elif payment.payment_type == 'refund' %}
+                                        <span class="badge bg-danger">{{ payment.get_payment_type_display }}</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">{{ payment.get_payment_type_display }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if payment.status == 'active' %}
+                                        <span class="badge bg-success">Active</span>
+                                        {% elif payment.status == 'refunded' %}
+                                        <span class="badge bg-danger">Refunded</span>
+                                        {% elif payment.status == 'cancelled' %}
+                                        <span class="badge bg-secondary">Cancelled</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">{{ payment.get_status_display }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="text-muted small">
+                                            {{ payment.payment_date|date:"M d, Y" }}<br>
+                                            {{ payment.payment_date|time:"g:i A" }}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="text-muted small">
+                                            {{ payment.recorded_by.get_full_name|default:payment.recorded_by.username }}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="dropdown">
+                                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                                <i class="fas fa-ellipsis-v"></i>
+                                            </button>
+                                            <ul class="dropdown-menu">
+                                                <li><a class="dropdown-item" href="#" onclick="openViewModal({{ payment.id }})">
+                                                    <i class="fas fa-eye me-2"></i>View Details
+                                                </a></li>
+                                                <li><a class="dropdown-item" href="#" onclick="openEditModal({{ payment.id }})">
+                                                    <i class="fas fa-edit me-2"></i>Edit
+                                                </a></li>
+                                                <li><a class="dropdown-item" href="#" onclick="openPrintModal({{ payment.id }})">
+                                                    <i class="fas fa-receipt me-2"></i>Print Receipt
+                                                </a></li>
+                                                <li><a class="dropdown-item" href="#" onclick="openSendReminderModal({{ payment.id }})">
+                                                    <i class="fas fa-bell me-2"></i>Send Reminder
+                                                </a></li>
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li><a class="dropdown-item text-danger" href="#" onclick="openDeleteModal({{ payment.id }})">
+                                                    <i class="fas fa-trash me-2"></i>Delete
+                                                </a></li>
+                                                <li><a class="dropdown-item text-danger" href="#" onclick="openRefundModal({{ payment.id }})">
+                                                    <i class="fas fa-undo me-2"></i>Refund
+                                                </a></li>
+                                            </ul>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="10" class="text-center py-4">
+                                        <div class="text-muted">
+                                            <i class="fas fa-inbox fa-2x mb-3"></i>
+                                            <p>No payment records found matching your criteria.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Pagination -->
+                    {% if payments.has_other_pages %}
+                    <div class="card-footer bg-white border-0 py-3">
+                        <div class="row align-items-center">
+                            <div class="col-md-6">
+                                <div class="text-muted">
+                                    Showing {{ payments.start_index }} to {{ payments.end_index }} of {{ payments.paginator.count }} entries
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <nav aria-label="Page navigation" class="d-flex justify-content-end">
+                                    <ul class="pagination pagination-sm mb-0">
+                                        {% if payments.has_previous %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page=1" title="First Page">
+                                                <i class="fas fa-angle-double-left"></i>
+                                            </a>
+                                        </li>
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ payments.previous_page_number }}" title="Previous Page">
+                                                <i class="fas fa-angle-left"></i>
+                                            </a>
+                                        </li>
+                                        {% endif %}
+                                        
+                                        <!-- Page numbers -->
+                                        {% for num in payments.paginator.page_range %}
+                                            {% if payments.number == num %}
+                                        <li class="page-item active">
+                                                <span class="page-link">{{ num }}</span>
+                                            </li>
+                                            {% elif num > payments.number|add:'-3' and num < payments.number|add:'3' %}
+                                            <li class="page-item">
+                                                <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                                        </li>
+                                            {% endif %}
+                                        {% endfor %}
+                                        
+                                        {% if payments.has_next %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ payments.next_page_number }}" title="Next Page">
+                                                <i class="fas fa-angle-right"></i>
+                                            </a>
+                                        </li>
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ payments.paginator.num_pages }}" title="Last Page">
+                                                <i class="fas fa-angle-double-right"></i>
+                                            </a>
+                                        </li>
+                                        {% endif %}
+                                    </ul>
+                                </nav>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Record Payment Modal -->
+<div class="modal fade" id="recordPaymentModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Record Venue Payment</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="recordPaymentForm">
+                    {% csrf_token %}
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Booking Reference *</label>
+                            <select class="form-control" id="bookingReference" required>
+                                <option value="">Select Booking</option>
+                                {% for booking in bookings %}
+                                <option value="{{ booking.id }}" data-reference="{{ booking.booking_reference }}" data-customer="{{ booking.customer.full_name }}" data-venue="{{ booking.property_obj.title }}" data-total-amount="{{ booking.total_amount }}" data-paid-amount="{{ booking.paid_amount }}">
+                                    {{ booking.booking_reference }} - {{ booking.customer.full_name }} ({{ booking.property_obj.title }}) - Tsh{{ booking.total_amount }}
+                                </option>
+                                {% empty %}
+                                <option value="" disabled>No bookings available</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Amount *</label>
+                            <input type="number" class="form-control" id="paymentAmount" step="0.01" min="0" required readonly>
+                            <small class="text-muted">Auto-calculated remaining amount (non-editable)</small>
+                            <div id="balanceInfo" class="mt-2" style="display: none;">
+                                <div class="alert alert-info py-2">
+                                    <small>
+                                        <strong>Total:</strong> <span id="totalAmountDisplay"></span><br>
+                                        <strong>Paid:</strong> <span id="paidAmountDisplay"></span><br>
+                                        <strong>Remaining:</strong> <span id="remainingAmountDisplay"></span>
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Payment Method *</label>
+                            <select class="form-control" id="paymentMethod" required>
+                                <option value="">Select Method</option>
+                                <option value="cash">Cash</option>
+                                <option value="card">Card</option>
+                                <option value="mobile_money">Mobile Money</option>
+                                <option value="bank_transfer">Bank Transfer</option>
+                                <option value="check">Check</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Payment Type *</label>
+                            <select class="form-control" id="paymentType" required>
+                                <option value="full" selected>Full Payment</option>
+                                <option value="partial">Partial Payment</option>
+                                <option value="deposit">Deposit</option>
+                                <option value="refund">Refund</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6" id="partialAmountDiv" style="display: none;">
+                            <label class="form-label">Partial Amount *</label>
+                            <input type="number" class="form-control" id="partialAmount" step="0.01" min="0" placeholder="Enter partial amount">
+                            <small class="text-muted">Enter the amount customer wants to pay now</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Transaction Reference</label>
+                            <input type="text" class="form-control" id="transactionReference" placeholder="Transaction ID or reference" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Payment Date *</label>
+                            <input type="datetime-local" class="form-control" id="paymentDate" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-control" id="paymentNotes" rows="3" placeholder="Additional notes about this payment..."></textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitRecordPayment()">Record Payment</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- View Payment Details Modal -->
+<div class="modal fade" id="viewPaymentModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Payment Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="viewPaymentModalBody">
+                <!-- Content will be loaded dynamically -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Print Receipt Modal -->
+<div class="modal fade" id="printReceiptModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Print Receipt</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="printReceiptModalBody">
+                <!-- Receipt content will be loaded dynamically -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="downloadReceiptPDF()">
+                    <i class="fas fa-download me-2"></i>Download Receipt
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Refund Payment Modal -->
+<div class="modal fade" id="refundPaymentModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Process Refund</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Warning:</strong> This action will process a refund for the selected payment. This action cannot be undone.
+                </div>
+                <form id="refundPaymentForm">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Refund Amount *</label>
+                            <input type="number" class="form-control" id="refundAmount" step="0.01" min="0" required>
+                            <small class="text-muted">Auto-filled for extra payments, manual entry for normal refunds</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Refund Method *</label>
+                            <select class="form-control" id="refundMethod" required>
+                                <option value="">Select Method</option>
+                                <option value="cash">Cash</option>
+                                <option value="card">Card Refund</option>
+                                <option value="bank_transfer">Bank Transfer</option>
+                                <option value="mobile_money">Mobile Money</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Refund Reference</label>
+                            <input type="text" class="form-control" id="refundReference" readonly placeholder="Auto-generated">
+                            <small class="text-muted">Automatically generated</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Refund Date *</label>
+                            <input type="datetime-local" class="form-control" id="refundDate" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Reason for Refund *</label>
+                            <textarea class="form-control" id="refundReason" rows="3" placeholder="Please provide a reason for this refund..." required></textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" onclick="submitRefund()">Process Refund</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Payment Modal -->
+<div class="modal fade" id="editPaymentModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Payment</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="editPaymentModalBody">
+                <!-- Content will be loaded dynamically -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitEditPayment()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Send Reminder Modal -->
+<div class="modal fade" id="sendReminderModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Send Payment Reminder</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="sendReminderModalBody">
+                <!-- Content will be loaded dynamically -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="submitSendReminder()" id="sendReminderBtn">
+                    <i class="fas fa-paper-plane me-2"></i>Send Reminder
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Payment Modal -->
+<div class="modal fade" id="deletePaymentModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Delete Payment</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="deletePaymentModalBody">
+                <!-- Content will be loaded dynamically -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" onclick="confirmDeletePayment()">Delete Payment</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.avatar-sm {
+    width: 40px;
+    height: 40px;
+    font-size: 14px;
+    font-weight: bold;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Bootstrap 5 + jQuery compatibility layer
+if (typeof jQuery !== 'undefined' && typeof bootstrap !== 'undefined') {
+    jQuery.fn.modal = function(action) {
+        if (typeof action === 'undefined' || action === 'show') {
+            const modalId = this[0] ? this[0].getAttribute('id') : null;
+            if (modalId) {
+                const modalElement = document.getElementById(modalId);
+                const modal = new bootstrap.Modal(modalElement);
+                modal.show();
+            }
+            return this;
+        } else if (action === 'hide') {
+            const modalId = this[0] ? this[0].getAttribute('id') : null;
+            if (modalId) {
+                const modalElement = document.getElementById(modalId);
+                const modalInstance = bootstrap.Modal.getInstance(modalElement);
+                if (modalInstance) {
+                    modalInstance.hide();
+                }
+            }
+            return this;
+        }
+        return this;
+    };
+}
+
+let currentPaymentId = null;
+
+$(document).ready(function() {
+    console.log('Venue Payments page initialized');
+    
+    // Set current date/time for modals
+    const now = new Date();
+    const dateTimeString = now.toISOString().slice(0, 16);
+    $('#refundDate, #paymentDate').val(dateTimeString);
+    
+    // Reset payment form when modal is opened
+    $('#recordPaymentModal').on('show.bs.modal', function() {
+        // Clear form and reset state
+        $('#recordPaymentForm')[0].reset();
+        $('.fully-paid-warning').remove();
+        $('.form-control').removeClass('is-invalid').prop('disabled', false);
+        $('button[onclick="submitRecordPayment()"]').prop('disabled', false).text('Record Payment');
+        $('#balanceInfo').hide();
+        
+        // Set current date/time
+        $('#paymentDate').val(dateTimeString);
+    });
+    
+    // Auto-fill Transaction Reference and Amount when booking is selected
+    $('#bookingReference').on('change', function() {
+        const selectedOption = $(this).find('option:selected');
+        const bookingReference = selectedOption.data('reference');
+        const totalAmount = parseFloat(selectedOption.data('total-amount')) || 0;
+        const paidAmount = parseFloat(selectedOption.data('paid-amount')) || 0;
+        
+        // Remove any existing fully paid warnings
+        $('.fully-paid-warning').remove();
+        $('.form-control').removeClass('is-invalid');
+        
+        if (bookingReference) {
+            $('#transactionReference').val(bookingReference);
+            
+            // Calculate remaining amount
+            const remainingAmount = totalAmount - paidAmount;
+            
+            // Check if booking is fully paid
+            if (remainingAmount <= 0) {
+                // Show fully paid warning
+                const warningHtml = `
+                    <div class="alert alert-warning fully-paid-warning mt-2" role="alert">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Booking ${bookingReference} is already fully paid!</strong><br>
+                        Total: Tsh ${totalAmount.toFixed(2)} | Paid: Tsh ${paidAmount.toFixed(2)} | Remaining: Tsh 0.00<br>
+                        <small>Please start a new booking for additional payments.</small>
+                    </div>
+                `;
+                $('#bookingReference').after(warningHtml);
+                
+                // Disable form fields
+                $('#paymentAmount, #paymentMethod, #paymentType, #partialAmount').prop('disabled', true).addClass('is-invalid');
+                $('button[onclick="submitRecordPayment()"]').prop('disabled', true).text('Booking Fully Paid');
+                
+                // Set values to show the fully paid status
+                $('#paymentAmount').val(totalAmount);
+                $('#partialAmount').val(0);
+                
+                // Show balance information
+                $('#totalAmountDisplay').text(`Tsh${totalAmount.toFixed(2)}`);
+                $('#paidAmountDisplay').text(`Tsh${paidAmount.toFixed(2)}`);
+                $('#remainingAmountDisplay').text(`Tsh0.00`);
+                $('#balanceInfo').show();
+                
+                return; // Exit early for fully paid bookings
+            }
+            
+            // For bookings with remaining balance
+            $('#paymentAmount').val(remainingAmount);
+            $('#partialAmount').attr('max', remainingAmount);
+            $('#partialAmount').attr('placeholder', `Max: Tsh${remainingAmount.toFixed(2)}`);
+            
+            // Show balance information
+            $('#totalAmountDisplay').text(`Tsh${totalAmount.toFixed(2)}`);
+            $('#paidAmountDisplay').text(`Tsh${paidAmount.toFixed(2)}`);
+            $('#remainingAmountDisplay').text(`Tsh${remainingAmount.toFixed(2)}`);
+            $('#balanceInfo').show();
+            
+            // Enable form fields
+            $('#paymentAmount, #paymentMethod, #paymentType, #partialAmount').prop('disabled', false).removeClass('is-invalid');
+            $('button[onclick="submitRecordPayment()"]').prop('disabled', false).text('Record Payment');
+            
+        } else {
+            $('#transactionReference').val('');
+            $('#paymentAmount').val('');
+            $('#partialAmount').val('');
+            $('#balanceInfo').hide();
+            
+            // Enable form fields
+            $('#paymentAmount, #paymentMethod, #paymentType, #partialAmount').prop('disabled', false).removeClass('is-invalid');
+            $('button[onclick="submitRecordPayment()"]').prop('disabled', false).text('Record Payment');
+        }
+    });
+    
+    // Show/hide partial amount input based on payment type
+    $('#paymentType').on('change', function() {
+        const paymentType = $(this).val();
+        if (paymentType === 'partial') {
+            $('#partialAmountDiv').show();
+            $('#partialAmount').prop('required', true);
+            
+            // Set max amount to remaining balance
+            const selectedOption = $('#bookingReference').find('option:selected');
+            const totalAmount = parseFloat(selectedOption.data('total-amount')) || 0;
+            const paidAmount = parseFloat(selectedOption.data('paid-amount')) || 0;
+            const remainingAmount = totalAmount - paidAmount;
+            
+            $('#partialAmount').attr('max', remainingAmount);
+            $('#partialAmount').attr('placeholder', `Max: Tsh${remainingAmount.toFixed(2)}`);
+        } else {
+            $('#partialAmountDiv').hide();
+            $('#partialAmount').prop('required', false);
+            $('#partialAmount').val('');
+        }
+    });
+    
+    // Filter functionality
+    $('#paymentSearch, #methodFilter, #typeFilter, #dateFilter').on('change keyup', function() {
+        filterPayments();
+    });
+    
+    function filterPayments() {
+        const searchTerm = $('#paymentSearch').val().toLowerCase();
+        const methodFilter = $('#methodFilter').val();
+        const typeFilter = $('#typeFilter').val();
+        const dateFilter = $('#dateFilter').val();
+        
+        $('#paymentsTable tbody tr').each(function() {
+            let showRow = true;
+            const row = $(this);
+            
+            // Search filter
+            if (searchTerm && !row.text().toLowerCase().includes(searchTerm)) {
+                showRow = false;
+            }
+            
+            // Method filter
+            if (methodFilter && !row.find('td:nth-child(5)').text().toLowerCase().includes(methodFilter)) {
+                showRow = false;
+            }
+            
+            // Type filter
+            if (typeFilter && !row.find('td:nth-child(6)').text().toLowerCase().includes(typeFilter)) {
+                showRow = false;
+            }
+            
+            row.toggle(showRow);
+        });
+    }
+    
+    // Clear filters
+    window.clearFilters = function() {
+        $('#paymentSearch, #methodFilter, #typeFilter, #dateFilter').val('');
+        $('#paymentsTable tbody tr').show();
+    };
+    
+    // Export payments
+    window.exportPayments = function() {
+        alert('Export functionality will be implemented');
+    };
+});
+
+// Toast notification function
+function showToast(type, message) {
+    const bgClass = type === 'success' ? 'bg-success' : 'bg-danger';
+    const icon = type === 'success' ? '<i class="fas fa-check-circle me-2"></i>' : '<i class="fas fa-exclamation-circle me-2"></i>';
+    
+    // Create toast element
+    const toast = $(`
+        <div class="toast align-items-center text-white ${bgClass} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body">
+                    ${icon}${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        </div>
+    `);
+    
+    // Add to toast container
+    $('#toastContainer').append(toast);
+    
+    // Initialize and show toast
+    const bsToast = new bootstrap.Toast(toast[0], { autohide: true, delay: 3000 });
+    bsToast.show();
+    
+    // Remove toast from DOM after it's hidden
+    toast.on('hidden.bs.toast', function() {
+        toast.remove();
+    });
+}
+
+// Modal functions
+function openViewModal(paymentId) {
+    currentPaymentId = paymentId;
+    console.log('Opening view modal for payment:', paymentId);
+    $.get(`/properties/api/payment/${paymentId}/view-details/`, function(data) {
+        $('#viewPaymentModalBody').html(data);
+        $('#viewPaymentModal').modal('show');
+    }).fail(function(xhr, status, error) {
+        console.error('Failed to load payment details:', error);
+        alert('Failed to load payment details: ' + error);
+    });
+}
+
+function openEditModal(paymentId) {
+    currentPaymentId = paymentId;
+    console.log('Opening edit modal for payment:', paymentId);
+    $.get(`/properties/api/payment/${paymentId}/edit/`, function(data) {
+        $('#editPaymentModalBody').html(data);
+        $('#editPaymentModal').modal('show');
+    }).fail(function(xhr, status, error) {
+        console.error('Failed to load payment data for editing:', error);
+        alert('Failed to load payment data for editing: ' + error);
+    });
+}
+
+function openDeleteModal(paymentId) {
+    currentPaymentId = paymentId;
+    console.log('Opening delete modal for payment:', paymentId);
+    $.get(`/properties/api/payment/${paymentId}/delete/`, function(data) {
+        $('#deletePaymentModalBody').html(data);
+        $('#deletePaymentModal').modal('show');
+    }).fail(function(xhr, status, error) {
+        console.error('Failed to load payment data for deletion:', error);
+        alert('Failed to load payment data for deletion: ' + error);
+    });
+}
+
+function openPrintModal(paymentId) {
+    currentPaymentId = paymentId;
+    console.log('Opening print modal for payment:', paymentId);
+    $.get(`/properties/api/payment/${paymentId}/generate-receipt/`, function(data) {
+        $('#printReceiptModalBody').html(data);
+        $('#printReceiptModal').modal('show');
+    }).fail(function(xhr, status, error) {
+        console.error('Failed to load receipt:', error);
+        alert('Failed to load receipt: ' + error);
+    });
+}
+
+function openRefundModal(paymentId) {
+    currentPaymentId = paymentId;
+    console.log('Opening refund modal for payment:', paymentId);
+    $('#refundPaymentModal').modal('show');
+}
+
+function printReceipt() {
+    $('#viewPaymentModal').modal('hide');
+    setTimeout(function() {
+        $('#printReceiptModal').modal('show');
+    }, 300);
+}
+
+function submitRefund() {
+    // Prevent double submission
+    const submitBtn = $('button[onclick="submitRefund()"]');
+    if (submitBtn.prop('disabled')) {
+        return;
+    }
+    submitBtn.prop('disabled', true).text('Processing...');
+    
+    const refundData = {
+        amount: $('#refundAmount').val(),
+        refund_method: $('#refundMethod').val(),
+        refund_reference: $('#refundReference').val(),
+        refund_date: $('#refundDate').val(),
+        reason: $('#refundReason').val()
+    };
+    
+    $.ajax({
+        url: '/properties/api/payment/' + currentPaymentId + '/process-refund/',
+        method: 'POST',
+        data: refundData,
+        success: function(response) {
+            alert('Refund processed successfully');
+            $('#refundPaymentModal').modal('hide');
+            location.reload();
+        },
+        error: function() {
+            alert('Failed to process refund');
+        },
+        complete: function() {
+            submitBtn.prop('disabled', false).text('Process Refund');
+        }
+    });
+}
+
+function submitEditPayment() {
+    const submitBtn = $('button[onclick="submitEditPayment()"]');
+    if (submitBtn.prop('disabled')) {
+        return;
+    }
+    submitBtn.prop('disabled', true).text('Saving...');
+    
+    const formData = {
+        amount: $('#editAmount').val(),
+        payment_method: $('#editPaymentMethod').val(),
+        payment_type: $('#editPaymentType').val(),
+        status: $('#editStatus').val(),
+        payment_date: $('#editPaymentDate').val(),
+        transaction_reference: $('#editTransactionReference').val(),
+        notes: $('#editNotes').val()
+    };
+    
+    $.ajax({
+        url: '/properties/api/payment/' + currentPaymentId + '/edit/',
+        method: 'POST',
+        data: formData,
+        success: function(response) {
+            alert('Payment updated successfully');
+            $('#editPaymentModal').modal('hide');
+            location.reload();
+        },
+        error: function() {
+            alert('Failed to update payment');
+        },
+        complete: function() {
+            submitBtn.prop('disabled', false).text('Save Changes');
+        }
+    });
+}
+
+function confirmDeletePayment() {
+    const submitBtn = $('button[onclick="confirmDeletePayment()"]');
+    if (submitBtn.prop('disabled')) {
+        return;
+    }
+    submitBtn.prop('disabled', true).text('Deleting...');
+    
+    $.ajax({
+        url: '/properties/api/payment/' + currentPaymentId + '/delete/',
+        method: 'POST',
+        success: function(response) {
+            alert('Payment deleted successfully');
+            $('#deletePaymentModal').modal('hide');
+            location.reload();
+        },
+        error: function() {
+            alert('Failed to delete payment');
+        },
+        complete: function() {
+            submitBtn.prop('disabled', false).text('Delete Payment');
+        }
+    });
+}
+
+function openSendReminderModal(paymentId) {
+    currentPaymentId = paymentId;
+    console.log('Opening send reminder modal for payment:', paymentId);
+    $.get(`/properties/api/payment/${paymentId}/send-reminder/`, function(data) {
+        $('#sendReminderModalBody').html(data);
+        $('#sendReminderModal').modal('show');
+    }).fail(function(xhr, status, error) {
+        console.error('Failed to load reminder form:', error);
+        alert('Failed to load reminder form: ' + error);
+    });
+}
+
+function submitSendReminder() {
+    const submitBtn = $('#sendReminderBtn');
+    if (submitBtn.prop('disabled')) {
+        return;
+    }
+    
+    submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Sending...');
+    
+    const reminderData = {
+        csrfmiddlewaretoken: $('[name=csrfmiddlewaretoken]').val()
+    };
+    
+    $.ajax({
+        url: '/properties/api/payment/' + currentPaymentId + '/send-reminder/',
+        method: 'POST',
+        data: reminderData,
+        success: function(response) {
+            if (response.success) {
+                // Show success toast
+                showToast('success', response.message || 'Payment reminder sent successfully!');
+                // Close modal after short delay
+                setTimeout(function() {
+                    $('#sendReminderModal').modal('hide');
+                }, 1500);
+            } else {
+                showToast('error', response.message || 'Failed to send reminder');
+                submitBtn.prop('disabled', false).html('<i class="fas fa-paper-plane me-2"></i>Send Reminder');
+            }
+        },
+        error: function(xhr) {
+            let errorMsg = 'Failed to send reminder';
+            if (xhr.responseJSON && xhr.responseJSON.message) {
+                errorMsg = xhr.responseJSON.message;
+            }
+            showToast('error', errorMsg);
+            submitBtn.prop('disabled', false).html('<i class="fas fa-paper-plane me-2"></i>Send Reminder');
+        }
+    });
+}
+
+function submitRecordPayment() {
+    // Prevent double submission
+    const submitBtn = $('button[onclick="submitRecordPayment()"]');
+    if (submitBtn.prop('disabled')) {
+        return;
+    }
+    submitBtn.prop('disabled', true).text('Processing...');
+    
+    const paymentType = $('#paymentType').val();
+    let amount = $('#paymentAmount').val();
+    
+    // If partial payment, use the partial amount instead
+    if (paymentType === 'partial') {
+        const partialAmount = $('#partialAmount').val();
+        if (!partialAmount || parseFloat(partialAmount) <= 0) {
+            alert('Please enter a valid partial amount');
+            submitBtn.prop('disabled', false).text('Record Payment');
+            return;
+        }
+        amount = partialAmount;
+    }
+    
+    const formData = {
+        booking_id: $('#bookingReference').val(),
+        amount: amount,
+        payment_method: $('#paymentMethod').val(),
+        payment_type: paymentType,
+        transaction_reference: $('#transactionReference').val(),
+        payment_date: $('#paymentDate').val(),
+        notes: $('#paymentNotes').val()
+    };
+    
+    // Check each required field individually
+    const missingFields = [];
+    if (!formData.booking_id) missingFields.push('Booking Reference');
+    if (!formData.amount || parseFloat(formData.amount) <= 0) missingFields.push('Amount');
+    if (!formData.payment_method) missingFields.push('Payment Method');
+    if (!formData.payment_type) missingFields.push('Payment Type');
+    if (!formData.payment_date) missingFields.push('Payment Date');
+    
+    if (missingFields.length > 0) {
+        alert('Please fill in the following required fields:\n' + missingFields.join('\n'));
+        submitBtn.prop('disabled', false).text('Record Payment');
+        return;
+    }
+    
+    // Add CSRF token
+    formData.csrfmiddlewaretoken = $('[name=csrfmiddlewaretoken]').val();
+    
+    // Validate payment amount against booking balance
+    const selectedOption = $('#bookingReference').find('option:selected');
+    const totalAmount = parseFloat(selectedOption.data('total-amount')) || 0;
+    const paidAmount = parseFloat(selectedOption.data('paid-amount')) || 0;
+    const remainingBalance = totalAmount - paidAmount;
+    const paymentAmount = parseFloat(amount);
+    
+    if (paymentAmount > remainingBalance) {
+        alert(`Payment amount (Tsh ${paymentAmount.toFixed(2)}) exceeds remaining balance (Tsh ${remainingBalance.toFixed(2)}). Please enter a valid amount.`);
+        submitBtn.prop('disabled', false).text('Record Payment');
+        return;
+    }
+    
+    // Submit to API
+    $.ajax({
+        url: '/properties/api/record-payment/',
+        method: 'POST',
+        data: formData,
+        success: function(response) {
+            if (response.success) {
+                alert('Payment recorded successfully!');
+                $('#recordPaymentModal').modal('hide');
+                location.reload(); // Refresh to show new payment
+            } else {
+                alert('Failed to record payment: ' + response.message);
+                submitBtn.prop('disabled', false).text('Record Payment');
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('Payment recording error:', error);
+            let errorMessage = 'Failed to record payment. ';
+            if (xhr.responseJSON && xhr.responseJSON.message) {
+                errorMessage += xhr.responseJSON.message;
+            } else {
+                errorMessage += 'Please try again.';
+            }
+            alert(errorMessage);
+            submitBtn.prop('disabled', false).text('Record Payment');
+        }
+    });
+}
+
+function downloadReceiptPDF() {
+    if (currentPaymentId) {
+        // Open the download endpoint in a new window to trigger PDF download
+        window.location.href = `/properties/api/payment/${currentPaymentId}/download-receipt/`;
+    } else {
+        alert('No payment selected');
+    }
+}
+</script>
+{% endblock %}

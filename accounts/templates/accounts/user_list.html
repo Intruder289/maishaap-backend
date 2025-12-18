@@ -1,0 +1,904 @@
+{% extends "accounts/base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Users - Maisha{% endblock %}
+
+{% block content %}
+<!-- User Stats Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between">
+          <div>
+            <h6 class="mb-2 text-500">Total Users</h6>
+            <h4 class="mb-0" id="total-users">{{ total_users }}</h4>
+            <p class="fs--1 mb-0 text-success">
+              <span class="me-1 fas fa-users"></span>
+              All users
+            </p>
+          </div>
+          <div class="d-flex align-items-center">
+            <div class="avatar avatar-lg">
+              <div class="avatar-name rounded-circle bg-primary-subtle text-primary">
+                <span data-feather="users"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+        
+  <div class="col-6 col-lg-3">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between">
+          <div>
+            <h6 class="mb-2 text-500">Active Users</h6>
+            <h4 class="mb-0" id="active-users">{{ active_users }}</h4>
+            <p class="fs--1 mb-0 text-success">
+              <span class="me-1 fas fa-check-circle"></span>
+              Active users
+            </p>
+          </div>
+          <div class="d-flex align-items-center">
+            <div class="avatar avatar-lg">
+              <div class="avatar-name rounded-circle bg-success-subtle text-success">
+                <span data-feather="user-check"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-lg-3">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between">
+          <div>
+            <h6 class="mb-2 text-500">Approved Users</h6>
+            <h4 class="mb-0" id="approved-users">{{ approved_users }}</h4>
+            <p class="fs--1 mb-0 text-info">
+              <span class="me-1 fas fa-shield-alt"></span>
+              Verified users
+            </p>
+          </div>
+          <div class="d-flex align-items-center">
+            <div class="avatar avatar-lg">
+              <div class="avatar-name rounded-circle bg-info-subtle text-info">
+                <span data-feather="shield"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-lg-3">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between">
+          <div>
+            <h6 class="mb-2 text-500">Pending Users</h6>
+            <h4 class="mb-0" id="pending-users">{{ pending_users }}</h4>
+            <p class="fs--1 mb-0 {% if pending_users > 0 %}text-warning{% else %}text-500{% endif %}">
+              <span class="me-1 {% if pending_users > 0 %}fas fa-clock{% endif %}"></span>
+              {% if pending_users > 0 %}Awaiting approval{% else %}All approved{% endif %}
+            </p>
+          </div>
+          <div class="d-flex align-items-center">
+            <div class="avatar avatar-lg">
+              <div class="avatar-name rounded-circle bg-warning-subtle text-warning">
+                <span data-feather="clock"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Users Table -->
+<div class="card">
+  <div class="card-header">
+    <div class="row flex-between-center">
+      <div class="col">
+        <h6 class="mb-2">Users Management</h6>
+        <h5 class="mb-0">Monitor and manage all system users</h5>
+      </div>
+      <div class="col-auto">
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
+          <span class="fas fa-plus me-2"></span>Add User
+        </button>
+        <button type="button" class="btn btn-secondary ms-2" onclick="clearFilters()">
+          <span class="fas fa-times me-2"></span>Clear All
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Search and Filters -->
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label">Search</label>
+        <div class="position-relative">
+          <input class="form-control pe-5 ajax-search" 
+                 type="search" 
+                 placeholder="Search users..." 
+                 data-search-url="{% url 'accounts_api:api_user_search' %}"
+                 data-target-table="users-table">
+          <span class="position-absolute top-50 end-0 translate-middle-y me-3">
+            <i class="fas fa-search"></i>
+          </span>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Status</label>
+        <select class="form-select ajax-filter" data-filter-type="status">
+          <option value="">All Status</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+          <option value="approved">Approved</option>
+          <option value="pending">Pending</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Role</label>
+        <select class="form-select ajax-filter" data-filter-type="role">
+          <option value="">All Roles</option>
+          <option value="admin">Admin</option>
+          <option value="staff">Staff</option>
+          <option value="tenant">Tenant</option>
+          <option value="owner">Property Owner</option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">&nbsp;</label>
+        <div class="d-flex gap-2">
+          <button class="btn btn-outline-secondary" onclick="clearFilters()">
+            <i class="fas fa-times me-1"></i>Clear
+          </button>
+          <button class="btn btn-outline-primary" onclick="exportUsers()">
+            <i class="fas fa-download me-1"></i>Export
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0" id="users-table">
+        <thead class="table-light">
+          <tr>
+            <th>User</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Status</th>
+            <th>Approval</th>
+            <th>Joined</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="users-table-body">
+          {% for user in page_obj %}
+          <tr data-user-id="{{ user.id }}">
+            <td>
+              <div class="d-flex align-items-center">
+                {% if user.profile and user.profile.image %}
+                  <img src="{{ user.profile.image.url }}" alt="{{ user.get_full_name|default:user.username }}" class="avatar-sm rounded-circle me-3">
+                {% else %}
+                  <div class="avatar-sm bg-primary text-white rounded-circle me-3 d-flex align-items-center justify-content-center fw-bold">
+                    {% if user.first_name and user.last_name %}
+                      {{ user.first_name|first }}{{ user.last_name|first }}
+                    {% else %}
+                      {{ user.username|first|upper }}
+                    {% endif %}
+                  </div>
+                {% endif %}
+                <div>
+                  <strong>
+                    {% if user.first_name and user.last_name %}
+                      {{ user.get_full_name }}
+                    {% else %}
+                      {{ user.username|title }}
+                    {% endif %}
+                  </strong><br>
+                  <small class="text-muted">@{{ user.username }}</small>
+                </div>
+              </div>
+            </td>
+            <td>
+              <span class="text-muted">{{ user.email }}</span>
+            </td>
+            <td>
+              {% if user.is_superuser %}
+                <span class="badge bg-danger text-white">Admin</span>
+              {% elif user.is_staff %}
+                <span class="badge bg-warning text-dark">Staff</span>
+              {% elif user.profile %}
+                {% with primary_role=user.profile.get_primary_role %}
+                  {% if primary_role %}
+                    {% if primary_role == 'Admin' %}
+                      <span class="badge bg-danger text-white">Admin</span>
+                    {% elif primary_role == 'Manager' %}
+                      <span class="badge bg-success">Manager</span>
+                    {% elif primary_role == 'Property owner' %}
+                      <span class="badge bg-info">Property Owner</span>
+                    {% else %}
+                      <span class="badge bg-secondary">{{ primary_role }}</span>
+                    {% endif %}
+                  {% elif user.profile.role == 'tenant' %}
+                    <span class="badge bg-primary">Tenant</span>
+                  {% elif user.profile.role == 'owner' %}
+                    <span class="badge bg-info">Property Owner</span>
+                  {% else %}
+                    <span class="badge bg-secondary">User</span>
+                  {% endif %}
+                {% endwith %}
+              {% else %}
+                <span class="badge bg-secondary">User</span>
+              {% endif %}
+            </td>
+            <td>
+              <span class="badge {% if user.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                {% if user.is_active %}
+                  <i class="fas fa-check-circle me-1"></i>
+                  Active
+                {% else %}
+                  <i class="fas fa-times-circle me-1"></i>
+                  Inactive
+                {% endif %}
+              </span>
+            </td>
+            <td>
+              {% if user.profile %}
+                {% if user.profile.is_approved %}
+                  <span class="badge bg-success">
+                    <i class="fas fa-check me-1"></i>
+                    Approved
+                  </span>
+                {% else %}
+                  <span class="badge bg-warning text-dark">
+                    <i class="fas fa-clock me-1"></i>
+                    Pending
+                  </span>
+                {% endif %}
+              {% else %}
+                <span class="badge bg-secondary">
+                  <i class="fas fa-question me-1"></i>
+                  No Profile
+                </span>
+              {% endif %}
+            </td>
+            <td>
+              <div>
+                <strong>{{ user.date_joined|date:"M j, Y" }}</strong><br>
+                <small class="text-muted">{{ user.date_joined|date:"g:i A" }}</small>
+              </div>
+            </td>
+            <td>
+              <div class="dropdown">
+                <button class="btn btn-link btn btn-primary-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                  <span class="fas fa-ellipsis-h"></span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                  <li><a class="dropdown-item" href="#" onclick="openUserProfileModal({{ user.id }}); return false;"><i class="fas fa-eye me-2 text-primary"></i>View Profile</a></li>
+                  <li><a class="dropdown-item" href="#" onclick="openEditUserModal({{ user.id }}); return false;"><i class="fas fa-edit me-2 text-warning"></i>Edit Profile</a></li>
+                  <li><a class="dropdown-item" href="#" onclick="openAssignRolesModal({{ user.id }}); return false;"><i class="fas fa-user-tag me-2 text-info"></i>Assign Roles</a></li>
+                  <li><hr class="dropdown-divider"></li>
+                  {% if user.profile %}
+                  <li>
+                    <a class="dropdown-item toggle-approval-action" 
+                       href="#" 
+                       data-url="/api/v1/users/{{ user.id }}/toggle-approval/"
+                       data-item-id="{{ user.id }}">
+                      <i class="fas fa-{% if user.profile.is_approved %}check-circle{% else %}clock{% endif %} me-2 text-{% if user.profile.is_approved %}success{% else %}warning{% endif %}"></i>
+                      {% if user.profile.is_approved %}Unapprove{% else %}Approve{% endif %}
+                    </a>
+                  </li>
+                  {% endif %}
+                  <li>
+                    <a class="dropdown-item reset-password-action" 
+                       href="#" 
+                       data-url="/api/v1/users/{{ user.id }}/reset-password/"
+                       data-item-id="{{ user.id }}">
+                      <i class="fas fa-key me-2 text-info"></i>Reset Password
+                    </a>
+                  </li>
+                  <li>
+                    <a class="dropdown-item toggle-status-action" 
+                       href="#" 
+                       data-url="/api/v1/users/{{ user.id }}/toggle-status/"
+                       data-item-id="{{ user.id }}">
+                      <i class="fas fa-toggle-{% if user.is_active %}on{% else %}off{% endif %} me-2 text-{% if user.is_active %}warning{% else %}success{% endif %}"></i>
+                      {% if user.is_active %}Deactivate{% else %}Activate{% endif %}
+                    </a>
+                  </li>
+                  <li>
+                    <a class="dropdown-item text-danger delete-action" 
+                       href="#" 
+                       data-url="/api/v1/users/{{ user.id }}/delete/"
+                       data-item-id="{{ user.id }}"
+                       data-item-name="user">
+                      <i class="fas fa-trash me-2"></i>Delete
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="text-center py-5">
+              <div class="text-muted">
+                <i class="fas fa-users fs-1 mb-3 d-block"></i>
+                <h5>No users found</h5>
+                <p class="mb-0">No users match your search criteria</p>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  
+  <!-- Pagination -->
+  {% if page_obj.has_other_pages %}
+  <div class="card-footer bg-white border-0 py-3">
+    <div class="row align-items-center">
+      <div class="col-md-6">
+        <div class="text-muted">
+          Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} entries
+        </div>
+      </div>
+      <div class="col-md-6">
+        <nav aria-label="Page navigation" class="d-flex justify-content-end">
+          <ul class="pagination pagination-sm mb-0">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+              <a class="page-link" href="?page=1" title="First Page">
+                <i class="fas fa-angle-double-left"></i>
+              </a>
+            </li>
+            <li class="page-item">
+              <a class="page-link" href="?page={{ page_obj.previous_page_number }}" title="Previous Page">
+                <i class="fas fa-angle-left"></i>
+              </a>
+            </li>
+            {% endif %}
+            
+            <!-- Page numbers -->
+            {% for num in page_obj.paginator.page_range %}
+              {% if page_obj.number == num %}
+            <li class="page-item active">
+                <span class="page-link">{{ num }}</span>
+              </li>
+              {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+            </li>
+              {% endif %}
+            {% endfor %}
+            
+            {% if page_obj.has_next %}
+            <li class="page-item">
+              <a class="page-link" href="?page={{ page_obj.next_page_number }}" title="Next Page">
+                <i class="fas fa-angle-right"></i>
+              </a>
+            </li>
+            <li class="page-item">
+              <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}" title="Last Page">
+                <i class="fas fa-angle-double-right"></i>
+              </a>
+            </li>
+            {% endif %}
+          </ul>
+        </nav>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Add User Modal -->
+<!-- Generic Modal Container for AJAX-loaded content -->
+<div class="modal fade" id="genericAjaxModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-warning text-dark">
+        <h5 class="modal-title" id="genericAjaxModalTitle">Loading...</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="genericAjaxModalBody">
+        <div class="text-center text-muted py-3">
+          <i class="fas fa-spinner fa-spin me-2"></i>Loading...
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+<div class="modal fade" id="addUserModal" tabindex="-1" aria-labelledby="addUserModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-warning text-dark">
+        <h5 class="modal-title" id="addUserModalLabel">
+          <i class="fas fa-user-plus me-2"></i>Add New User
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="addUserForm">
+        {% csrf_token %}
+        <div class="modal-body">
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="id_first_name" class="form-label">First Name</label>
+              <input type="text" class="form-control" id="id_first_name" name="first_name" required>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="id_last_name" class="form-label">Last Name</label>
+              <input type="text" class="form-control" id="id_last_name" name="last_name" required>
+            </div>
+          </div>
+          
+          <div class="mb-3">
+            <label for="id_username" class="form-label">Username</label>
+            <input type="text" class="form-control" id="id_username" name="username" required>
+          </div>
+          
+          <div class="mb-3">
+            <label for="id_email" class="form-label">Email</label>
+            <input type="email" class="form-control" id="id_email" name="email" required>
+          </div>
+          
+          <div class="mb-3">
+            <label for="id_phone" class="form-label">Phone Number</label>
+            <input type="tel" class="form-control" id="id_phone" name="phone">
+          </div>
+          
+          <div class="mb-3">
+            <label for="id_password" class="form-label">Password</label>
+            <input type="password" class="form-control" id="id_password" name="password" required>
+          </div>
+          
+          <div class="mb-3">
+            <label for="id_role" class="form-label">Role</label>
+            <select class="form-select" id="id_role" name="role" required>
+              <option value="">Select Role</option>
+              <option value="tenant">Tenant</option>
+              <option value="owner">Property Owner</option>
+            </select>
+          </div>
+          
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="id_is_approved" name="is_approved" checked>
+            <label class="form-check-label" for="id_is_approved">
+              Approve user immediately
+            </label>
+          </div>
+        </div>
+        
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-save me-2"></i>Create User
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Edit User Modal -->
+<div class="modal fade" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editUserModalLabel">
+          <i class="fas fa-user-edit me-2"></i>Edit User
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="editUserForm">
+        {% csrf_token %}
+        <input type="hidden" id="edit_user_id" name="user_id">
+        <div class="modal-body">
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="edit_first_name" class="form-label">First Name</label>
+              <input type="text" class="form-control" id="edit_first_name" name="first_name" required>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="edit_last_name" class="form-label">Last Name</label>
+              <input type="text" class="form-control" id="edit_last_name" name="last_name" required>
+            </div>
+          </div>
+          
+          <div class="mb-3">
+            <label for="edit_username" class="form-label">Username</label>
+            <input type="text" class="form-control" id="edit_username" name="username" required>
+          </div>
+          
+          <div class="mb-3">
+            <label for="edit_email" class="form-label">Email</label>
+            <input type="email" class="form-control" id="edit_email" name="email" required>
+          </div>
+          
+          <div class="mb-3">
+            <label for="edit_phone" class="form-label">Phone Number</label>
+            <input type="tel" class="form-control" id="edit_phone" name="phone">
+          </div>
+          
+          <div class="alert alert-info mb-0">
+            <small><i class="fas fa-info-circle me-2"></i><strong>Note:</strong> To change user role, use "Assign Roles" from the dropdown menu. To approve/unapprove user, use the "Approve/Unapprove" action.</small>
+          </div>
+        </div>
+        
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-save me-2"></i>Update User
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.avatar-sm {
+    width: 40px;
+    height: 40px;
+    font-size: 14px;
+    font-weight: bold;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Ensure CSRF token is available
+(function() {
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (csrfToken && !document.querySelector('meta[name=csrf-token]')) {
+        const meta = document.createElement('meta');
+        meta.name = 'csrf-token';
+        meta.content = csrfToken.value;
+        document.head.appendChild(meta);
+    }
+})();
+$(document).ready(function() {
+    // Initialize Bootstrap dropdowns
+    var dropdownElementList = [].slice.call(document.querySelectorAll('[data-bs-toggle="dropdown"]'));
+    var dropdownList = dropdownElementList.map(function (dropdownToggleEl) {
+        return new bootstrap.Dropdown(dropdownToggleEl);
+    });
+    
+    // Simple search functionality (client-side)
+    $('.ajax-search').on('input', function() {
+        const searchTerm = $(this).val().toLowerCase();
+        filterTable(searchTerm);
+    });
+    
+    // Simple filter functionality (client-side)
+    $('.ajax-filter').on('change', function() {
+        const filterType = $(this).data('filter-type');
+        const filterValue = $(this).val();
+        filterTableByType(filterType, filterValue);
+    });
+    
+    // Filter table by search term
+    function filterTable(searchTerm) {
+        $('#users-table tbody tr').each(function() {
+            const row = $(this);
+            const text = row.text().toLowerCase();
+            if (text.includes(searchTerm)) {
+                row.show();
+            } else {
+                row.hide();
+            }
+        });
+    }
+    
+    // Filter table by type
+    function filterTableByType(filterType, filterValue) {
+        $('#users-table tbody tr').each(function() {
+            const row = $(this);
+            let showRow = true;
+            
+            if (filterValue) {
+                if (filterType === 'status') {
+                    const statusText = row.find('td:nth-child(4)').text().toLowerCase();
+                    if (filterValue === 'active' && !statusText.includes('active')) {
+                        showRow = false;
+                    } else if (filterValue === 'inactive' && !statusText.includes('inactive')) {
+                        showRow = false;
+                    }
+                } else if (filterType === 'role') {
+                    const roleText = row.find('td:nth-child(3)').text().toLowerCase();
+                    if (!roleText.includes(filterValue.toLowerCase())) {
+                        showRow = false;
+                    }
+                }
+            }
+            
+            if (showRow) {
+                row.show();
+            } else {
+                row.hide();
+            }
+        });
+    }
+    
+    // (Removed old generic delete/toggle handlers to avoid conflicts.)
+    
+    // Clear filters function
+    window.clearFilters = function() {
+        $('.ajax-search').val('');
+        $('.ajax-filter').val('');
+        $('#users-table tbody tr').show();
+    };
+    
+    // Export users function
+    window.exportUsers = function() {
+        alert('Export functionality will be implemented');
+    };
+    
+    // Helpers to open and populate the generic modal
+    function openGenericModal(title) {
+        $('#genericAjaxModalTitle').text(title || '');
+        $('#genericAjaxModalBody').html('<div class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin me-2"></i>Loading...</div>');
+        const modal = new bootstrap.Modal(document.getElementById('genericAjaxModal'));
+        modal.show();
+        return modal;
+    }
+    
+    // View Profile - Redirect to profile page
+    window.openUserProfileModal = function(userId) {
+        window.location.href = `/users/${userId}/profile/`;
+    };
+    
+    // Edit Profile
+    window.openEditUserModal = function(userId) {
+        const modal = openGenericModal('Edit User');
+        $.get('{% url "accounts_api:api_user_detail" %}', { user_id: userId }, function(resp){
+            if (resp && resp.success) {
+                const u = resp.user;
+                // Create form HTML directly without cloning modal structure
+                const formHtml = `
+                    <form id="editUserForm">
+                        {% csrf_token %}
+                        <input type="hidden" name="user_id" value="${u.id}">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">First Name</label>
+                                <input type="text" class="form-control" name="first_name" value="${u.first_name || ''}" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Last Name</label>
+                                <input type="text" class="form-control" name="last_name" value="${u.last_name || ''}" required>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Username</label>
+                            <input type="text" class="form-control" name="username" value="${u.username || ''}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" name="email" value="${u.email || ''}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Phone Number</label>
+                            <input type="tel" class="form-control" name="phone" value="${u.profile && u.profile.phone ? u.profile.phone : ''}">
+                        </div>
+                        <div class="alert alert-info mb-0">
+                            <small><i class="fas fa-info-circle me-2"></i><strong>Note:</strong> To change user role, use "Assign Roles" from the dropdown menu. To approve/unapprove user, use the "Approve/Unapprove" action.</small>
+                        </div>
+                        <div class="d-flex justify-content-end gap-2">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i>Update User
+                            </button>
+                        </div>
+                    </form>`;
+                $('#genericAjaxModalBody').html(formHtml);
+                // Bind submit to update
+                $('#editUserForm').on('submit', function(e){
+                    e.preventDefault();
+                    const formData = new FormData(this);
+                    const submitBtn = $(this).find('button[type="submit"]');
+                    const original = submitBtn.html();
+                    submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Saving...');
+                    $.ajax({
+                        url: '{% url "accounts_api:api_user_update" %}',
+                        method: 'POST',
+                        data: formData,
+                        processData: false,
+                        contentType: false,
+                        headers: { 'X-CSRFToken': $('[name=csrfmiddlewaretoken]').first().val() },
+                        success: function(r){
+                            if (r.success) {
+                                location.reload();
+                            } else {
+                                alert(r.message || 'Failed to update user');
+                            }
+                        },
+                        error: function(){ alert('Error updating user'); },
+                        complete: function(){ submitBtn.prop('disabled', false).html(original); }
+                    });
+                });
+            } else {
+                $('#genericAjaxModalBody').html('<div class="text-danger">Failed to load user.</div>');
+            }
+        }).fail(function(){
+            $('#genericAjaxModalBody').html('<div class="text-danger">Error loading user.</div>');
+        });
+    };
+    
+    // Assign Roles - Redirect to edit roles modal
+    window.openAssignRolesModal = function(userId) {
+        window.location.href = `/users/${userId}/edit-roles/`;
+    };
+    
+    // (Removed Additional Permissions action)
+    
+    // Activate/Deactivate
+    window.openToggleStatusModal = function(userId, isActive) {
+        const modal = openGenericModal(isActive ? 'Deactivate Staff' : 'Activate Staff');
+        // Build the action URL dynamically
+        const actionUrl = isActive ? `/users/${userId}/deactivate/` : `/users/${userId}/activate/`;
+        const html = `
+            <div class="mb-3">Are you sure you want to ${isActive ? 'deactivate' : 'activate'} this user?</div>
+            <div class="text-end">
+              <form method="post" action="${actionUrl}">
+                {% csrf_token %}
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-danger ms-2">Confirm</button>
+              </form>
+            </div>`;
+        $('#genericAjaxModalBody').html(html);
+    };
+    
+    // Delete user
+    window.openDeleteUserModal = function(userId) {
+        const modal = openGenericModal('Delete Staff');
+        const actionUrl = `/users/${userId}/delete/`;
+        const html = `
+            <div class="alert alert-warning"><i class="fas fa-exclamation-triangle me-2"></i>This action cannot be undone.</div>
+            <div class="text-end">
+              <form method="post" action="${actionUrl}">
+                {% csrf_token %}
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-danger ms-2">Delete</button>
+              </form>
+            </div>`;
+        $('#genericAjaxModalBody').html(html);
+    };
+    
+    // Handle Add User Form submission
+    $('#addUserForm').on('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        const submitBtn = $(this).find('button[type="submit"]');
+        const original = submitBtn.html();
+        
+        submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Creating...');
+        
+        $.ajax({
+            url: '{% url "accounts_api:api_user_create" %}',
+            method: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            headers: { 'X-CSRFToken': $('[name=csrfmiddlewaretoken]').first().val() },
+            success: function(response) {
+                if (response.success) {
+                    $('#addUserModal').modal('hide');
+                    $('#addUserForm')[0].reset();
+                    // Reload page to show new user
+                    location.reload();
+                } else {
+                    alert(response.message || 'Failed to create user');
+                    submitBtn.prop('disabled', false).html(original);
+                }
+            },
+            error: function(xhr) {
+                let errorMsg = 'Error creating user';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg = xhr.responseJSON.message;
+                }
+                alert(errorMsg);
+                submitBtn.prop('disabled', false).html(original);
+            }
+        });
+    });
+    
+    // Handle Reset Password action (direct handler to ensure it works)
+    $(document).on('click', '.reset-password-action', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const link = $(this);
+        // Use attr() to get the exact data attribute value
+        const url = link.attr('data-url');
+        const itemId = link.attr('data-item-id');
+        
+        console.log('Reset password clicked', { url, itemId, link: this });
+        
+        if (!url || !itemId) {
+            console.error('Missing URL or itemId for reset password action', { url, itemId });
+            alert('Invalid action configuration. Please refresh the page.');
+            return;
+        }
+        
+        if (confirm('Are you sure you want to reset this user\'s password to the default? The new password will be: DefaultPass@12')) {
+            const csrfToken = $('[name=csrfmiddlewaretoken]').first().val() || 
+                             $('meta[name=csrf-token]').attr('content') || '';
+            
+            if (!csrfToken) {
+                alert('Security token not found. Please refresh the page.');
+                console.error('CSRF token not found');
+                return;
+            }
+            
+            console.log('Sending reset password request to:', url, 'with CSRF token');
+            
+            $.ajax({
+                url: url,
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrfToken,
+                    'Content-Type': 'application/json',
+                },
+                success: function(data) {
+                    console.log('Reset password response:', data);
+                    if (data.success) {
+                        const message = 'Password reset successfully! New password: ' + (data.default_password || 'DefaultPass@12');
+                        alert(message);
+                        
+                        // Try to copy to clipboard
+                        if (navigator.clipboard) {
+                            navigator.clipboard.writeText(data.default_password || 'DefaultPass@12').then(() => {
+                                console.log('Password copied to clipboard');
+                            }).catch(err => {
+                                console.error('Failed to copy to clipboard:', err);
+                            });
+                        }
+                    } else {
+                        alert(data.message || 'Failed to reset password');
+                    }
+                },
+                error: function(xhr) {
+                    console.error('Reset password AJAX error:', xhr);
+                    let errorMsg = 'An error occurred while resetting password';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMsg = xhr.responseJSON.message;
+                    } else if (xhr.status === 403) {
+                        errorMsg = 'Permission denied. Please check your login status.';
+                    } else if (xhr.status === 404) {
+                        errorMsg = 'User not found.';
+                    } else if (xhr.status === 500) {
+                        errorMsg = 'Server error. Please try again later.';
+                    }
+                    alert(errorMsg);
+                }
+            });
+        }
+    });
+});
+
+// Legacy functions kept as no-ops to avoid console errors if referenced elsewhere
+function viewUserProfile(userId) {}
+function editUser(userId) {}
+</script>
+{% endblock %}

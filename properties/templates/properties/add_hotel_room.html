@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Add Hotel Room{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="page-title-box">
+                <div class="page-title-right">
+                    <ol class="breadcrumb m-0">
+                        <li class="breadcrumb-item"><a href="{% url 'properties:dashboard' %}">Properties</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'properties:hotel_dashboard' %}">Hotel Management</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'properties:hotel_rooms' %}">Rooms</a></li>
+                        <li class="breadcrumb-item active">Add Room</li>
+                    </ol>
+                </div>
+                <h4 class="page-title">Add Hotel Room</h4>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-bed me-2"></i>Add New Room
+                    </h5>
+                    <p class="text-muted mb-0">Hotel: <strong>{{ selected_property.title }}</strong></p>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <!-- Room Information -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary mb-3">
+                                    <i class="fas fa-bed me-2"></i>Room Information
+                                </h6>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Room Number *</label>
+                                <input type="text" class="form-control" name="room_number" required placeholder="e.g., 101, 205, Suite-1">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Room Type *</label>
+                                <select class="form-control" name="room_type" required>
+                                    <option value="">Select Room Type</option>
+                                    <option value="Single">Single</option>
+                                    <option value="Double">Double</option>
+                                    <option value="Twin">Twin</option>
+                                    <option value="Suite">Suite</option>
+                                    <option value="Deluxe">Deluxe</option>
+                                    <option value="Presidential">Presidential</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Floor Number</label>
+                                <input type="number" class="form-control" name="floor_number" min="0" placeholder="Floor number">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Capacity *</label>
+                                <input type="number" class="form-control" name="capacity" min="1" value="1" required placeholder="Number of guests">
+                            </div>
+                        </div>
+
+                        <!-- Room Details -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary mb-3">
+                                    <i class="fas fa-info-circle me-2"></i>Room Details
+                                </h6>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Bed Type</label>
+                                <select class="form-control" name="bed_type">
+                                    <option value="">Select Bed Type</option>
+                                    <option value="Single Bed">Single Bed</option>
+                                    <option value="Double Bed">Double Bed</option>
+                                    <option value="Queen Bed">Queen Bed</option>
+                                    <option value="King Bed">King Bed</option>
+                                    <option value="Twin Beds">Twin Beds</option>
+                                    <option value="Sofa Bed">Sofa Bed</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Base Rate (per night) *</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">Tsh</span>
+                                    <input type="number" class="form-control" name="base_rate" step="0.01" min="0" required placeholder="0.00">
+                                </div>
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label">Amenities</label>
+                                <textarea class="form-control" name="amenities" rows="3" placeholder="e.g., WiFi, TV, Mini-bar, Air conditioning, Balcony"></textarea>
+                                <div class="form-text">List room amenities separated by commas</div>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-2"></i>Add Room
+                                    </button>
+                                    <a href="{% url 'properties:hotel_rooms' %}" class="btn btn-secondary">
+                                        <i class="fas fa-times me-2"></i>Cancel
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-generate room number suggestions based on room type
+    const roomTypeSelect = document.querySelector('select[name="room_type"]');
+    const roomNumberInput = document.querySelector('input[name="room_number"]');
+    
+    roomTypeSelect.addEventListener('change', function() {
+        if (this.value === 'Suite') {
+            roomNumberInput.placeholder = 'e.g., Suite-1, Suite-2';
+        } else if (this.value === 'Presidential') {
+            roomNumberInput.placeholder = 'e.g., Presidential-1';
+        } else {
+            roomNumberInput.placeholder = 'e.g., 101, 205, 301';
+        }
+    });
+});
+</script>
+{% endblock %}

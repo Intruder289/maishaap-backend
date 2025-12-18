@@ -1,0 +1,368 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}Rent Reminder Analytics{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1"><i class="fas fa-chart-bar text-primary me-2"></i>Rent Reminder Analytics</h2>
+            <p class="text-muted mb-0">Track performance and effectiveness of your rent reminder system.</p>
+        </div>
+        <div>
+            <a href="{% url 'properties:house_rent_reminders_dashboard' %}" class="btn btn-outline-secondary me-2">
+                <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+            </a>
+            <button class="btn btn-primary" onclick="exportAnalytics()">
+                <i class="fas fa-download me-2"></i>Export Report
+            </button>
+        </div>
+    </div>
+
+    <!-- Date Range Filter -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Filter by Date Range</h5>
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label for="start_date" class="form-label">Start Date</label>
+                    <input type="date" class="form-control" id="start_date" name="start_date" 
+                           value="{{ request.GET.start_date|default:start_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label for="end_date" class="form-label">End Date</label>
+                    <input type="date" class="form-control" id="end_date" name="end_date" 
+                           value="{{ request.GET.end_date|default:end_date }}">
+                </div>
+                <div class="col-md-3">
+                    <label for="property_filter" class="form-label">Property</label>
+                    <select name="property_id" id="property_filter" class="form-select">
+                        <option value="">All Properties</option>
+                        {% for property in properties %}
+                        <option value="{{ property.id }}" {% if request.GET.property_id == property.id|stringformat:"s" %}selected{% endif %}>
+                            {{ property.title }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">&nbsp;</label>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-filter me-2"></i>Apply Filter
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Key Metrics -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ total_reminders }}</h4>
+                            <p class="mb-0">Total Reminders</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-bell fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ sent_reminders }}</h4>
+                            <p class="mb-0">Sent Successfully</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-check fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ success_rate }}%</h4>
+                            <p class="mb-0">Success Rate</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-percentage fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">{{ avg_response_time }}h</h4>
+                            <p class="mb-0">Avg Response Time</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-clock fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Reminder Types Performance -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Reminder Types Performance</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="reminderTypesChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Monthly Trends -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Monthly Trends</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="monthlyTrendsChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Property Performance -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Property Performance</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Property</th>
+                                    <th>Reminders</th>
+                                    <th>Success Rate</th>
+                                    <th>Avg Response</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for property_stat in property_stats %}
+                                <tr>
+                                    <td>{{ property_stat.property_title }}</td>
+                                    <td>{{ property_stat.total_reminders }}</td>
+                                    <td>
+                                        <span class="badge bg-{% if property_stat.success_rate >= 80 %}success{% elif property_stat.success_rate >= 60 %}warning{% else %}danger{% endif %}">
+                                            {{ property_stat.success_rate }}%
+                                        </span>
+                                    </td>
+                                    <td>{{ property_stat.avg_response_time }}h</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">No data available</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Overdue Analysis -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Overdue Analysis</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="overdueChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detailed Statistics -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Detailed Statistics</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <h6 class="text-muted">Reminder Status Breakdown</h6>
+                    <ul class="list-unstyled">
+                        <li><span class="badge bg-success me-2">Sent</span> {{ sent_count }} ({{ sent_percentage }}%)</li>
+                        <li><span class="badge bg-warning me-2">Scheduled</span> {{ scheduled_count }} ({{ scheduled_percentage }}%)</li>
+                        <li><span class="badge bg-danger me-2">Failed</span> {{ failed_count }} ({{ failed_percentage }}%)</li>
+                        <li><span class="badge bg-secondary me-2">Cancelled</span> {{ cancelled_count }} ({{ cancelled_percentage }}%)</li>
+                    </ul>
+                </div>
+                <div class="col-md-4">
+                    <h6 class="text-muted">Reminder Types</h6>
+                    <ul class="list-unstyled">
+                        <li><span class="badge bg-primary me-2">Email</span> {{ email_count }} ({{ email_percentage }}%)</li>
+                        <li><span class="badge bg-info me-2">SMS</span> {{ sms_count }} ({{ sms_percentage }}%)</li>
+                        <li><span class="badge bg-warning me-2">Push</span> {{ push_count }} ({{ push_percentage }}%)</li>
+                        <li><span class="badge bg-secondary me-2">Phone</span> {{ phone_count }} ({{ phone_percentage }}%)</li>
+                    </ul>
+                </div>
+                <div class="col-md-4">
+                    <h6 class="text-muted">Time Analysis</h6>
+                    <ul class="list-unstyled">
+                        <li><strong>Peak Hours:</strong> {{ peak_hours }}</li>
+                        <li><strong>Best Day:</strong> {{ best_day }}</li>
+                        <li><strong>Avg Processing:</strong> {{ avg_processing_time }}min</li>
+                        <li><strong>Response Rate:</strong> {{ response_rate }}%</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Recent Activity</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date</th>
+                            <th>Property</th>
+                            <th>Type</th>
+                            <th>Status</th>
+                            <th>Response Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for activity in recent_activity %}
+                        <tr>
+                            <td>{{ activity.date|date:"M d, Y H:i" }}</td>
+                            <td>{{ activity.property_title }}</td>
+                            <td>
+                                <span class="badge bg-secondary">{{ activity.reminder_type }}</span>
+                            </td>
+                            <td>
+                                {% if activity.status == 'sent' %}
+                                    <span class="badge bg-success">Sent</span>
+                                {% elif activity.status == 'failed' %}
+                                    <span class="badge bg-danger">Failed</span>
+                                {% else %}
+                                    <span class="badge bg-warning">{{ activity.status|title }}</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ activity.response_time|default:"N/A" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center p-4">No recent activity</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Reminder Types Chart
+const reminderTypesCtx = document.getElementById('reminderTypesChart').getContext('2d');
+new Chart(reminderTypesCtx, {
+    type: 'doughnut',
+    data: {
+        labels: ['Email', 'SMS', 'Push', 'Phone'],
+        datasets: [{
+            data: [{{ email_count }}, {{ sms_count }}, {{ push_count }}, {{ phone_count }}],
+            backgroundColor: ['#007bff', '#17a2b8', '#ffc107', '#6c757d']
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            }
+        }
+    }
+});
+
+// Monthly Trends Chart
+const monthlyTrendsCtx = document.getElementById('monthlyTrendsChart').getContext('2d');
+new Chart(monthlyTrendsCtx, {
+    type: 'line',
+    data: {
+        labels: {{ monthly_labels|safe }},
+        datasets: [{
+            label: 'Reminders Sent',
+            data: {{ monthly_data|safe }},
+            borderColor: '#007bff',
+            backgroundColor: 'rgba(0, 123, 255, 0.1)',
+            tension: 0.4
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+});
+
+// Overdue Chart
+const overdueCtx = document.getElementById('overdueChart').getContext('2d');
+new Chart(overdueCtx, {
+    type: 'bar',
+    data: {
+        labels: ['0-3 days', '4-7 days', '8-14 days', '15-30 days', '30+ days'],
+        datasets: [{
+            label: 'Overdue Count',
+            data: [{{ overdue_0_3 }}, {{ overdue_4_7 }}, {{ overdue_8_14 }}, {{ overdue_15_30 }}, {{ overdue_30_plus }}],
+            backgroundColor: ['#28a745', '#ffc107', '#fd7e14', '#dc3545', '#6f42c1']
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+});
+
+function exportAnalytics() {
+    // Implementation for exporting analytics
+    alert('Export functionality will be implemented');
+}
+</script>
+{% endblock %}

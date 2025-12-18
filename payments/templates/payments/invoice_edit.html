@@ -1,0 +1,53 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+{% load currency_filters %}
+
+{% block title %}Edit Invoice #{{ invoice.id }} - Maisha{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h5 class="mb-0">Edit Invoice #{{ invoice.id }}</h5>
+      </div>
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="amount" class="form-label">Amount *</label>
+              <input type="number" class="form-control" id="amount" name="amount" 
+                     value="{{ invoice.amount }}" step="0.01" min="0" required>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="due_date" class="form-label">Due Date *</label>
+              <input type="date" class="form-control" id="due_date" name="due_date" 
+                     value="{{ invoice.due_date|date:'Y-m-d' }}" required>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="status" class="form-label">Status *</label>
+              <select class="form-select" id="status" name="status" required>
+                {% for value, label in status_choices %}
+                <option value="{{ value }}" {% if invoice.status == value %}selected{% endif %}>
+                  {{ label }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">
+              <i class="fas fa-save me-2"></i>Save Changes
+            </button>
+            <a href="{% url 'payments:invoice_detail' invoice.id %}" class="btn btn-secondary">
+              <i class="fas fa-times me-2"></i>Cancel
+            </a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

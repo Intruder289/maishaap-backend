@@ -1,0 +1,246 @@
+{% extends "accounts/base.html" %}
+{% load static %}
+
+{% block title %}403 - Access Forbidden{% endblock %}
+
+{% block extra_head %}
+<style>
+    .error-page {
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        min-height: auto;
+        padding: 2rem 1rem;
+        margin-top: 2rem;
+    }
+    
+    .error-container {
+        text-align: center;
+        max-width: 600px;
+        width: 100%;
+    }
+    
+    .error-icon {
+        margin: 0 auto 0.75rem;
+        width: 10px !important;
+        height: 10px !important;
+        max-width: 10px !important;
+        max-height: 10px !important;
+        color: #dc3545;
+        display: inline-block;
+    }
+    
+    .error-icon svg {
+        width: 10px !important;
+        height: 10px !important;
+        max-width: 10px !important;
+        max-height: 10px !important;
+        display: block;
+    }
+    
+    .error-code {
+        font-size: 3rem;
+        font-weight: 700;
+        color: #dc3545;
+        margin-bottom: 0.75rem;
+    }
+    
+    .error-title {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 0.75rem;
+    }
+    
+    .error-message {
+        font-size: 1.1rem;
+        color: #666;
+        margin-bottom: 2rem;
+    }
+    
+    .error-details {
+        text-align: left;
+        background: #f8f9fa;
+        padding: 1.5rem;
+        border-radius: 0.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .error-details h3 {
+        font-size: 1.1rem;
+        margin-bottom: 1rem;
+        color: #333;
+    }
+    
+    .error-details ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+    
+    .error-details li {
+        padding: 0.5rem 0;
+        padding-left: 1.5rem;
+        position: relative;
+        color: #666;
+    }
+    
+    .error-details li:before {
+        content: "•";
+        position: absolute;
+        left: 0;
+        color: #dc3545;
+        font-weight: bold;
+    }
+    
+    .error-actions {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        margin-bottom: 2rem;
+        flex-wrap: wrap;
+    }
+    
+    .btn-primary-primary-action,
+    .btn-primary-secondary-action {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.5rem;
+        border-radius: 0.5rem;
+        text-decoration: none;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-primary-primary-action {
+        background: #dc3545;
+        color: white;
+    }
+    
+    .btn-primary-primary-action:hover {
+        background: #c82333;
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
+    }
+    
+    .btn-primary-secondary-action {
+        background: #6c757d;
+        color: white;
+    }
+    
+    .btn-primary-secondary-action:hover {
+        background: #5a6268;
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(108, 117, 125, 0.3);
+    }
+    
+    .contact-info {
+        margin-top: 2rem;
+        padding-top: 2rem;
+        border-top: 1px solid #dee2e6;
+        color: #666;
+        font-size: 0.9rem;
+    }
+    
+    .contact-info a {
+        color: #dc3545;
+        text-decoration: none;
+    }
+    
+    .contact-info a:hover {
+        text-decoration: underline;
+    }
+    
+    @media (max-width: 768px) {
+        .error-icon {
+            width: 6px !important;
+            height: 6px !important;
+            max-width: 6px !important;
+            max-height: 6px !important;
+        }
+        
+        .error-icon svg {
+            width: 6px !important;
+            height: 6px !important;
+            max-width: 6px !important;
+            max-height: 6px !important;
+        }
+        
+        .error-code {
+            font-size: 2.5rem;
+        }
+        
+        .error-title {
+            font-size: 1.25rem;
+        }
+        
+        .error-actions {
+            flex-direction: column;
+        }
+        
+        .btn-primary-primary-action,
+        .btn-primary-secondary-action {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="error-page">
+    <div class="error-container">
+        <!-- Error Code -->
+        <h1 class="error-code">{{ error_code|default:"403" }}</h1>
+        
+        <!-- Error Title -->
+        <h2 class="error-title">{{ error_title|default:"Access Forbidden" }}</h2>
+        
+        <!-- Error Message -->
+        <p class="error-message">
+            {{ error_message|default:"You don't have permission to access this page. This area is restricted to authorized users only." }}
+        </p>
+        
+        <!-- Error Details -->
+        <div class="error-details">
+            <h3>Why am I seeing this?</h3>
+            <ul>
+                <li>You may not have the required role or permissions</li>
+                <li>Your account may be pending approval</li>
+                <li>This page may be restricted to administrators only</li>
+                <li>You may need to log in with different credentials</li>
+            </ul>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="error-actions">
+            {% if show_dashboard_link %}
+            <a href="{% url 'accounts:dashboard' %}" class="btn btn-primary-primary-action">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                </svg>
+                Go to Dashboard
+            </a>
+            {% endif %}
+            
+            <a href="javascript:history.back()" class="btn btn-primary-secondary-action">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Go Back
+            </a>
+        </div>
+        
+        <!-- Contact Information -->
+        <div class="contact-info">
+            <p>
+                Need access to this page? Contact your system administrator or 
+                <a href="mailto:support@maisha.com">support@maisha.com</a>
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

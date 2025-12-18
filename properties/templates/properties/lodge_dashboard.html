@@ -1,0 +1,545 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}Lodge Management Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <!-- Page Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="mb-1">
+                        <i class="fas fa-mountain text-primary me-2"></i>Lodge Management Dashboard
+                    </h2>
+                    <p class="text-muted mb-0">Manage lodge operations, bookings, and outdoor activities</p>
+                    {% if selected_property %}
+                        <div class="mt-2">
+                            <span class="badge bg-primary">
+                                <i class="fas fa-building me-1"></i>Managing: {{ selected_property.title }}
+                            </span>
+                            <a href="{% url 'properties:lodge_clear_selection' %}" class="btn btn-sm btn-outline-secondary ms-2">
+                                <i class="fas fa-times me-1"></i>Clear Selection
+                            </a>
+                        </div>
+                    {% else %}
+                        <div class="mt-2">
+                            <span class="badge bg-info">
+                                <i class="fas fa-globe me-1"></i>Managing: All Lodges
+                            </span>
+                            <a href="{% url 'properties:lodge_select_property' %}" class="btn btn-sm btn-outline-primary ms-2">
+                                <i class="fas fa-building me-1"></i>Select Lodge
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+                <div>
+                    <a href="{% url 'properties:create_lodge_booking' %}" class="btn btn-primary">
+                        <i class="fas fa-plus me-2"></i>New Booking
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Stats Cards -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-0">{{ total_rooms }}</h4>
+                                    <p class="mb-0">Total Rooms</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-bed fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-0">{{ total_bookings }}</h4>
+                                    <p class="mb-0">Total Bookings</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-check-circle fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-0">{{ active_bookings }}</h4>
+                                    <p class="mb-0">Active Bookings</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-user fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-0">Tsh{{ revenue|floatformat:0 }}</h4>
+                                    <p class="mb-0">Total Revenue</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-hiking fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Quick Actions -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Quick Actions</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-2">
+                                    <a href="{% url 'properties:lodge_bookings' %}" class="btn btn-outline-primary w-100 mb-2">
+                                        <i class="fas fa-calendar-alt d-block mb-2"></i>
+                                        View Bookings
+                                    </a>
+                                </div>
+                                <div class="col-md-2">
+                                    <a href="{% url 'properties:add_lodge_room' %}" class="btn btn-outline-success w-100 mb-2">
+                                        <i class="fas fa-plus d-block mb-2"></i>
+                                        Add Room
+                                    </a>
+                                </div>
+                                <div class="col-md-2">
+                                    <a href="{% url 'properties:lodge_customers' %}" class="btn btn-outline-info w-100 mb-2">
+                                        <i class="fas fa-users d-block mb-2"></i>
+                                        Customers
+                                    </a>
+                                </div>
+                                <div class="col-md-2">
+                                    <a href="{% url 'properties:lodge_payments' %}" class="btn btn-outline-warning w-100 mb-2">
+                                        <i class="fas fa-money-bill-wave d-block mb-2"></i>
+                                        Payments
+                                    </a>
+                                </div>
+                                <div class="col-md-2">
+                                    <a href="{% url 'properties:lodge_reports' %}" class="btn btn-outline-secondary w-100 mb-2">
+                                        <i class="fas fa-chart-bar d-block mb-2"></i>
+                                        Reports
+                                    </a>
+                                </div>
+                                <div class="col-md-2">
+                                    <button class="btn btn-outline-danger w-100 mb-2" data-bs-toggle="modal" data-bs-target="#activityModal">
+                                        <i class="fas fa-hiking d-block mb-2"></i>
+                                        Activities
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Today's Activities -->
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="row flex-between-center">
+                                <div class="col">
+                                    <h6 class="mb-2">Today's Check-ins & Activities</h6>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Customer</th>
+                                            <th>Property</th>
+                                            <th>Check-in</th>
+                                            <th>Check-out</th>
+                                            <th>Guests</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for booking in todays_checkins %}
+                                        <tr data-booking-id="{{ booking.id }}">
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3 fw-bold">
+                                                        {{ booking.customer.full_name|first|upper }}
+                                                    </div>
+                                                <div>
+                                                        <strong>{{ booking.customer.full_name }}</strong>
+                                                        <div class="text-muted small">{{ booking.customer.email|default:booking.customer.phone }}</div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                {% if booking.property_obj %}
+                                                <div class="d-flex align-items-center">
+                                                    <i class="fas fa-home text-muted me-2"></i>
+                                                    <div>
+                                                        <div class="fw-bold">{{ booking.property_obj.title }}</div>
+                                                        <div class="text-muted small">{{ booking.room_number|default:"-" }}</div>
+                                                    </div>
+                                                </div>
+                                                {% else %}
+                                                <span class="text-muted">No property</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ booking.check_in_date|date:"M d, Y" }}</td>
+                                            <td>{{ booking.check_out_date|date:"M d, Y" }}</td>
+                                            <td>
+                                                <div class="text-muted small">
+                                                    <i class="fas fa-users me-1"></i>{{ booking.number_of_guests }} {{ booking.number_of_guests|pluralize:"guest,guests" }}
+                                                </div>
+                                            </td>
+                                            <td>
+                                                {% if booking.booking_status == 'checked_in' %}
+                                                <span class="badge bg-success">{{ booking.get_booking_status_display }}</span>
+                                                {% elif booking.booking_status == 'confirmed' %}
+                                                <span class="badge bg-primary">{{ booking.get_booking_status_display }}</span>
+                                                {% elif booking.booking_status == 'cancelled' %}
+                                                <span class="badge bg-danger">{{ booking.get_booking_status_display }}</span>
+                                                {% else %}
+                                                <span class="badge bg-warning">{{ booking.get_booking_status_display }}</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <div class="dropdown">
+                                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                                        <i class="fas fa-ellipsis-v"></i>
+                                                    </button>
+                                                    <ul class="dropdown-menu">
+                                                        <li><a class="dropdown-item" href="#"><i class="fas fa-eye me-2"></i>View Details</a></li>
+                                                        {% if booking.booking_status == 'confirmed' %}
+                                                        <li><hr class="dropdown-divider"></li>
+                                                        <li><a class="dropdown-item" href="#"><i class="fas fa-sign-in-alt me-2"></i>Check-in</a></li>
+                                                        {% elif booking.booking_status == 'checked_in' %}
+                                                        <li><hr class="dropdown-divider"></li>
+                                                        <li><a class="dropdown-item" href="#"><i class="fas fa-sign-out-alt me-2"></i>Check-out</a></li>
+                                                        {% endif %}
+                                                    </ul>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr>
+                                            <td colspan="7" class="text-center py-4">
+                                                <div class="text-muted">
+                                                    <i class="fas fa-calendar-check fa-2x mb-3"></i>
+                                                    <p>No check-ins for today.</p>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <!-- Pagination -->
+                            {% if todays_checkins.has_other_pages %}
+                            <div class="card-footer bg-white border-0 py-3">
+                                <div class="row align-items-center">
+                                    <div class="col-md-6">
+                                        <div class="text-muted">
+                                            Showing {{ todays_checkins.start_index }} to {{ todays_checkins.end_index }} of {{ todays_checkins.paginator.count }} entries
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <nav aria-label="Page navigation" class="d-flex justify-content-end">
+                                            <ul class="pagination pagination-sm mb-0">
+                                                {% if todays_checkins.has_previous %}
+                                                <li class="page-item">
+                                                    <a class="page-link" href="?page=1" title="First Page">
+                                                        <i class="fas fa-angle-double-left"></i>
+                                                    </a>
+                                                </li>
+                                                <li class="page-item">
+                                                    <a class="page-link" href="?page={{ todays_checkins.previous_page_number }}" title="Previous Page">
+                                                        <i class="fas fa-angle-left"></i>
+                                                    </a>
+                                                </li>
+                                                {% endif %}
+                                                
+                                                <!-- Page numbers -->
+                                                {% for num in todays_checkins.paginator.page_range %}
+                                                    {% if todays_checkins.number == num %}
+                                                <li class="page-item active">
+                                                    <span class="page-link">{{ num }}</span>
+                                                </li>
+                                                    {% elif num > todays_checkins.number|add:'-3' and num < todays_checkins.number|add:'3' %}
+                                                    <li class="page-item">
+                                                        <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                                                    </li>
+                                                    {% endif %}
+                                                {% endfor %}
+                                                
+                                                {% if todays_checkins.has_next %}
+                                                <li class="page-item">
+                                                    <a class="page-link" href="?page={{ todays_checkins.next_page_number }}" title="Next Page">
+                                                        <i class="fas fa-angle-right"></i>
+                                                    </a>
+                                                </li>
+                                                <li class="page-item">
+                                                    <a class="page-link" href="?page={{ todays_checkins.paginator.num_pages }}" title="Last Page">
+                                                        <i class="fas fa-angle-double-right"></i>
+                                                    </a>
+                                                </li>
+                                                {% endif %}
+                                            </ul>
+                                        </nav>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Room Status Overview</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between">
+                                    <span>Available</span>
+                                    <span class="badge bg-success">12</span>
+                                </div>
+                                <div class="progress mt-1" style="height: 8px;">
+                                    <div class="progress-bar bg-success" style="width: 75%"></div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between">
+                                    <span>Occupied</span>
+                                    <span class="badge bg-warning">4</span>
+                                </div>
+                                <div class="progress mt-1" style="height: 8px;">
+                                    <div class="progress-bar bg-warning" style="width: 25%"></div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between">
+                                    <span>Maintenance</span>
+                                    <span class="badge bg-danger">0</span>
+                                </div>
+                                <div class="progress mt-1" style="height: 8px;">
+                                    <div class="progress-bar bg-danger" style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <h5 class="mb-0">Available Activities</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div>
+                                    <strong>Hiking Trails</strong><br>
+                                    <small class="text-muted">3 routes available</small>
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge bg-success">Available</span>
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div>
+                                    <strong>Camping Sites</strong><br>
+                                    <small class="text-muted">5 sites available</small>
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge bg-success">Available</span>
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div>
+                                    <strong>Bird Watching</strong><br>
+                                    <small class="text-muted">Guide available</small>
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge bg-info">Booked</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New Booking Modal -->
+<div class="modal fade" id="newBookingModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">New Lodge Booking</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="newBookingForm">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Customer Name *</label>
+                            <input type="text" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Phone Number *</label>
+                            <input type="tel" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Room Type *</label>
+                            <select class="form-control" required>
+                                <option value="">Select Room Type</option>
+                                <option value="cabin">Cabin</option>
+                                <option value="tent">Tent Site</option>
+                                <option value="chalet">Chalet</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Check-in Date *</label>
+                            <input type="date" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Check-out Date *</label>
+                            <input type="date" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Number of Guests *</label>
+                            <input type="number" class="form-control" min="1" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Total Amount *</label>
+                            <input type="number" class="form-control" step="0.01" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Activities</label>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="hiking">
+                                        <label class="form-check-label" for="hiking">Hiking</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="camping">
+                                        <label class="form-check-label" for="camping">Camping</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="bird_watching">
+                                        <label class="form-check-label" for="bird_watching">Bird Watching</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Special Requests</label>
+                            <textarea class="form-control" rows="3"></textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary">Create Booking</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Activity Modal -->
+<div class="modal fade" id="activityModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Manage Activities</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="list-group">
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>Hiking Trails</strong><br>
+                            <small class="text-muted">3 different routes available</small>
+                        </div>
+                        <span class="badge bg-success">Available</span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>Camping Sites</strong><br>
+                            <small class="text-muted">5 sites with facilities</small>
+                        </div>
+                        <span class="badge bg-success">Available</span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>Bird Watching</strong><br>
+                            <small class="text-muted">Guided tours available</small>
+                        </div>
+                        <span class="badge bg-info">Booked</span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>Nature Photography</strong><br>
+                            <small class="text-muted">Equipment rental available</small>
+                        </div>
+                        <span class="badge bg-success">Available</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary">Add Activity</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    console.log('Lodge Dashboard initialized');
+    
+    // Auto-refresh every 30 seconds
+    setInterval(function() {
+        console.log('Refreshing lodge dashboard data...');
+    }, 30000);
+});
+</script>
+{% endblock %}

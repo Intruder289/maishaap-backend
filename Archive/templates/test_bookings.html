@@ -1,0 +1,81 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}Test Bookings{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Test Bookings Query</h3>
+                </div>
+                <div class="card-body">
+                    <h4>House Bookings Query Results:</h4>
+                    <p><strong>Found {{ house_count }} bookings</strong> with property_type__name__iexact='house'</p>
+                    
+                    {% if house_bookings %}
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Reference</th>
+                                <th>Customer</th>
+                                <th>Property</th>
+                                <th>Property Type</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for booking in house_bookings %}
+                            <tr>
+                                <td>{{ booking.id }}</td>
+                                <td>{{ booking.booking_reference }}</td>
+                                <td>{{ booking.customer.full_name }}</td>
+                                <td>{{ booking.property_obj.title }}</td>
+                                <td>{{ booking.property_obj.property_type.name }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p class="text-muted">No house bookings found</p>
+                    {% endif %}
+                    
+                    <hr>
+                    
+                    <h4>All Bookings (for comparison):</h4>
+                    <p><strong>Found {{ all_count }} total bookings</strong></p>
+                    
+                    {% if all_bookings %}
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Reference</th>
+                                <th>Customer</th>
+                                <th>Property</th>
+                                <th>Property Type</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for booking in all_bookings %}
+                            <tr>
+                                <td>{{ booking.id }}</td>
+                                <td>{{ booking.booking_reference }}</td>
+                                <td>{{ booking.customer.full_name }}</td>
+                                <td>{{ booking.property_obj.title }}</td>
+                                <td>{{ booking.property_obj.property_type.name }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p class="text-muted">No bookings found</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

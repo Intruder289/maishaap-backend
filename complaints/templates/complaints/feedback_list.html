@@ -1,0 +1,151 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}Feedback{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>
+                    {% if is_staff_view %}
+                        All Feedback
+                    {% else %}
+                        My Feedback
+                    {% endif %}
+                </h2>
+                <a href="{% url 'complaints:feedback_create' %}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> New Feedback
+                </a>
+            </div>
+
+            <!-- Filters -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <form method="get" class="row g-3">
+                        <div class="col-md-4">
+                            <label for="type" class="form-label">Type</label>
+                            <select name="type" id="type" class="form-select">
+                                <option value="">All Types</option>
+                                {% for value, label in type_choices %}
+                                    <option value="{{ value }}" {% if current_type == value %}selected{% endif %}>
+                                        {{ label }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 d-flex align-items-end">
+                            <!-- Filter button removed -->
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Feedback List -->
+            <div class="row">
+                {% for feedback in feedback_items %}
+                    <div class="col-md-6 col-lg-4 mb-4">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    {% if feedback.title %}
+                                        <h5 class="card-title">{{ feedback.title|truncatechars:50 }}</h5>
+                                    {% else %}
+                                        <h5 class="card-title text-muted">{{ feedback.get_feedback_type_display }}</h5>
+                                    {% endif %}
+                                    <span class="badge bg-{% if feedback.feedback_type == 'bug' %}danger{% elif feedback.feedback_type == 'feature' %}info{% elif feedback.feedback_type == 'rating' %}success{% else %}secondary{% endif %}">
+                                        {{ feedback.get_feedback_type_display }}
+                                    </span>
+                                </div>
+                                
+                                <p class="card-text text-muted">{{ feedback.message|truncatechars:100 }}</p>
+                                
+                                {% if feedback.property %}
+                                    <div class="mb-2">
+                                        <small class="text-muted">
+                                            <i class="fas fa-building"></i> {{ feedback.property.name }}
+                                        </small>
+                                    </div>
+                                {% endif %}
+                                
+                                {% if feedback.rating %}
+                                    <div class="mb-2">
+                                        {% for i in "12345" %}
+                                            {% if forloop.counter <= feedback.rating %}
+                                                <i class="fas fa-star text-warning"></i>
+                                            {% else %}
+                                                <i class="far fa-star text-muted"></i>
+                                            {% endif %}
+                                        {% endfor %}
+                                        <small class="text-muted ms-1">({{ feedback.rating }}/5)</small>
+                                    </div>
+                                {% endif %}
+                                
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <small class="text-muted">
+                                        {{ feedback.created_at|date:"M d, Y" }}
+                                        {% if is_staff_view %}
+                                            by {{ feedback.user.get_full_name|default:feedback.user.username }}
+                                        {% endif %}
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="col-12">
+                        <div class="text-center py-5">
+                            <i class="fas fa-comment-dots fa-3x text-muted mb-3"></i>
+                            <h4 class="text-muted">No feedback found</h4>
+                            <p class="text-muted">
+                                {% if current_type %}
+                                    Try adjusting your filters.
+                                {% else %}
+                                    Share your thoughts and help us improve!
+                                {% endif %}
+                            </p>
+                            {% if not current_type %}
+                                <a href="{% url 'complaints:feedback_create' %}" class="btn btn-primary">
+                                    Give Feedback
+                                </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <!-- Pagination -->
+            {% if feedback_items.has_other_pages %}
+                <nav aria-label="Feedback pagination" class="mt-4">
+                    <ul class="pagination pagination-sm justify-content-center">
+                        {% if feedback_items.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1{% if current_type %}&type={{ current_type }}{% endif %}">First</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ feedback_items.previous_page_number }}{% if current_type %}&type={{ current_type }}{% endif %}">Previous</a>
+                            </li>
+                        {% endif %}
+
+                        <li class="page-item active">
+                            <span class="page-link">
+                                Page {{ feedback_items.number }} of {{ feedback_items.paginator.num_pages }}
+                            </span>
+                        </li>
+
+                        {% if feedback_items.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ feedback_items.next_page_number }}{% if current_type %}&type={{ current_type }}{% endif %}">Next</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ feedback_items.paginator.num_pages }}{% if current_type %}&type={{ current_type }}{% endif %}">Last</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

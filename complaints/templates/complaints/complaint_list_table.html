@@ -1,0 +1,187 @@
+<!-- AJAX Table Content -->
+<div class="table-responsive">
+  <table class="table table-hover mb-0">
+    <thead class="table-light">
+      <tr>
+        <th>Complaint</th>
+        <th>Property</th>
+        {% if user.is_staff %}
+        <th>User</th>
+        {% endif %}
+        <th>Priority</th>
+        <th>Status</th>
+        <th>Category</th>
+        <th>Created</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="complaints-table-body">
+      {% for complaint in complaints %}
+      <tr data-complaint-id="{{ complaint.id }}">
+        <td>
+          <div class="d-flex align-items-center">
+            <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3 fw-bold">
+              {{ complaint.title|first|upper }}
+            </div>
+            <div>
+              <strong>
+                <a href="{% url 'complaints:complaint_detail' complaint.id %}" class="text-decoration-none">
+                  {{ complaint.title }}
+                </a>
+              </strong>
+              <div class="text-muted small">{{ complaint.description|truncatechars:50 }}</div>
+            </div>
+          </div>
+        </td>
+        <td>
+          {% if complaint.property %}
+          <div class="d-flex align-items-center">
+            <i class="fas fa-home text-muted me-2"></i>
+            <div>
+              <div class="fw-bold">{{ complaint.property.title }}</div>
+              <div class="text-muted small">{{ complaint.property.address|truncatechars:30 }}</div>
+            </div>
+          </div>
+          {% else %}
+          <span class="text-muted">No property</span>
+          {% endif %}
+        </td>
+        {% if user.is_staff %}
+        <td>
+          <div class="d-flex align-items-center">
+            <i class="fas fa-user text-muted me-2"></i>
+            <div>
+              <div class="fw-bold">{{ complaint.user.get_full_name|default:complaint.user.username }}</div>
+              <div class="text-muted small">{{ complaint.user.email }}</div>
+            </div>
+          </div>
+        </td>
+        {% endif %}
+        <td>
+          {% if complaint.priority == 'urgent' %}
+          <span class="badge bg-danger">{{ complaint.get_priority_display }}</span>
+          {% elif complaint.priority == 'high' %}
+          <span class="badge bg-warning">{{ complaint.get_priority_display }}</span>
+          {% elif complaint.priority == 'medium' %}
+          <span class="badge bg-info">{{ complaint.get_priority_display }}</span>
+          {% else %}
+          <span class="badge bg-success">{{ complaint.get_priority_display }}</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if complaint.status == 'resolved' %}
+          <span class="badge bg-success">{{ complaint.get_status_display }}</span>
+          {% elif complaint.status == 'in_progress' %}
+          <span class="badge bg-primary">{{ complaint.get_status_display }}</span>
+          {% elif complaint.status == 'pending' %}
+          <span class="badge bg-warning">{{ complaint.get_status_display }}</span>
+          {% else %}
+          <span class="badge bg-secondary">{{ complaint.get_status_display }}</span>
+          {% endif %}
+        </td>
+        <td>
+          <span class="badge bg-secondary">{{ complaint.get_category_display }}</span>
+        </td>
+        <td>
+          <div class="text-muted small">
+            {{ complaint.created_at|date:"M d, Y" }}<br>
+            {{ complaint.created_at|time:"g:i A" }}
+          </div>
+        </td>
+        <td>
+          <div class="dropdown">
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+              <i class="fas fa-ellipsis-v"></i>
+            </button>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="#" onclick="openViewModal({{ complaint.id }})">
+                <i class="fas fa-eye me-2"></i>View Details
+              </a></li>
+              {% if user.is_staff %}
+              <li><a class="dropdown-item" href="#" onclick="openStartWorkModal({{ complaint.id }})">
+                <i class="fas fa-play me-2"></i>Start Work
+              </a></li>
+              <li><a class="dropdown-item" href="#" onclick="openMarkResolvedModal({{ complaint.id }})">
+                <i class="fas fa-check me-2"></i>Mark Resolved
+              </a></li>
+              {% if complaint.status == 'resolved' %}
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item text-danger" href="#" onclick="openDeleteModal({{ complaint.id }})">
+                <i class="fas fa-trash me-2"></i>Delete
+              </a></li>
+              {% endif %}
+              {% endif %}
+            </ul>
+          </div>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="8" class="text-center py-4">
+          <div class="text-muted">
+            <i class="fas fa-inbox fa-2x mb-3"></i>
+            <p>No complaints found matching your criteria.</p>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Pagination -->
+{% if complaints.has_other_pages %}
+<div class="card-footer bg-white border-0 py-3">
+  <div class="row align-items-center">
+    <div class="col-md-6">
+      <div class="text-muted">
+        Showing {{ complaints.start_index }} to {{ complaints.end_index }} of {{ complaints.paginator.count }} entries
+      </div>
+    </div>
+    <div class="col-md-6">
+      <nav aria-label="Page navigation" class="d-flex justify-content-end">
+        <ul class="pagination pagination-sm mb-0">
+          {% if complaints.has_previous %}
+          <li class="page-item">
+            <a class="page-link" href="#" onclick="loadPage(1); return false;" title="First Page">
+              <i class="fas fa-angle-double-left"></i>
+            </a>
+          </li>
+          <li class="page-item">
+            <a class="page-link" href="#" onclick="loadPage({{ complaints.previous_page_number }}); return false;" title="Previous Page">
+              <i class="fas fa-angle-left"></i>
+            </a>
+          </li>
+          {% endif %}
+
+          <!-- Page numbers -->
+          {% for num in complaints.paginator.page_range %}
+            {% if complaints.number == num %}
+            <li class="page-item active">
+              <span class="page-link">{{ num }}</span>
+            </li>
+            {% elif num > complaints.number|add:'-3' and num < complaints.number|add:'3' %}
+            <li class="page-item">
+              <a class="page-link" href="#" onclick="loadPage({{ num }}); return false;">{{ num }}</a>
+            </li>
+            {% endif %}
+          {% endfor %}
+
+          {% if complaints.has_next %}
+          <li class="page-item">
+            <a class="page-link" href="#" onclick="loadPage({{ complaints.next_page_number }}); return false;" title="Next Page">
+              <i class="fas fa-angle-right"></i>
+            </a>
+          </li>
+          <li class="page-item">
+            <a class="page-link" href="#" onclick="loadPage({{ complaints.paginator.num_pages }}); return false;" title="Last Page">
+              <i class="fas fa-angle-double-right"></i>
+            </a>
+          </li>
+          {% endif %}
+        </ul>
+      </nav>
+    </div>
+  </div>
+</div>
+{% endif %}

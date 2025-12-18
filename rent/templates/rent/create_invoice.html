@@ -1,0 +1,276 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Create Invoice - Maisha{% endblock %}
+
+{% block content %}
+<!-- FontAwesome Icons -->
+
+<div class="container-fluid">
+    <!-- Professional Page Header -->
+    <div class="row mb-4">
+        <nav aria-label="breadcrumb">
+            <!-- <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'rent:dashboard' %}">Rent</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'rent:invoice_list' %}">Invoices</a></li>
+                <li class="breadcrumb-item active">Create Invoice</li>
+            </ol> -->
+        </nav>
+        <h1 class="h2 mb-2">
+            <i class="fas fa-plus-circle"></i>
+            Create New Invoice
+        </h1>
+        <p class="text-body-emphasis">
+            Generate a new rental invoice for lease payment collection
+        </p>
+    </div>
+
+    <!-- Form Container -->
+    <div class="card mb-6">
+        <div>
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>Please correct the following errors:</strong>
+                    <ul>
+                        {% for error in form.non_field_errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+
+            <form method="post" novalidate>
+                {% csrf_token %}
+                
+                <!-- Lease Information Section -->
+                <div class="form-section">
+                    <h3 class="section-title">
+                        <i class="fas fa-home"></i>
+                        Lease Information
+                    </h3>
+                    
+                    <div class="form-grid">
+                        <div>
+                            <label for="{{ form.lease.id_for_label }}" class="form-label">
+                                Lease Agreement <span class="required">*</span>
+                            </label>
+                            {{ form.lease }}
+                            {% if form.lease.errors %}
+                                <div>
+                                    {% for error in form.lease.errors %}
+                                        <div><i class="fas fa-exclamation-circle"></i>{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="help-text">Select the lease agreement for this invoice</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Billing Period Section -->
+                <div class="form-section">
+                    <h3 class="section-title">
+                        <i class="fas fa-calendar-alt"></i>
+                        Billing Period
+                    </h3>
+                    
+                    <div class="form-grid three-col">
+                        <div>
+                            <label for="{{ form.period_start.id_for_label }}" class="form-label">
+                                Period Start <span class="required">*</span>
+                            </label>
+                            {{ form.period_start }}
+                            {% if form.period_start.errors %}
+                                <div>
+                                    {% for error in form.period_start.errors %}
+                                        <div><i class="fas fa-exclamation-circle"></i>{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div>
+                            <label for="{{ form.period_end.id_for_label }}" class="form-label">
+                                Period End <span class="required">*</span>
+                            </label>
+                            {{ form.period_end }}
+                            {% if form.period_end.errors %}
+                                <div>
+                                    {% for error in form.period_end.errors %}
+                                        <div><i class="fas fa-exclamation-circle"></i>{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div>
+                            <label for="{{ form.due_date.id_for_label }}" class="form-label">
+                                Due Date <span class="required">*</span>
+                            </label>
+                            {{ form.due_date }}
+                            {% if form.due_date.errors %}
+                                <div>
+                                    {% for error in form.due_date.errors %}
+                                        <div><i class="fas fa-exclamation-circle"></i>{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Financial Details Section -->
+                <div class="form-section">
+                    <h3 class="section-title">
+                        <i class="fas fa-dollar-sign"></i>
+                        Financial Details
+                    </h3>
+                    
+                    <div class="form-grid two-col">
+                        <div>
+                            <label for="{{ form.base_rent.id_for_label }}" class="form-label">
+                                Base Rent (Tsh) <span class="required">*</span>
+                            </label>
+                            {{ form.base_rent }}
+                            {% if form.base_rent.errors %}
+                                <div>
+                                    {% for error in form.base_rent.errors %}
+                                        <div><i class="fas fa-exclamation-circle"></i>{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="help-text">Monthly rent amount in Tanzanian Shillings</div>
+                        </div>
+                        
+                        <div>
+                            <label for="{{ form.late_fee.id_for_label }}" class="form-label">
+                                Late Fee (Tsh)
+                            </label>
+                            {{ form.late_fee }}
+                            {% if form.late_fee.errors %}
+                                <div>
+                                    {% for error in form.late_fee.errors %}
+                                        <div><i class="fas fa-exclamation-circle"></i>{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="help-text">Optional late payment penalty</div>
+                        </div>
+                        
+                        <div>
+                            <label for="{{ form.other_charges.id_for_label }}" class="form-label">
+                                Other Charges (Tsh)
+                            </label>
+                            {{ form.other_charges }}
+                            {% if form.other_charges.errors %}
+                                <div>
+                                    {% for error in form.other_charges.errors %}
+                                        <div><i class="fas fa-exclamation-circle"></i>{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="help-text">Additional charges (utilities, maintenance, etc.)</div>
+                        </div>
+                        
+                        <div>
+                            <label for="{{ form.discount.id_for_label }}" class="form-label">
+                                Discount (Tsh)
+                            </label>
+                            {{ form.discount }}
+                            {% if form.discount.errors %}
+                                <div>
+                                    {% for error in form.discount.errors %}
+                                        <div><i class="fas fa-exclamation-circle"></i>{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="help-text">Optional discount amount</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Additional Information Section -->
+                <div class="form-section">
+                    <h3 class="section-title">
+                        <i class="fas fa-sticky-note"></i>
+                        Additional Information
+                    </h3>
+                    
+                    <div class="form-grid">
+                        <div>
+                            <label for="{{ form.notes.id_for_label }}" class="form-label">
+                                Notes
+                            </label>
+                            {{ form.notes }}
+                            {% if form.notes.errors %}
+                                <div>
+                                    {% for error in form.notes.errors %}
+                                        <div><i class="fas fa-exclamation-circle"></i>{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="help-text">Optional notes or special instructions for this invoice</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Form Actions -->
+                <div>
+                    <a href="{% url 'rent:invoice_list' %}" class="btn btn-primary secondary">
+                        <i class="fas fa-times"></i>
+                        Cancel
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i>
+                        Create Invoice
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-populate due date when period end is selected
+    const periodEndField = document.getElementById('{{ form.period_end.id_for_label }}');
+    const dueDateField = document.getElementById('{{ form.due_date.id_for_label }}');
+    
+    if (periodEndField && dueDateField) {
+        periodEndField.addEventListener('change', function() {
+            if (this.value && !dueDateField.value) {
+                const endDate = new Date(this.value);
+                endDate.setDate(endDate.getDate() + 5); // Due 5 days after period end
+                dueDateField.value = endDate.toISOString().split('T')[0];
+            }
+        });
+    }
+    
+    // Calculate total amount preview
+    const calculateTotal = function() {
+        const baseRent = parseFloat(document.getElementById('{{ form.base_rent.id_for_label }}').value) || 0;
+        const lateFee = parseFloat(document.getElementById('{{ form.late_fee.id_for_label }}').value) || 0;
+        const otherCharges = parseFloat(document.getElementById('{{ form.other_charges.id_for_label }}').value) || 0;
+        const discount = parseFloat(document.getElementById('{{ form.discount.id_for_label }}').value) || 0;
+        
+        const total = baseRent + lateFee + otherCharges - discount;
+        
+        // Show total in a tooltip or small indicator
+        const totalIndicator = document.getElementById('total-preview');
+        if (totalIndicator) {
+            totalIndicator.textContent = `Total: Tsh ${total.toLocaleString()}`;
+        }
+    };
+    
+    // Add event listeners for automatic calculation
+    ['{{ form.base_rent.id_for_label }}', '{{ form.late_fee.id_for_label }}', '{{ form.other_charges.id_for_label }}', '{{ form.discount.id_for_label }}'].forEach(id => {
+        const field = document.getElementById(id);
+        if (field) {
+            field.addEventListener('input', calculateTotal);
+        }
+    });
+});
+</script>
+{% endblock %}

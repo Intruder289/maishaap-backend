@@ -1,0 +1,296 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+  <div>
+    <div>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <path d="M12 3l10 9h-3v9h-6v-6H11v6H5v-9H2z" fill="white"/>
+      </svg>
+    </div>
+    <div>
+      <h1>{{ title }}</h1>
+      <p>
+        {% if property %}Edit property details and images{% else %}Add a new property to your portfolio{% endif %}
+      </p>
+    </div>
+  </div>
+  <div>
+    <a href="{% if property %}{% url 'accounts:house_detail' property.pk %}{% else %}{% url 'accounts:houses_list' %}{% endif %}" class="btn btn-primary-secondary">
+      ← Cancel
+    </a>
+  </div>
+</div>
+
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  
+  <!-- Main Form -->
+  <div>
+    <!-- Basic Information -->
+    <div>
+      <h3>Basic Information</h3>
+      <div>
+        <div>
+          {{ form.title.label_tag }}
+          {{ form.title }}
+          {% if form.title.errors %}
+            <div class="error-message">{{ form.title.errors.0 }}</div>
+          {% endif %}
+        </div>
+        <div>
+          {{ form.description.label_tag }}
+          {{ form.description }}
+          {% if form.description.errors %}
+            <div class="error-message">{{ form.description.errors.0 }}</div>
+          {% endif %}
+        </div>
+        <div>
+          <div>
+            {{ form.property_type.label_tag }}
+            {{ form.property_type }}
+            {% if form.property_type.errors %}
+              <div class="error-message">{{ form.property_type.errors.0 }}</div>
+            {% endif %}
+          </div>
+          <div>
+            {{ form.region.label_tag }}
+            {{ form.region }}
+            {% if form.region.errors %}
+              <div class="error-message">{{ form.region.errors.0 }}</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Location -->
+    <div>
+      <h3>Location</h3>
+      <div>
+        <div>
+          {{ form.address.label_tag }}
+          {{ form.address }}
+          {% if form.address.errors %}
+            <div class="error-message">{{ form.address.errors.0 }}</div>
+          {% endif %}
+        </div>
+        <div>
+          <div>
+            {{ form.latitude.label_tag }}
+            {{ form.latitude }}
+            {% if form.latitude.errors %}
+              <div class="error-message">{{ form.latitude.errors.0 }}</div>
+            {% endif %}
+          </div>
+          <div>
+            {{ form.longitude.label_tag }}
+            {{ form.longitude }}
+            {% if form.longitude.errors %}
+              <div class="error-message">{{ form.longitude.errors.0 }}</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Property Details -->
+    <div>
+      <h3>Property Details</h3>
+      <div>
+        <div>
+          {{ form.bedrooms.label_tag }}
+          {{ form.bedrooms }}
+          {% if form.bedrooms.errors %}
+            <div class="error-message">{{ form.bedrooms.errors.0 }}</div>
+          {% endif %}
+        </div>
+        <div>
+          {{ form.bathrooms.label_tag }}
+          {{ form.bathrooms }}
+          {% if form.bathrooms.errors %}
+            <div class="error-message">{{ form.bathrooms.errors.0 }}</div>
+          {% endif %}
+        </div>
+        <div>
+          {{ form.size_sqft.label_tag }}
+          {{ form.size_sqft }}
+          {% if form.size_sqft.errors %}
+            <div class="error-message">{{ form.size_sqft.errors.0 }}</div>
+          {% endif %}
+        </div>
+      </div>
+      <div>
+        <div>
+          {{ form.floor_number.label_tag }}
+          {{ form.floor_number }}
+          {% if form.floor_number.errors %}
+            <div class="error-message">{{ form.floor_number.errors.0 }}</div>
+          {% endif %}
+        </div>
+        <div>
+          {{ form.total_floors.label_tag }}
+          {{ form.total_floors }}
+          {% if form.total_floors.errors %}
+            <div class="error-message">{{ form.total_floors.errors.0 }}</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    
+    <!-- Pricing -->
+    <div>
+      <h3>Pricing</h3>
+      <div>
+        <div>
+          {{ form.rent_amount.label_tag }}
+          {{ form.rent_amount }}
+          {% if form.rent_amount.errors %}
+            <div class="error-message">{{ form.rent_amount.errors.0 }}</div>
+          {% endif %}
+        </div>
+        <div>
+          {{ form.deposit_amount.label_tag }}
+          {{ form.deposit_amount }}
+          {% if form.deposit_amount.errors %}
+            <div class="error-message">{{ form.deposit_amount.errors.0 }}</div>
+          {% endif %}
+        </div>
+      </div>
+      <div>
+        {{ form.utilities_included }}
+        {{ form.utilities_included.label_tag }}
+      </div>
+    </div>
+    
+    <!-- Property Features -->
+    <div>
+      <h3>Property Features</h3>
+      <div>
+        <div>
+          {{ form.is_furnished }}
+          {{ form.is_furnished.label_tag }}
+        </div>
+        <div>
+          {{ form.pets_allowed }}
+          {{ form.pets_allowed.label_tag }}
+        </div>
+        <div>
+          {{ form.smoking_allowed }}
+          {{ form.smoking_allowed.label_tag }}
+        </div>
+        <div>
+          {{ form.is_featured }}
+          {{ form.is_featured.label_tag }}
+        </div>
+      </div>
+      
+      <!-- Amenities -->
+      <div>
+        <label>Amenities</label>
+        <div>
+          {{ form.amenities }}
+        </div>
+        {% if form.amenities.errors %}
+          <div class="error-message">{{ form.amenities.errors.0 }}</div>
+        {% endif %}
+      </div>
+    </div>
+    
+    <!-- Property Images -->
+    <div>
+      <h3>Property Images</h3>
+      <div id="image-formset">
+        {{ image_formset.management_form }}
+        {% for form_image in image_formset %}
+          <div class="image-form">
+            {{ form_image.id }}
+            <div>
+              <div>
+                {{ form_image.image.label_tag }}
+                {{ form_image.image }}
+                {% if form_image.image.errors %}
+                  <div class="error-message">{{ form_image.image.errors.0 }}</div>
+                {% endif %}
+              </div>
+              <div>
+                <div>
+                  {{ form_image.caption.label_tag }}
+                  {{ form_image.caption }}
+                </div>
+                <div>
+                  {{ form_image.is_primary }}
+                  {{ form_image.is_primary.label_tag }}
+                </div>
+                <div>
+                  {{ form_image.order.label_tag }}
+                  {{ form_image.order }}
+                </div>
+              </div>
+              {% if form_image.DELETE %}
+                <div>
+                  {{ form_image.DELETE }}
+                  {{ form_image.DELETE.label_tag }}
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  
+  <!-- Sidebar -->
+  <div>
+    <!-- Status & Availability -->
+    <div>
+      <h3>Status & Availability</h3>
+      <div>
+        <div>
+          {{ form.status.label_tag }}
+          {{ form.status }}
+          {% if form.status.errors %}
+            <div class="error-message">{{ form.status.errors.0 }}</div>
+          {% endif %}
+        </div>
+        <div>
+          {{ form.available_from.label_tag }}
+          {{ form.available_from }}
+          {% if form.available_from.errors %}
+            <div class="error-message">{{ form.available_from.errors.0 }}</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    
+    <!-- Form Actions -->
+    <div>
+      <h3>Actions</h3>
+      <div>
+        <button type="submit" class="btn btn-primary-primary">
+          {% if property %}Update House{% else %}Create House{% endif %}
+        </button>
+        <a href="{% if property %}{% url 'accounts:house_detail' property.pk %}{% else %}{% url 'accounts:houses_list' %}{% endif %}" 
+           class="btn btn-primary-secondary">
+          Cancel
+        </a>
+      </div>
+    </div>
+    
+    <!-- Help -->
+    <div>
+      <h4>Tips</h4>
+      <ul>
+        <li>Add detailed descriptions to attract more tenants</li>
+        <li>Upload high-quality images from different angles</li>
+        <li>Set competitive pricing based on market rates</li>
+        <li>Keep property information up to date</li>
+      </ul>
+    </div>
+  </div>
+</form>
+
+{% endblock %}

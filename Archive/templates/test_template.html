@@ -1,0 +1,21 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}Test Template - Maisha{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="card mb-6">
+        <h1>Test Template</h1>
+        <p>This is a test template to verify template rendering.</p>
+        
+        {% if image_formset %}
+            <p>✅ image_formset is available</p>
+        {% else %}
+            <p>❌ image_formset is not available</p>
+        {% endif %}
+        
+        <p>Template rendering test completed.</p>
+    </div>
+</div>
+{% endblock %}

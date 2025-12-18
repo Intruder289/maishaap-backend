@@ -1,0 +1,308 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Generate Report - Maisha{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Enhanced Page Header -->
+    <div class="row mb-4">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <div class="header-icon-wrapper generate">
+                    <i class="fas fa-magic"></i>
+                </div>
+                <div>
+                    <h1 class="h2 mb-2">
+                        <i class="fas fa-rocket"></i>
+                        Report Generator
+                    </h1>
+                    <p class="text-body-emphasis">Create custom analytical reports with advanced filtering and multiple export formats</p>
+                </div>
+            </div>
+            <div>
+                <a href="{% url 'reports:dashboard' %}" class="secondary-btn btn-primary">
+                    <i class="fas fa-arrow-left"></i>Back to Dashboard
+                </a>
+                <button class="btn btn-primary" onclick="document.getElementById('report_type').focus()">
+                    <i class="fas fa-bolt"></i>Quick Start
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Form Section -->
+    <div class="form-section">
+        <div class="card mb-6 form-card">
+            <div class="card-header-section">
+                <div class="text-center">
+                    <div class="form-header-icon">
+                        <i class="fas fa-magic"></i>
+                    </div>
+                    <h3>Report Configuration</h3>
+                    <p>Customize your report parameters and export preferences</p>
+                </div>
+            </div>
+            <div class="form-content">
+                <form method="post" class="report-form needs-validation" novalidate>
+                    {% csrf_token %}
+                    
+                    <div class="form-section-wrapper">
+                        <!-- Report Title -->
+                        <div class="form-group">
+                            <label for="title" class="form-label">
+                                <i class="fas fa-heading form-label-icon"></i>
+                                Report Title
+                            </label>
+                            <input type="text" class="form-input" id="title" name="title" 
+                                   placeholder="Enter a descriptive title for your report" required>
+                            <div class="form-hint">This will appear as the main heading of your report</div>
+                        </div>
+                        
+                        <!-- Report Type -->
+                        <div class="form-group">
+                            <label for="report_type" class="form-label">
+                                <i class="fas fa-chart-pie form-label-icon"></i>
+                                Report Type
+                            </label>
+                            <select class="form-input form-select" id="report_type" name="report_type" required>
+                                <option value="">Choose the type of report to generate...</option>
+                                {% for value, label in report_types %}
+                                <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-hint">Select the data category you want to analyze</div>
+                        </div>
+                        
+                        <!-- Date Range -->
+                        <div class="date-range-group">
+                            <div class="form-group">
+                                <label for="start_date" class="form-label">
+                                    <i class="fas fa-play form-label-icon"></i>
+                                    Start Date
+                                </label>
+                                <input type="date" class="form-input" id="start_date" name="start_date" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="end_date" class="form-label">
+                                    <i class="fas fa-stop form-label-icon"></i>
+                                    End Date
+                                </label>
+                                <input type="date" class="form-input" id="end_date" name="end_date" required>
+                            </div>
+                        </div>
+                        
+                        <!-- Output Format -->
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-file-export form-label-icon"></i>
+                                Output Format
+                            </label>
+                            <div class="format-selection">
+                                {% for value, label in formats %}
+                                <div class="format-option">
+                                    <input type="radio" class="format-radio" name="format" id="format_{{ value }}" value="{{ value }}" 
+                                           {% if value == 'pdf' %}checked{% endif %} required>
+                                    <label class="format-label" for="format_{{ value }}">
+                                        <div class="format-icon">
+                                            <i class="fas fa-file-{% if value == 'pdf' %}pdf{% elif value == 'excel' %}excel{% else %}alt{% endif %}"></i>
+                                        </div>
+                                        <div class="format-text">{{ label }}</div>
+                                    </label>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        
+                        <!-- Submit Button -->
+                        <div class="form-submit-section">
+                            <button type="submit" class="generate-btn btn-primary">
+                                <div class="btn btn-primary-icon">
+                                    <i class="fas fa-rocket"></i>
+                                </div>
+                                <span class="btn btn-primary-text">Generate Report</span>
+                                <div class="btn btn-primary-spinner d-none">
+                                    <i class="fas fa-spinner fa-spin"></i>
+                                </div>
+                            </button>
+                            
+                            <div class="form-info">
+                                <i class="fas fa-info-circle"></i>
+                                Report generation may take a few moments depending on data size
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Help Section -->
+    <div class="help-section">
+        <div class="card mb-6 help-card">
+            <div class="card-header-section">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="fas fa-lightbulb"></i>
+                        <div>
+                            <h3>Report Types Guide</h3>
+                            <p>Learn about different report categories and their features</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="help-content">
+                <div class="help-grid">
+                    <div class="help-item">
+                        <div class="help-item-icon financial">
+                            <i class="fas fa-dollar-sign"></i>
+                        </div>
+                        <div class="help-item-content">
+                            <h5>Financial Reports</h5>
+                            <p>Comprehensive revenue analysis, expense tracking, rent collection statistics, and profit margin calculations</p>
+                            <div class="help-features">
+                                <span class="feature-tag">Revenue Trends</span>
+                                <span class="feature-tag">Expense Analysis</span>
+                                <span class="feature-tag">Profit Margins</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="help-item">
+                        <div class="help-item-icon maintenance">
+                            <i class="fas fa-tools"></i>
+                        </div>
+                        <div class="help-item-content">
+                            <h5>Maintenance Reports</h5>
+                            <p>Service request tracking, completion rates, response time analysis, and operational efficiency metrics</p>
+                            <div class="help-features">
+                                <span class="feature-tag">Response Times</span>
+                                <span class="feature-tag">Completion Rates</span>
+                                <span class="feature-tag">Cost Analysis</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="help-item">
+                        <div class="help-item-icon property">
+                            <i class="fas fa-home"></i>
+                        </div>
+                        <div class="help-item-content">
+                            <h5>Property Reports</h5>
+                            <p>Occupancy rates, property performance metrics, tenant satisfaction scores, and market analysis data</p>
+                            <div class="help-features">
+                                <span class="feature-tag">Occupancy Rates</span>
+                                <span class="feature-tag">Performance</span>
+                                <span class="feature-tag">Market Analysis</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="help-item">
+                        <div class="help-item-icon analytics">
+                            <i class="fas fa-chart-bar"></i>
+                        </div>
+                        <div class="help-item-content">
+                            <h5>Custom Analytics</h5>
+                            <p>Business intelligence dashboards, trend analysis, predictive insights, and key performance indicators</p>
+                            <div class="help-features">
+                                <span class="feature-tag">Trend Analysis</span>
+                                <span class="feature-tag">KPI Tracking</span>
+                                <span class="feature-tag">Predictions</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Set default dates
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - 1);
+    
+    document.getElementById('start_date').value = startDate.toISOString().split('T')[0];
+    document.getElementById('end_date').value = endDate.toISOString().split('T')[0];
+    
+    // Auto-generate title based on report type
+    document.getElementById('report_type').addEventListener('change', function() {
+        const reportType = this.options[this.selectedIndex].text;
+        const titleField = document.getElementById('title');
+        if (reportType && reportType !== 'Choose the type of report to generate...') {
+            const today = new Date().toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            });
+            titleField.value = `${reportType} - ${today}`;
+            
+            // Add visual feedback
+            titleField.style.transform = 'scale(1.02)';
+            setTimeout(() => {
+                titleField.style.transform = 'scale(1)';
+            }, 200);
+        }
+    });
+    
+    // Form submission with loading state
+    const form = document.querySelector('form');
+    const submitBtn = document.querySelector('.generate-btn btn-primary');
+    const spinner = submitBtn.querySelector('.spinner-border');
+    
+    form.addEventListener('submit', function(e) {
+        // Add loading state
+        submitBtn.disabled = true;
+        spinner.classList.remove('d-none');
+        submitBtn.innerHTML = '<i class="fas fa-cog fa-spin me-2"></i>Generating Report...<span class="spinner-border spinner-border-sm ms-2" role="status"></span>';
+        
+        // Add form validation
+        if (!form.checkValidity()) {
+            e.preventDefault();
+            e.stopPropagation();
+            submitBtn.disabled = false;
+            spinner.classList.add('d-none');
+            submitBtn.innerHTML = '<i class="fas fa-rocket me-2"></i>Generate Report';
+        }
+        
+        form.classList.add('was-validated');
+    });
+    
+    // Date validation
+    const startDateInput = document.getElementById('start_date');
+    const endDateInput = document.getElementById('end_date');
+    
+    function validateDates() {
+        const startDate = new Date(startDateInput.value);
+        const endDate = new Date(endDateInput.value);
+        
+        if (startDate > endDate) {
+            endDateInput.setCustomValidity('End date must be after start date');
+        } else {
+            endDateInput.setCustomValidity('');
+        }
+    }
+    
+    startDateInput.addEventListener('change', validateDates);
+    endDateInput.addEventListener('change', validateDates);
+    
+    // Animate form elements on load
+    const formElements = document.querySelectorAll('.form-control, .form-select, .btn btn-primary');
+    formElements.forEach((element, index) => {
+        element.style.opacity = '0';
+        element.style.transform = 'translateY(20px)';
+        
+        setTimeout(() => {
+            element.style.transition = 'all 0.5s ease';
+            element.style.opacity = '1';
+            element.style.transform = 'translateY(0)';
+        }, index * 100);
+    });
+});
+</script>
+{% endblock %}

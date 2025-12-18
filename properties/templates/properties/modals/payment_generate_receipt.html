@@ -1,0 +1,68 @@
+<div class="text-center mb-4">
+    <h4 class="mb-2">Payment Receipt</h4>
+    <p class="text-muted">Receipt #{{ payment.id }}</p>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <h6 class="text-muted mb-3">Payment Details</h6>
+        <div class="mb-3">
+            <label class="form-label fw-bold">Receipt Number</label>
+            <p class="mb-0">#{{ payment.id }}</p>
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-bold">Amount Paid</label>
+            <p class="mb-0 fs-5 text-success">Tsh{{ payment.amount|floatformat:0 }}</p>
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-bold">Payment Method</label>
+            <p class="mb-0">{{ payment.payment_method|title }}</p>
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-bold">Transaction Reference</label>
+            <p class="mb-0">{{ payment.transaction_reference|default:"N/A" }}</p>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <h6 class="text-muted mb-3">Customer Information</h6>
+        <div class="mb-3">
+            <label class="form-label fw-bold">Name</label>
+            <p class="mb-0">{{ payment.booking.customer.full_name }}</p>
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-bold">Email</label>
+            <p class="mb-0">{{ payment.booking.customer.email }}</p>
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-bold">Phone</label>
+            <p class="mb-0">{{ payment.booking.customer.phone }}</p>
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-bold">Payment Date</label>
+            <p class="mb-0">{{ payment.payment_date|date:"M d, Y H:i" }}</p>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <h6 class="text-muted mb-3">Property Information</h6>
+        <div class="card border">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p class="mb-1"><strong>Property:</strong> {{ payment.booking.property_obj.title }}</p>
+                        <p class="mb-1"><strong>Address:</strong> {{ payment.booking.property_obj.address }}</p>
+                        <p class="mb-1"><strong>Type:</strong> {{ payment.booking.property_obj.property_type.name }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p class="mb-1"><strong>Booking Reference:</strong> {{ payment.booking.booking_reference }}</p>
+                        <p class="mb-1"><strong>Check-in:</strong> {{ payment.booking.check_in_date|date:"M d, Y" }}</p>
+                        <p class="mb-1"><strong>Check-out:</strong> {{ payment.booking.check_out_date|date:"M d, Y" }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+

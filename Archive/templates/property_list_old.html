@@ -1,0 +1,805 @@
+{% extends "accounts/base.html" %}
+{% load static %}
+{% load currency_filters %}
+
+{% block title %}Properties{% endblock %}
+{% block page_title %}Properties{% endblock %}
+{% block page_description %}Manage all properties in the system{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item active">Properties</li>
+{% endblock %}
+
+{% block page_actions %}
+{% endblock %}
+
+{% block content %}
+<!-- Properties Table -->
+<div class="card">
+  <div class="card-header">
+    <div class="row flex-between-center">
+      <div class="col-auto">
+        <h5 class="mb-0">Properties 
+          <span class="badge bg-primary-subtle text-primary ms-2" id="item-count">{{ properties.count }}</span>
+        </h5>
+      </div>
+      <div class="col-auto">
+        <button type="button" class="btn btn-primary" id="addPropertyBtn" data-bs-toggle="modal" data-bs-target="#addPropertyModal">
+          <i class="fas fa-plus me-2"></i>Add Property
+        </button>
+        <button type="button" class="btn btn-outline-secondary ms-2" onclick="emergencyCleanup()" title="Emergency Modal Cleanup (Ctrl+Shift+C)">
+          <i class="fas fa-broom me-2"></i>Cleanup
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Table Search and Filter Component -->
+  <div class="card-body border-bottom">
+    <div class="row g-3 align-items-center">
+      <div class="col-md-4">
+        <div class="position-relative">
+          <input class="form-control pe-5 ajax-search" 
+                 type="search" 
+                 placeholder="Search properties..." 
+                 data-search-url="/api/v1/properties/search/"
+                 data-target-table="properties-table"
+                 value="{{ search }}"
+                 id="propertySearch">
+          <span class="position-absolute top-50 end-0 translate-middle-y me-3">
+            <i class="fas fa-search text-400"></i>
+          </span>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <select class="form-select" id="propertyTypeFilter">
+          <option value="">All Types</option>
+          <option value="House">House</option>
+          <option value="Hotel">Hotel</option>
+          <option value="Lodge">Lodge</option>
+          <option value="Venue">Venue</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <select class="form-select" id="statusFilter">
+          <option value="">All Status</option>
+          <option value="available">Available</option>
+          <option value="rented">Rented</option>
+          <option value="under_maintenance">Under Maintenance</option>
+          <option value="unavailable">Unavailable</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <select class="form-select" id="activeFilter">
+          <option value="">All Properties</option>
+          <option value="true">Active Only</option>
+          <option value="false">Inactive Only</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <div class="btn-group" role="group">
+          <button class="btn btn-outline-secondary" onclick="clearFilters()" title="Clear Filters">
+            <i class="fas fa-times"></i>
+          </button>
+          <button class="btn btn-outline-secondary" title="Export">
+            <i class="fas fa-download"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm table-hover mb-0" id="properties-table">
+        <thead class="bg-light">
+          <tr>
+            <th class="border-0">Property</th>
+            <th class="border-0">Type</th>
+            <th class="border-0">Location</th>
+            <th class="border-0">Rent</th>
+            <th class="border-0">Status</th>
+            <th class="border-0">Active</th>
+            <th class="border-0">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="table-body">
+          {% for property in properties %}
+          <tr data-item-id="{{ property.id }}">
+            <td>
+              <div class="d-flex align-items-center">
+                <img src="{% if property.images.first %}{{ property.images.first.image.url }}{% else %}{% static 'img/generic/4.png' %}{% endif %}" 
+                     alt="{{ property.title }}" class="rounded me-3">
+                <div>
+                  <h6 class="mb-0">{{ property.title }}</h6>
+                  <small class="text-600">{{ property.address|truncatechars:30 }}</small>
+                </div>
+              </div>
+            </td>
+            <td>
+              <span class="badge bg-primary-subtle text-primary">{{ property.property_type }}</span>
+            </td>
+            <td class="text-600">{{ property.region }}</td>
+            <td class="fw-bold">{{ property.rent_amount|currency_tzs }}</td>
+            <td>
+              <span class="badge badge {% if property.status == 'available' %}bg-success-subtle text-success{% elif property.status == 'rented' %}bg-primary-subtle text-primary{% elif property.status == 'under_maintenance' %}bg-warning-subtle text-warning{% else %}bg-danger-subtle text-danger{% endif %}">
+                {{ property.get_status_display }}
+              </span>
+            </td>
+            <td>
+              <span class="badge {% if property.is_active %}bg-success-subtle text-success{% else %}bg-danger-subtle text-danger{% endif %}">
+                {% if property.is_active %}Active{% else %}Inactive{% endif %}
+              </span>
+            </td>
+            <td>
+              <div class="dropdown">
+                <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                  Actions
+                </button>
+                <ul class="dropdown-menu">
+                  <li><a class="dropdown-item" href="{{ property.get_absolute_url }}">
+                    <i class="fas fa-eye me-2"></i>View
+                  </a></li>
+                  <li><a class="dropdown-item" href="{% url 'properties:property_edit' property.pk %}">
+                    <i class="fas fa-edit me-2"></i>Edit
+                  </a></li>
+                  <li><hr class="dropdown-divider"></li>
+                  <li><a class="dropdown-item" href="#" onclick="togglePropertyStatus({{ property.id }}, {{ property.is_active|yesno:'false,true' }})">
+                    <i class="fas fa-{% if property.is_active %}ban{% else %}check{% endif %} me-2"></i>
+                    {% if property.is_active %}Deactivate{% else %}Activate{% endif %}
+                  </a></li>
+                  <li><hr class="dropdown-divider"></li>
+                  <li><a class="dropdown-item text-danger" href="#" onclick="deleteProperty({{ property.id }}, '{{ property.title }}')">
+                    <i class="fas fa-trash me-2"></i>Delete
+                  </a></li>
+                </ul>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="text-center text-600 py-5">
+              <div class="py-4">
+                <i class="fas fa-home fs-1 text-300 mb-3"></i>
+                <h5>No properties found</h5>
+                <p class="text-600">Get started by adding your first property.</p>
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addPropertyModal">
+                  <i class="fas fa-plus me-2"></i>Add Property
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  
+  <!-- Standard Pagination -->
+  {% include 'components/pagination.html' %}
+</div>
+
+<!-- AJAX Loading Indicator -->
+<div class="ajax-loading" style="display: none; text-align: center; padding: 20px;">
+  <div class="spinner-border text-primary" role="status">
+    <span class="visually-hidden">Loading...</span>
+  </div>
+  <p class="mt-2 text-muted">Loading...</p>
+</div>
+
+
+<div class="modal fade" id="addPropertyModal" tabindex="-1" aria-labelledby="addPropertyModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="addPropertyModalLabel">
+          <i class="fas fa-plus-circle me-2"></i>Add New Property
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <!-- Step 1: Property Type Selection -->
+        <div id="step1-property-type" class="step-content">
+          <div class="text-center mb-4">
+            <h4>Select Property Type</h4>
+            <p class="text-muted">Choose the type of property you want to add</p>
+          </div>
+          
+          <div class="row g-4">
+            <div class="col-md-6 col-lg-3">
+              <div class="card property-type-card" data-type="House" onclick="selectPropertyType('House')">
+                <div class="card-body text-center">
+                  <i class="fas fa-home fa-3x text-primary mb-3"></i>
+                  <h5 class="card-title">House</h5>
+                  <p class="card-text text-muted">Residential house with bedrooms, bathrooms, and living spaces</p>
+                </div>
+              </div>
+            </div>
+            
+            <div class="col-md-6 col-lg-3">
+              <div class="card property-type-card" data-type="Hotel" onclick="selectPropertyType('Hotel')">
+                <div class="card-body text-center">
+                  <i class="fas fa-bed fa-3x text-success mb-3"></i>
+                  <h5 class="card-title">Hotel</h5>
+                  <p class="card-text text-muted">Accommodation facility with multiple rooms and services</p>
+                </div>
+              </div>
+            </div>
+            
+            <div class="col-md-6 col-lg-3">
+              <div class="card property-type-card" data-type="Lodge" onclick="selectPropertyType('Lodge')">
+                <div class="card-body text-center">
+                  <i class="fas fa-mountain fa-3x text-warning mb-3"></i>
+                  <h5 class="card-title">Lodge</h5>
+                  <p class="card-text text-muted">Rustic accommodation with rooms and outdoor facilities</p>
+                </div>
+              </div>
+            </div>
+            
+            <div class="col-md-6 col-lg-3">
+              <div class="card property-type-card" data-type="Venue" onclick="selectPropertyType('Venue')">
+                <div class="card-body text-center">
+                  <i class="fas fa-calendar-alt fa-3x text-info mb-3"></i>
+                  <h5 class="card-title">Venue</h5>
+                  <p class="card-text text-muted">Event space for meetings, weddings, conferences</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Step 2: Property Form (Dynamic) -->
+        <div id="step2-property-form" class="step-content" style="display: none;">
+          <div class="d-flex align-items-center mb-4">
+            <button type="button" class="btn btn-outline-secondary me-3" onclick="goBackToStep1()">
+              <i class="fas fa-arrow-left me-2"></i>Back
+            </button>
+            <div>
+              <h4 class="mb-0">Add <span id="selected-property-type"></span></h4>
+              <p class="text-muted mb-0">Fill in the details for your property</p>
+            </div>
+          </div>
+          
+          <form id="addPropertyForm">
+            {% csrf_token %}
+            <input type="hidden" id="selected_property_type" name="property_type">
+            
+            <!-- Dynamic form content will be loaded here -->
+            <div id="dynamic-form-content">
+              <!-- Content will be loaded based on property type -->
+            </div>
+          </form>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="savePropertyBtn" style="display: none;">
+          <i class="fas fa-save me-2"></i>Save Property
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.property-type-card {
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+}
+
+.property-type-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+  border-color: #007bff;
+}
+
+.property-type-card.selected {
+  border-color: #007bff;
+  background-color: #f8f9fa;
+}
+
+.step-content {
+  min-height: 400px;
+}
+
+.form-section {
+  margin-bottom: 2rem;
+}
+
+.form-section h5 {
+  color: #495057;
+  border-bottom: 2px solid #e9ecef;
+  padding-bottom: 0.5rem;
+  margin-bottom: 1rem;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    console.log('Document ready - initializing property modal...');
+    
+    // Simple test - just try to open the modal when button is clicked
+    $('#addPropertyBtn').on('click', function(e) {
+        console.log('Add Property button clicked!');
+        e.preventDefault();
+        
+        // Try multiple methods to open the modal
+        try {
+            // Method 1: Bootstrap 5
+            const modal = new bootstrap.Modal(document.getElementById('addPropertyModal'));
+            modal.show();
+            console.log('Modal opened with Bootstrap 5');
+        } catch (error) {
+            console.error('Bootstrap 5 method failed:', error);
+            
+            try {
+                // Method 2: jQuery/Bootstrap 4 style
+                $('#addPropertyModal').modal('show');
+                console.log('Modal opened with jQuery method');
+            } catch (error2) {
+                console.error('jQuery method failed:', error2);
+                
+                // Method 3: Manual show
+                $('#addPropertyModal').removeClass('fade').show();
+                console.log('Modal opened manually');
+            }
+        }
+    });
+    
+    // Load form data when modal is shown
+    $('#addPropertyModal').on('show.bs.modal', function() {
+        console.log('Modal is being shown, loading form data...');
+        loadFormData();
+    });
+    
+    // Handle modal hidden event to ensure cleanup
+    $('#addPropertyModal').on('hidden.bs.modal', function() {
+        console.log('Modal hidden event triggered');
+        ensureModalCleanup();
+    });
+    
+    // Handle modal hide event
+    $('#addPropertyModal').on('hide.bs.modal', function() {
+        console.log('Modal hide event triggered');
+    });
+    
+    // Add fallback close functionality
+    $('#addPropertyModal').on('click', function(e) {
+        // Close modal when clicking on backdrop
+        if (e.target === this) {
+            console.log('Closing modal via backdrop click');
+            closeModal();
+        }
+    });
+    
+    // Close modal when clicking close button
+    $('#addPropertyModal .btn-close, #addPropertyModal [data-bs-dismiss="modal"]').on('click', function() {
+        console.log('Closing modal via close button');
+        closeModal();
+    });
+    
+    // Handle form submission
+    $('#savePropertyBtn').on('click', function() {
+        submitPropertyForm();
+    });
+    
+    // Function to close modal with fallback
+    function closeModal() {
+        console.log('Attempting to close modal...');
+        try {
+            // Try Bootstrap 5 method
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addPropertyModal'));
+            if (modal) {
+                modal.hide();
+                console.log('Modal closed with Bootstrap instance');
+            } else {
+                const newModal = new bootstrap.Modal(document.getElementById('addPropertyModal'));
+                newModal.hide();
+                console.log('Modal closed with new Bootstrap instance');
+            }
+        } catch (error) {
+            console.error('Bootstrap close failed:', error);
+            // Fallback: manual close with proper cleanup
+            manualCloseModal();
+        }
+        
+        // Always ensure cleanup after a short delay
+        setTimeout(function() {
+            ensureModalCleanup();
+        }, 300);
+    }
+    
+    // Manual modal close with proper cleanup
+    function manualCloseModal() {
+        console.log('Closing modal manually');
+        
+        // Remove modal classes
+        $('#addPropertyModal').removeClass('show').addClass('fade');
+        
+        // Remove body classes
+        $('body').removeClass('modal-open');
+        
+        // Remove backdrop
+        $('.modal-backdrop').remove();
+        
+        // Reset body padding
+        $('body').css('padding-right', '');
+        
+        // Ensure modal is hidden
+        $('#addPropertyModal').hide();
+        
+        console.log('Modal closed manually');
+    }
+    
+    // Ensure modal cleanup
+    function ensureModalCleanup() {
+        // Remove any remaining backdrop
+        $('.modal-backdrop').remove();
+        
+        // Ensure body is not locked
+        $('body').removeClass('modal-open');
+        $('body').css('padding-right', '');
+        
+        // Ensure modal is hidden
+        $('#addPropertyModal').removeClass('show').hide();
+        
+        console.log('Modal cleanup completed');
+    }
+    
+    // Make closeModal globally available
+    window.closeModal = closeModal;
+    
+    // Handle Enter key in form
+    $('#addPropertyForm').on('keypress', function(e) {
+        if (e.which === 13) {
+            e.preventDefault();
+            submitPropertyForm();
+        }
+    });
+    
+    // Handle ESC key to close modal
+    $(document).on('keydown', function(e) {
+        if (e.key === 'Escape' && $('#addPropertyModal').hasClass('show')) {
+            console.log('ESC key pressed, closing modal');
+            closeModal();
+        }
+        
+        // Emergency cleanup with Ctrl+Shift+C
+        if (e.ctrlKey && e.shiftKey && e.key === 'C') {
+            console.log('Emergency cleanup triggered');
+            emergencyCleanup();
+        }
+    });
+    
+    // Emergency cleanup function
+    function emergencyCleanup() {
+        console.log('Performing emergency cleanup...');
+        
+        // Remove all modal backdrops
+        $('.modal-backdrop').remove();
+        
+        // Remove all modal-related classes from body
+        $('body').removeClass('modal-open');
+        $('body').css('padding-right', '');
+        
+        // Hide all modals
+        $('.modal').removeClass('show').hide();
+        
+        // Remove any remaining overlay elements
+        $('.modal-backdrop, .modal-overlay').remove();
+        
+        console.log('Emergency cleanup completed');
+    }
+    
+    // Make emergency cleanup globally available
+    window.emergencyCleanup = emergencyCleanup;
+    
+    // Dynamic form field handling
+    function togglePropertyFields(propertyType) {
+        console.log('Toggling fields for property type:', propertyType);
+        
+        // Hide all type-specific fields first
+        $('#total-rooms-field, #room-types-field, #capacity-field, #venue-type-field').hide();
+        $('#bedrooms-field').show();
+        
+        // Show relevant fields based on property type
+        if (propertyType === 'Hotel' || propertyType === 'Lodge') {
+            $('#total-rooms-field, #room-types-field').show();
+            $('#bedrooms-field').hide();
+        } else if (propertyType === 'Venue') {
+            $('#capacity-field, #venue-type-field').show();
+            $('#bedrooms-field').hide();
+        }
+        
+        // Update required fields
+        if (propertyType === 'Venue') {
+            $('#id_bedrooms').prop('required', false);
+        } else {
+            $('#id_bedrooms').prop('required', true);
+        }
+    }
+    
+    // Property filtering functions
+    function applyFilters() {
+        const searchTerm = $('#propertySearch').val().toLowerCase();
+        const typeFilter = $('#propertyTypeFilter').val();
+        const statusFilter = $('#statusFilter').val();
+        const activeFilter = $('#activeFilter').val();
+        
+        $('#properties-table tbody tr').each(function() {
+            const row = $(this);
+            const propertyTitle = row.find('h6').text().toLowerCase();
+            const propertyType = row.find('.badge').first().text();
+            const statusBadge = row.find('.badge').eq(1).text();
+            const activeBadge = row.find('.badge').last().text();
+            
+            let showRow = true;
+            
+            // Search filter
+            if (searchTerm && !propertyTitle.includes(searchTerm)) {
+                showRow = false;
+            }
+            
+            // Type filter
+            if (typeFilter && propertyType !== typeFilter) {
+                showRow = false;
+            }
+            
+            // Status filter
+            if (statusFilter) {
+                const statusText = statusFilter === 'available' ? 'Available' : 
+                                 statusFilter === 'rented' ? 'Rented' :
+                                 statusFilter === 'under_maintenance' ? 'Under Maintenance' : 'Unavailable';
+                if (statusBadge !== statusText) {
+                    showRow = false;
+                }
+            }
+            
+            // Active filter
+            if (activeFilter) {
+                const activeText = activeFilter === 'true' ? 'Active' : 'Inactive';
+                if (activeBadge !== activeText) {
+                    showRow = false;
+                }
+            }
+            
+            row.toggle(showRow);
+        });
+        
+        updateItemCount();
+    }
+    
+    function clearFilters() {
+        $('#propertySearch').val('');
+        $('#propertyTypeFilter').val('');
+        $('#statusFilter').val('');
+        $('#activeFilter').val('');
+        $('#properties-table tbody tr').show();
+        updateItemCount();
+    }
+    
+    function updateItemCount() {
+        const visibleRows = $('#properties-table tbody tr:visible').length;
+        $('#item-count').text(visibleRows);
+    }
+    
+    // Property action functions
+    function togglePropertyStatus(propertyId, currentStatus) {
+        const isActive = (currentStatus === true) || (currentStatus === 'true') || (currentStatus === 1) || (currentStatus === '1');
+        const newActive = !isActive;
+        const action = newActive ? 'activate' : 'deactivate';
+        
+        if (confirm(`Are you sure you want to ${action} this property?`)) {
+            $.ajax({
+                url: `/api/v1/properties/${propertyId}/toggle-status/`,
+                method: 'PATCH',
+                headers: {
+                    'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+                },
+                contentType: 'application/json',
+                data: JSON.stringify({ is_active: newActive }),
+                success: function(response) {
+                    if (response && response.success) {
+                        location.reload();
+                    } else {
+                        alert('Error updating property status: ' + (response && response.message ? response.message : 'Unknown error'));
+                    }
+                },
+                error: function() {
+                    alert('An error occurred while updating the property status.');
+                }
+            });
+        }
+    }
+    
+    function deleteProperty(propertyId, propertyTitle) {
+        if (confirm(`Are you sure you want to delete "Tsh{propertyTitle}"? This action cannot be undone.`)) {
+            $.ajax({
+                url: `/api/v1/properties/Tsh{propertyId}/delete/`,
+                method: 'DELETE',
+                headers: {
+                    'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+                },
+                success: function(response) {
+                    if (response.success) {
+                        location.reload();
+                    } else {
+                        alert('Error deleting property: ' + response.message);
+                    }
+                },
+                error: function() {
+                    alert('An error occurred while deleting the property.');
+                }
+            });
+        }
+    }
+    
+    // Event listeners for filtering
+    $('#propertySearch, #propertyTypeFilter, #statusFilter, #activeFilter').on('change keyup', applyFilters);
+    
+    // Make functions globally available
+    window.togglePropertyFields = togglePropertyFields;
+    window.clearFilters = clearFilters;
+    window.togglePropertyStatus = togglePropertyStatus;
+    window.deleteProperty = deleteProperty;
+    
+    function loadFormData() {
+        console.log('Loading form data...');
+        $.ajax({
+            url: '/api/v1/properties/form-data/',
+            method: 'GET',
+            success: function(response) {
+                console.log('Form data loaded:', response);
+                if (response.success) {
+                    // Populate property types
+                    const propertyTypeSelect = $('#id_property_type');
+                    propertyTypeSelect.empty().append('<option value="">Select Property Type</option>');
+                    response.data.property_types.forEach(function(type) {
+                        propertyTypeSelect.append(`<option value="${type.id}">${type.name}</option>`);
+                    });
+                    
+                    // Populate regions
+                    const regionSelect = $('#id_region');
+                    regionSelect.empty().append('<option value="">Select Region</option>');
+                    response.data.regions.forEach(function(region) {
+                        regionSelect.append(`<option value="${region.id}">${region.name}</option>`);
+                    });
+                    
+                    // Populate amenities
+                    const amenitiesContainer = $('#amenities-container');
+                    amenitiesContainer.empty();
+                    response.data.amenities.forEach(function(amenity) {
+                        amenitiesContainer.append(`
+                            <div class="col-md-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="amenity_${amenity.id}" name="amenities" value="${amenity.id}">
+                                    <label class="form-check-label" for="amenity_${amenity.id}">
+                                        ${amenity.name}
+                                    </label>
+                                </div>
+                            </div>
+                        `);
+                    });
+                } else {
+                    console.error('Form data loading failed:', response.message);
+                }
+            },
+            error: function(xhr) {
+                console.error('Failed to load form data:', xhr.responseJSON || xhr.statusText);
+            }
+        });
+    }
+    
+    function submitPropertyForm() {
+        const form = $('#addPropertyForm');
+        
+        // Collect form data manually to handle all input types properly
+        const jsonData = {};
+        
+        // Handle text inputs, selects, and textareas
+        form.find('input[type="text"], input[type="number"], input[type="date"], select, textarea').each(function() {
+            if (this.name) {
+                jsonData[this.name] = this.value;
+            }
+        });
+        
+        // Handle checkboxes
+        form.find('input[type="checkbox"]').each(function() {
+            jsonData[this.name] = this.checked;
+        });
+        
+        // Handle amenities specifically
+        const amenities = [];
+        form.find('input[name="amenities"]:checked').each(function() {
+            amenities.push(parseInt(this.value));
+        });
+        jsonData['amenities'] = amenities;
+        
+        // Show loading state
+        const saveBtn = $('#savePropertyBtn');
+        const originalText = saveBtn.html();
+        saveBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Saving...');
+        
+        $.ajax({
+            url: '/api/v1/properties/create/',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(jsonData),
+            headers: {
+                'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    // Show success message
+                    showAlert('success', response.message);
+                    
+                    // Close modal and reset form
+                    $('#addPropertyModal').modal('hide');
+                    form[0].reset();
+                    
+                    // Redirect to properties list page
+                    setTimeout(function() {
+                        window.location.href = '/properties/';
+                    }, 1000);
+                } else {
+                    showAlert('danger', response.message);
+                    if (response.errors) {
+                        displayFormErrors(response.errors);
+                    }
+                }
+            },
+            error: function(xhr) {
+                let errorMessage = 'An error occurred while saving the property.';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMessage = xhr.responseJSON.message;
+                }
+                showAlert('danger', errorMessage);
+                console.error('Error details:', xhr.responseJSON);
+            },
+            complete: function() {
+                // Reset button state
+                saveBtn.prop('disabled', false).html(originalText);
+            }
+        });
+    }
+    
+    function displayFormErrors(errors) {
+        // Clear previous errors
+        $('.is-invalid').removeClass('is-invalid');
+        $('.invalid-feedback').remove();
+        
+        // Display new errors
+        Object.keys(errors).forEach(function(field) {
+            const input = $(`[name="${field}"]`);
+            input.addClass('is-invalid');
+            input.after(`<div class="invalid-feedback">${errors[field][0]}</div>`);
+        });
+    }
+    
+    function showAlert(type, message) {
+        const alertHtml = `
+            <div class="alert alert-Tsh{type} alert-dismissible fade show" role="alert">
+                Tsh{message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        `;
+        
+        // Remove existing alerts
+        $('.alert').remove();
+        
+        // Add new alert
+        $('.content').prepend(alertHtml);
+        
+        // Auto-dismiss after 5 seconds
+        setTimeout(function() {
+            $('.alert').fadeOut();
+        }, 5000);
+    }
+});
+</script>
+{% endblock %}

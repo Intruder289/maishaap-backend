@@ -1,0 +1,1495 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}{{ title }} - Maisha{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb mb-0">
+                            <li class="breadcrumb-item"><a href="{% url 'properties:property_list' %}" class="text-decoration-none">Properties</a></li>
+                            <li class="breadcrumb-item active">{{ title }}</li>
+                        </ol>
+                    </nav>
+                    <h1 class="h3 mb-1 fw-bold text-body-emphasis">
+                        <i class="fas fa-{% if property_type == 'hotel' %}bed{% elif property_type == 'house' %}home{% elif property_type == 'lodge' %}mountain{% elif property_type == 'venue' %}calendar-alt{% else %}plus-circle{% endif %} me-2 text-primary"></i>
+                        {{ title }}
+                    </h1>
+                    <p class="text-body-secondary mb-0">
+                        {% if property %}
+                            Update property information and details
+                        {% else %}
+                            Add a new {% if property_type %}{{ property_type }}{% else %}property{% endif %} to your portfolio
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Form Card -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-0">
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger border-0 rounded-0 mb-0">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <div>
+                                    <strong>Please correct the following errors:</strong>
+                                    <ul class="mb-0 mt-2">
+                                        {% for error in form.non_field_errors %}
+                                            <li>{{ error }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+                    
+                    {% if image_formset.non_form_errors %}
+                        <div class="alert alert-danger border-0 rounded-0 mb-0">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <div>
+                                    <strong>Image formset errors:</strong>
+                                    <ul class="mb-0 mt-2">
+                                        {% for error in image_formset.non_form_errors %}
+                                            <li>{{ error }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    {% if property %}
+                        <form method="post" action="{% url 'properties:property_edit' property.pk %}" enctype="multipart/form-data" novalidate class="p-4" id="propertyEditForm" onsubmit="console.log('FORM ONSUBMIT FIRED!'); return true;">
+                    {% else %}
+                        <form method="post" action="{% url 'properties:property_create' %}{% if property_type %}?type={{ property_type }}{% endif %}" enctype="multipart/form-data" novalidate class="p-4" id="propertyEditForm" onsubmit="console.log('FORM ONSUBMIT (inline) FIRED'); return true;">
+                    {% endif %}
+                        {% csrf_token %}
+                        <input type="hidden" name="form_submitted" value="1">
+                        {% if not property and property_type %}<input type="hidden" name="type" value="{{ property_type }}">{% endif %}
+                
+                        <!-- Basic Information Section -->
+                        <div class="card border-0 mb-4">
+                            <div class="card-header bg-body-tertiary border-0">
+                                <h5 class="card-title mb-0 fw-semibold">
+                                    <i class="fas fa-info-circle me-2 text-primary"></i>
+                                    Basic Information
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-md-8">
+                                        <label for="{{ form.title.id_for_label }}" class="form-label fw-semibold">
+                                            Property Title <span class="text-danger">*</span>
+                                        </label>
+                                        {{ form.title }}
+                                        {% if form.title.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.title.errors %}
+                                                    <div><i class="fas fa-exclamation-circle me-1"></i>{{ error }}</div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="col-md-4">
+                                        <label for="{{ form.property_type.id_for_label }}" class="form-label fw-semibold">
+                                            Property Type <span class="text-danger">*</span>
+                                        </label>
+                                        {% if not property %}
+                                            {# When creating, show disabled field and hidden input to ensure value is submitted #}
+                                            {% if property_type %}
+                                                {# If property_type is specified in URL, use it directly #}
+                                                <select name="{{ form.property_type.name }}" id="{{ form.property_type.id_for_label }}" class="form-control" disabled>
+                                                    {% for choice in form.property_type.field.choices %}
+                                                        {% if choice.0 %}
+                                                            {% if choice.1|lower == property_type|lower or choice.1|lower == property_type %}
+                                                                <option value="{{ choice.0 }}" selected>{{ choice.1 }}</option>
+                                                            {% else %}
+                                                                <option value="{{ choice.0 }}">{{ choice.1 }}</option>
+                                                            {% endif %}
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </select>
+                                                {% for choice in form.property_type.field.choices %}
+                                                    {% if choice.0 %}
+                                                        {% if choice.1|lower == property_type|lower %}
+                                                            <input type="hidden" name="{{ form.property_type.name }}" value="{{ choice.0 }}">
+                                                        {% endif %}
+                                                    {% endif %}
+                                                {% endfor %}
+                                            {% else %}
+                                                {# Fallback to form value if property_type not in URL #}
+                                                <select name="{{ form.property_type.name }}" id="{{ form.property_type.id_for_label }}" class="form-control" disabled>
+                                                    {% for choice in form.property_type.field.choices %}
+                                                        {% if choice.0 == form.property_type.value %}
+                                                            <option value="{{ choice.0 }}" selected>{{ choice.1 }}</option>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </select>
+                                                <input type="hidden" name="{{ form.property_type.name }}" value="{{ form.property_type.value }}">
+                                            {% endif %}
+                                            <div class="form-text">Property type is determined by the creation URL</div>
+                                        {% else %}
+                                            {{ form.property_type }}
+                                        {% endif %}
+                                        {% if form.property_type.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.property_type.errors %}
+                                                    <div><i class="fas fa-exclamation-circle me-1"></i>{{ error }}</div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                <div class="row g-3 mt-2">
+                                    <div class="col-12">
+                                        <label for="{{ form.description.id_for_label }}" class="form-label fw-semibold">
+                                            Description <span class="text-danger">*</span>
+                                        </label>
+                                        {{ form.description }}
+                                        {% if form.description.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.description.errors %}
+                                                    <div><i class="fas fa-exclamation-circle me-1"></i>{{ error }}</div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                        <div class="form-text">Provide a detailed description of the property</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Location Information Section -->
+                        <div class="card border-0 mb-4">
+                            <div class="card-header bg-body-tertiary border-0">
+                                <h5 class="card-title mb-0 fw-semibold">
+                                    <i class="fas fa-map-marker-alt me-2 text-primary"></i>
+                                    Location Information
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label for="{{ form.region.id_for_label }}" class="form-label fw-semibold">
+                                            Region <span class="text-danger">*</span>
+                                        </label>
+                                        {{ form.region }}
+                                        {% if form.region.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.region.errors %}
+                                                    <div><i class="fas fa-exclamation-circle me-1"></i>{{ error }}</div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="col-md-4">
+                                        <label for="{{ form.district.id_for_label }}" class="form-label fw-semibold">
+                                            District
+                                        </label>
+                                        {{ form.district }}
+                                        {% if form.district.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.district.errors %}
+                                                    <div><i class="fas fa-exclamation-circle me-1"></i>{{ error }}</div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                        <small class="form-text text-muted">Select region first to see districts</small>
+                                    </div>
+                                    
+                                    <div class="col-md-4">
+                                        <label for="{{ form.latitude.id_for_label }}" class="form-label fw-semibold">
+                                            Latitude
+                                        </label>
+                                        {{ form.latitude }}
+                                        {% if form.latitude.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.latitude.errors %}
+                                                    <div><i class="fas fa-exclamation-circle me-1"></i>{{ error }}</div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                        <div class="form-text">GPS coordinates (optional)</div>
+                                    </div>
+                                    
+                                    <div class="col-md-4">
+                                        <label for="{{ form.longitude.id_for_label }}" class="form-label fw-semibold">
+                                            Longitude
+                                        </label>
+                                        {{ form.longitude }}
+                                        {% if form.longitude.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.longitude.errors %}
+                                                    <div><i class="fas fa-exclamation-circle me-1"></i>{{ error }}</div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                        <div class="form-text">GPS coordinates (optional)</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row g-3 mt-2">
+                                    <div class="col-12">
+                                        <label for="{{ form.address.id_for_label }}" class="form-label fw-semibold">
+                                            Address <span class="text-danger">*</span>
+                                        </label>
+                                        {{ form.address }}
+                                        {% if form.address.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.address.errors %}
+                                                    <div><i class="fas fa-exclamation-circle me-1"></i>{{ error }}</div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                        <div class="form-text">Full street address of the property</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Property Details Section -->
+                        <div class="card border-0 mb-4">
+                            <div class="card-header bg-body-tertiary border-0">
+                                <h5 class="card-title mb-0 fw-semibold">
+                                    <i class="fas fa-{% if property_type == 'hotel' %}bed{% elif property_type == 'house' %}home{% elif property_type == 'lodge' %}mountain{% elif property_type == 'venue' %}calendar-alt{% else %}home{% endif %} me-2 text-primary"></i>
+                                    {% if property_type == 'hotel' %}Hotel Details{% elif property_type == 'house' %}House Details{% elif property_type == 'lodge' %}Lodge Details{% elif property_type == 'venue' %}Venue Details{% else %}Property Details{% endif %}
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <!-- ALWAYS include size_sqft - show visible field or hidden field with existing value -->
+                                {% if property_type == 'hotel' or property_type == 'lodge' or property_type == 'house' or property_type == 'venue' %}
+                                <!-- Field will be shown below in type-specific sections -->
+                                {% else %}
+                                <!-- For other property types, include as hidden field with existing value -->
+                                <input type="hidden" name="size_sqft" value="{% if property %}{{ property.size_sqft|default:'' }}{% else %}{% endif %}" id="id_size_sqft">
+                                {% endif %}
+                                
+                                <!-- Hotel/Lodge specific fields -->
+                                {% if property_type == 'hotel' or property_type == 'lodge' %}
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label for="{{ form.total_rooms.id_for_label }}" class="form-label fw-semibold">
+                                            Total Rooms <span class="text-danger">*</span>
+                                        </label>
+                                        {{ form.total_rooms }}
+                                        {% if form.total_rooms.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.total_rooms.errors %}
+                                                    <div><i class="fas fa-exclamation-circle me-1"></i>{{ error }}</div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="col-md-4">
+                                        <label for="{{ form.bathrooms.id_for_label }}" class="form-label fw-semibold">
+                                            Common Bathrooms
+                                        </label>
+                                        {{ form.bathrooms }}
+                                        {% if form.bathrooms.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.bathrooms.errors %}
+                                                    <div><i class="fas fa-exclamation-circle me-1"></i>{{ error }}</div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="col-md-4">
+                                        <label for="{{ form.size_sqft.id_for_label }}" class="form-label fw-semibold">
+                                            Size (sqft) <span class="text-danger">*</span>
+                                        </label>
+                                        {{ form.size_sqft }}
+                                        {% if form.size_sqft.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.size_sqft.errors %}
+                                                    <div><i class="fas fa-exclamation-circle me-1"></i>{{ error }}</div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                <div class="row g-3 mt-2">
+                                    <div class="col-12">
+                                        <label for="{{ form.room_types.id_for_label }}" class="form-label fw-semibold">
+                                            Room Types
+                                        </label>
+                                        {{ form.room_types }}
+                                        {% if form.room_types.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.room_types.errors %}
+                                                    <div><i class="fas fa-exclamation-circle me-1"></i>{{ error }}</div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                        <div class="form-text">JSON format: {"Single": 10, "Double": 5, "Suite": 2}</div>
+                                    </div>
+                                </div>
+                                {% endif %}
+                        
+                                <!-- House specific fields -->
+                                {% if property_type == 'house' %}
+                                <div class="row g-3">
+                                    <div class="col-md-3">
+                                        <label for="{{ form.bedrooms.id_for_label }}" class="form-label fw-semibold">
+                                            Bedrooms <span class="text-danger">*</span>
+                                        </label>
+                                        {{ form.bedrooms }}
+                                        {% if form.bedrooms.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.bedrooms.errors %}
+                                                    <div><i class="fas fa-exclamation-circle me-1"></i>{{ error }}</div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="col-md-3">
+                                        <label for="{{ form.bathrooms.id_for_label }}" class="form-label fw-semibold">
+                                            Bathrooms <span class="text-danger">*</span>
+                                        </label>
+                                        {{ form.bathrooms }}
+                                        {% if form.bathrooms.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.bathrooms.errors %}
+                                                    <div><i class="fas fa-exclamation-circle me-1"></i>{{ error }}</div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="col-md-3">
+                                        <label for="{{ form.floor_number.id_for_label }}" class="form-label fw-semibold">
+                                            Floor Number
+                                        </label>
+                                        {{ form.floor_number }}
+                                        {% if form.floor_number.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.floor_number.errors %}
+                                                    <div><i class="fas fa-exclamation-circle me-1"></i>{{ error }}</div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="col-md-3">
+                                        <label for="{{ form.total_floors.id_for_label }}" class="form-label fw-semibold">
+                                            Total Floors
+                                        </label>
+                                        {{ form.total_floors }}
+                                        {% if form.total_floors.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.total_floors.errors %}
+                                                    <div><i class="fas fa-exclamation-circle me-1"></i>{{ error }}</div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                <div class="row g-3 mt-2">
+                                    <div class="col-md-6">
+                                        <label for="{{ form.size_sqft.id_for_label }}" class="form-label fw-semibold">
+                                            Size (sqft) <span class="text-danger">*</span>
+                                        </label>
+                                        {{ form.size_sqft }}
+                                        {% if form.size_sqft.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.size_sqft.errors %}
+                                                    <div><i class="fas fa-exclamation-circle me-1"></i>{{ error }}</div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                        <div class="form-text">{{ form.size_sqft.help_text }}</div>
+                                    </div>
+                                </div>
+                                {% endif %}
+                                
+                                <!-- Venue specific fields -->
+                                {% if property_type == 'venue' %}
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label for="{{ form.capacity.id_for_label }}" class="form-label fw-semibold">
+                                            Maximum Capacity <span class="text-danger">*</span>
+                                        </label>
+                                        {{ form.capacity }}
+                                        {% if form.capacity.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.capacity.errors %}
+                                                    <div><i class="fas fa-exclamation-circle me-1"></i>{{ error }}</div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="col-md-4">
+                                        <label for="{{ form.venue_type.id_for_label }}" class="form-label fw-semibold">
+                                            Venue Type
+                                        </label>
+                                        {{ form.venue_type }}
+                                        {% if form.venue_type.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.venue_type.errors %}
+                                                    <div><i class="fas fa-exclamation-circle me-1"></i>{{ error }}</div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="col-md-4">
+                                        <label for="{{ form.bathrooms.id_for_label }}" class="form-label fw-semibold">
+                                            Restrooms
+                                        </label>
+                                        {{ form.bathrooms }}
+                                        {% if form.bathrooms.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.bathrooms.errors %}
+                                                    <div><i class="fas fa-exclamation-circle me-1"></i>{{ error }}</div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                <div class="row g-3 mt-2">
+                                    <div class="col-md-6">
+                                        <label for="{{ form.size_sqft.id_for_label }}" class="form-label fw-semibold">
+                                            Size (sqft) <span class="text-danger">*</span>
+                                        </label>
+                                        {{ form.size_sqft }}
+                                        {% if form.size_sqft.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.size_sqft.errors %}
+                                                    <div><i class="fas fa-exclamation-circle me-1"></i>{{ error }}</div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                        <div class="form-text">{{ form.size_sqft.help_text }}</div>
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Pricing Information Section -->
+                        <div class="card border-0 mb-4">
+                            <div class="card-header bg-body-tertiary border-0">
+                                <h5 class="card-title mb-0 fw-semibold">
+                                    <i class="fas fa-dollar-sign me-2 text-primary"></i>
+                                    Pricing Information
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="{{ form.rent_amount.id_for_label }}" class="form-label fw-semibold">
+                                            {% if property_type == 'hotel' or property_type == 'lodge' %}Base Rate per Night (Tsh){% elif property_type == 'venue' %}Rate per Event (Tsh){% else %}Monthly Rent (Tsh){% endif %} <span class="text-danger">*</span>
+                                        </label>
+                                        {{ form.rent_amount }}
+                                        {% if form.rent_amount.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.rent_amount.errors %}
+                                                    <div><i class="fas fa-exclamation-circle me-1"></i>{{ error }}</div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                        <div class="form-text">
+                                            {% if property_type == 'hotel' or property_type == 'lodge' %}Base rate per night in Tanzania Shillings{% elif property_type == 'venue' %}Rate per event in Tanzania Shillings{% else %}Monthly rental amount in Tanzania Shillings{% endif %}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <label for="{{ form.deposit_amount.id_for_label }}" class="form-label fw-semibold">
+                                            Security Deposit (Tsh)
+                                        </label>
+                                        {{ form.deposit_amount }}
+                                        {% if form.deposit_amount.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.deposit_amount.errors %}
+                                                    <div><i class="fas fa-exclamation-circle me-1"></i>{{ error }}</div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                        <div class="form-text">{{ form.deposit_amount.help_text }}</div>
+                                    </div>
+                                    
+                                    {% if property_type == 'house' and form.visit_cost %}
+                                    <div class="col-md-6">
+                                        <label for="{{ form.visit_cost.id_for_label }}" class="form-label fw-semibold">
+                                            Visit Cost (Tsh)
+                                        </label>
+                                        {{ form.visit_cost }}
+                                        {% if form.visit_cost.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.visit_cost.errors %}
+                                                    <div><i class="fas fa-exclamation-circle me-1"></i>{{ error }}</div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                        <div class="form-text">
+                                            <i class="fas fa-info-circle me-1"></i>
+                                            One-time fee for users to view owner contact information and property location (House properties only)
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Property Status and Availability Section -->
+                        <div class="card border-0 mb-4">
+                            <div class="card-header bg-body-tertiary border-0">
+                                <h5 class="card-title mb-0 fw-semibold">
+                                    <i class="fas fa-calendar-check me-2 text-primary"></i>
+                                    Status & Availability
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="{{ form.status.id_for_label }}" class="form-label fw-semibold">
+                                            Status <span class="text-danger">*</span>
+                                        </label>
+                                        {{ form.status }}
+                                        {% if form.status.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.status.errors %}
+                                                    <div><i class="fas fa-exclamation-circle me-1"></i>{{ error }}</div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <label for="{{ form.available_from.id_for_label }}" class="form-label fw-semibold">
+                                            Available From
+                                        </label>
+                                        {{ form.available_from }}
+                                        {% if form.available_from.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.available_from.errors %}
+                                                    <div><i class="fas fa-exclamation-circle me-1"></i>{{ error }}</div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                <div class="row g-3 mt-2">
+                                    <div class="col-md-6">
+                                        <label for="{{ form.booking_expiration_hours.id_for_label }}" class="form-label fw-semibold">
+                                            Booking Expiration Hours
+                                        </label>
+                                        {{ form.booking_expiration_hours }}
+                                        {% if form.booking_expiration_hours.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.booking_expiration_hours.errors %}
+                                                    <div><i class="fas fa-exclamation-circle me-1"></i>{{ error }}</div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                        <div class="form-text">Hours after booking creation to cancel if no payment is made. Default: 12 hours. Set to 0 to disable auto-cancellation.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Property Features Section -->
+                        <div class="card border-0 mb-4">
+                            <div class="card-header bg-body-tertiary border-0">
+                                <h5 class="card-title mb-0 fw-semibold">
+                                    <i class="fas fa-star me-2 text-primary"></i>
+                                    Property Features
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <div class="form-check">
+                                            {{ form.utilities_included }}
+                                            <label class="form-check-label fw-semibold" for="{{ form.utilities_included.id_for_label }}">
+                                                Utilities Included
+                                            </label>
+                                        </div>
+                                        <div class="form-text">{{ form.utilities_included.help_text }}</div>
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <div class="form-check">
+                                            {{ form.is_furnished }}
+                                            <label class="form-check-label fw-semibold" for="{{ form.is_furnished.id_for_label }}">
+                                                Furnished
+                                            </label>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <div class="form-check">
+                                            {{ form.pets_allowed }}
+                                            <label class="form-check-label fw-semibold" for="{{ form.pets_allowed.id_for_label }}">
+                                                Pets Allowed
+                                            </label>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <div class="form-check">
+                                            {{ form.smoking_allowed }}
+                                            <label class="form-check-label fw-semibold" for="{{ form.smoking_allowed.id_for_label }}">
+                                                Smoking Allowed
+                                            </label>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-12">
+                                        <div class="form-check">
+                                            {{ form.is_featured }}
+                                            <label class="form-check-label fw-semibold" for="{{ form.is_featured.id_for_label }}">
+                                                Featured Property
+                                            </label>
+                                        </div>
+                                        <div class="form-text">{{ form.is_featured.help_text }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Amenities Section -->
+                        <div class="card border-0 mb-4">
+                            <div class="card-header bg-body-tertiary border-0">
+                                <h5 class="card-title mb-0 fw-semibold">
+                                    <i class="fas fa-list-check me-2 text-primary"></i>
+                                    Amenities
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    {% for choice in form.amenities %}
+                                        <div class="col-md-4 col-lg-3">
+                                            <div class="form-check">
+                                                {{ choice.tag }}
+                                                <label class="form-check-label fw-semibold" for="{{ choice.id_for_label }}">
+                                                    {{ choice.choice_label }}
+                                                </label>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                                {% if form.amenities.errors %}
+                                    <div class="invalid-feedback d-block mt-3">
+                                        {% for error in form.amenities.errors %}
+                                            <div><i class="fas fa-exclamation-circle me-1"></i>{{ error }}</div>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Property Images Section -->
+                        {% if image_formset %}
+                        <div class="card border-0 mb-4">
+                            <div class="card-header bg-body-tertiary border-0">
+                                <h5 class="card-title mb-0 fw-semibold">
+                                    <i class="fas fa-images me-2 text-primary"></i>
+                                    Property Images
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                    
+                    <div class="image-upload-container">
+                        <div class="upload-instructions">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <p>Upload property images to showcase your property</p>
+                            <small class="text-muted">Minimum 1 image, maximum 10 images. Supported formats: JPG, PNG, WEBP</small>
+                            <div id="image-count-info" class="mt-2">
+                                <span class="badge bg-info">0 / 10 images uploaded</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Drag and Drop Area -->
+                        <div class="drag-drop-area" id="dragDropArea">
+                            <div class="drag-drop-content">
+                                <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                                <h5 id="dragDropTitle">Drag & Drop Images Here</h5>
+                                <p class="text-muted" id="dragDropSubtitle">or click to browse files</p>
+                                <button type="button" class="btn btn-outline-primary" id="browseImagesBtn">
+                                    <i class="fas fa-folder-open me-2"></i>Browse Images
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Hidden file input -->
+                        <input type="file" id="imageFileInput" multiple accept="image/*" style="display: none;">
+                        
+                        <!-- Image Preview Container -->
+                        <div class="image-preview-container" id="imagePreviewContainer">
+                            <!-- Preview images will be inserted here -->
+                        </div>
+                        
+                        <!-- Upload Progress -->
+                        <div class="upload-progress" id="uploadProgress" style="display: none;">
+                            <div class="progress">
+                                <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                            </div>
+                            <small class="text-muted">Uploading images...</small>
+                        </div>
+                        
+                        <!-- Formset Management -->
+                        {{ image_formset.management_form }}
+                        
+                        <!-- Hidden formset forms for backend processing -->
+                        <!-- Note: These are kept minimal - JavaScript handles actual image uploads -->
+                        <div id="hiddenFormsContainer" style="display: none;">
+                            {% for form in image_formset %}
+                                <div class="image-form-item" data-form-index="{{ forloop.counter0 }}">
+                                    {% for hidden in form.hidden_fields %}
+                                        {{ hidden }}
+                                    {% endfor %}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                        <!-- Form Actions -->
+                        <div class="d-flex justify-content-between align-items-center pt-4 border-top">
+                            <a href="{% url 'properties:property_list' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>Cancel
+                            </a>
+                            
+                            <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                                <i class="fas fa-{% if property %}save{% else %}plus{% endif %} me-2"></i>
+                                {% if property %}Update Property{% else %}Create Property{% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Image Upload Styles - Phoenix Compatible */
+.image-upload-container {
+    margin-top: 1rem;
+}
+
+.upload-instructions {
+    text-align: center;
+    margin-bottom: 2rem;
+    padding: 1rem;
+    background-color: #f8f9fa;
+    border-radius: 0.5rem;
+    border: 2px dashed #dee2e6;
+}
+
+.upload-instructions i {
+    font-size: 2rem;
+    color: #6c757d;
+    margin-bottom: 0.5rem;
+}
+
+.drag-drop-area {
+    border: 2px dashed #dee2e6;
+    border-radius: 0.75rem;
+    padding: 3rem 2rem;
+    text-align: center;
+    background-color: #f8f9fa;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    margin-bottom: 2rem;
+}
+
+.drag-drop-area:hover {
+    border-color: #007bff;
+    background-color: #e3f2fd;
+}
+
+.drag-drop-area.dragover {
+    border-color: #007bff;
+    background-color: #e3f2fd;
+    transform: scale(1.02);
+}
+
+.drag-drop-content h5 {
+    margin-bottom: 0.5rem;
+    color: #495057;
+}
+
+.image-preview-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.image-preview-item {
+    position: relative;
+    border: 2px solid #e9ecef;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    background-color: white;
+    transition: all 0.3s ease;
+}
+
+.image-preview-item:hover {
+    border-color: #007bff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,123,255,0.15);
+}
+
+.image-preview-item img {
+    width: 100%;
+    height: 150px;
+    object-fit: cover;
+}
+
+.image-preview-item .preview-actions {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    display: flex;
+    gap: 0.25rem;
+}
+
+.image-preview-item .preview-actions .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+}
+
+.image-preview-item .preview-info {
+    padding: 0.75rem;
+}
+
+.image-preview-item .preview-info h6 {
+    margin-bottom: 0.25rem;
+    font-size: 0.875rem;
+    color: #495057;
+}
+
+.image-preview-item .preview-info small {
+    color: #6c757d;
+    font-size: 0.75rem;
+}
+
+.image-preview-item .caption-input {
+    width: 100%;
+    padding: 0.25rem;
+    font-size: 0.75rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+    margin-top: 0.25rem;
+}
+
+.image-preview-item .primary-checkbox {
+    margin-top: 0.5rem;
+}
+
+.image-preview-item .primary-checkbox label {
+    font-size: 0.75rem;
+    color: #6c757d;
+}
+
+.upload-progress {
+    margin-top: 1rem;
+}
+
+.upload-progress .progress {
+    height: 8px;
+    border-radius: 4px;
+}
+
+.upload-progress .progress-bar {
+    background-color: #007bff;
+    transition: width 0.3s ease;
+}
+
+@media (max-width: 768px) {
+    .image-preview-container {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const dragDropArea = document.getElementById('dragDropArea');
+    const imageFileInput = document.getElementById('imageFileInput');
+    const browseImagesBtn = document.getElementById('browseImagesBtn');
+    const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+    const uploadProgress = document.getElementById('uploadProgress');
+    const hiddenFormsContainer = document.getElementById('hiddenFormsContainer');
+    
+    let selectedImages = [];
+    let imageCounter = 0;
+    
+    // Drag and drop functionality
+    dragDropArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        dragDropArea.classList.add('dragover');
+    });
+    
+    dragDropArea.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        dragDropArea.classList.remove('dragover');
+    });
+    
+    dragDropArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        dragDropArea.classList.remove('dragover');
+        
+        const files = Array.from(e.dataTransfer.files);
+        handleImageFiles(files);
+    });
+    
+    // Click to browse
+    dragDropArea.addEventListener('click', function() {
+        imageFileInput.click();
+    });
+    
+    browseImagesBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        imageFileInput.click();
+    });
+    
+    // File input change
+    imageFileInput.addEventListener('change', function(e) {
+        const files = Array.from(e.target.files);
+        handleImageFiles(files);
+    });
+    
+    // Handle image files
+    function handleImageFiles(files) {
+        const imageFiles = files.filter(file => file.type.startsWith('image/'));
+        
+        if (imageFiles.length === 0) {
+            alert('Please select only image files.');
+            return;
+        }
+        
+        if (selectedImages.length + imageFiles.length > 10) {
+            alert('Maximum 10 images allowed. Please select fewer images.');
+            return;
+        }
+        
+        // Validate file sizes (max 5MB each)
+        const oversizedFiles = imageFiles.filter(file => file.size > 5 * 1024 * 1024);
+        if (oversizedFiles.length > 0) {
+            alert('Some files are too large. Maximum file size is 5MB.');
+            return;
+        }
+        
+        // Process each image
+        imageFiles.forEach(file => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                addImagePreview(file, e.target.result);
+            };
+            reader.readAsDataURL(file);
+        });
+        
+        // Clear the input
+        imageFileInput.value = '';
+    }
+    
+    // Add image preview
+    function addImagePreview(file, dataUrl) {
+        const imageId = `image_Tsh{imageCounter++}`;
+        const isPrimary = selectedImages.length === 0; // First image is primary by default
+        
+        const previewItem = document.createElement('div');
+        previewItem.className = 'image-preview-item';
+        previewItem.dataset.imageId = imageId;
+        
+        previewItem.innerHTML = `
+            <img src="${dataUrl}" alt="${file.name}">
+            <div class="preview-actions">
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeImage('${imageId}')">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+            <div class="preview-info">
+                <h6>${file.name}</h6>
+                <small>${(file.size / 1024 / 1024).toFixed(2)} MB</small>
+                <input type="text" class="caption-input" placeholder="Image caption (optional)" data-image-id="${imageId}">
+                <div class="primary-checkbox">
+                    <input type="radio" name="primary_image" value="${imageId}" ${isPrimary ? 'checked' : ''} data-image-id="${imageId}">
+                    <label>Primary image</label>
+                </div>
+            </div>
+        `;
+        
+        imagePreviewContainer.appendChild(previewItem);
+        
+        // Store image data
+        selectedImages.push({
+            id: imageId,
+            file: file,
+            dataUrl: dataUrl,
+            caption: '',
+            isPrimary: isPrimary,
+            order: selectedImages.length
+        });
+        
+        // Update formset management
+        updateFormsetManagement();
+        
+        // Update image count display
+        updateImageCount();
+        
+        // Hide drag drop area only if we have reached the maximum number of images
+        if (selectedImages.length >= 10) {
+            dragDropArea.style.display = 'none';
+        } else {
+            dragDropArea.style.display = 'block';
+        }
+    }
+    
+    // Remove image
+    window.removeImage = function(imageId) {
+        const previewItem = document.querySelector(`[data-image-id="Tsh{imageId}"]`);
+        if (previewItem) {
+            previewItem.remove();
+        }
+        
+        // Remove from selected images
+        selectedImages = selectedImages.filter(img => img.id !== imageId);
+        
+        // Update primary image if needed
+        if (selectedImages.length > 0) {
+            const firstImage = selectedImages[0];
+            const primaryRadio = document.querySelector(`input[name="primary_image"][value="Tsh{firstImage.id}"]`);
+            if (primaryRadio) {
+                primaryRadio.checked = true;
+                firstImage.isPrimary = true;
+            }
+        }
+        
+        // Show drag drop area if we haven't reached the maximum number of images
+        if (selectedImages.length < 10) {
+            dragDropArea.style.display = 'block';
+        }
+        
+        // Update formset management
+        updateFormsetManagement();
+        
+        // Update image count display
+        updateImageCount();
+    };
+    
+    // Update primary image
+    document.addEventListener('change', function(e) {
+        if (e.target.name === 'primary_image') {
+            // Update all images' primary status
+            selectedImages.forEach(img => {
+                img.isPrimary = img.id === e.target.value;
+            });
+        }
+        
+        // Update caption
+        if (e.target.classList.contains('caption-input')) {
+            const imageId = e.target.dataset.imageId;
+            const image = selectedImages.find(img => img.id === imageId);
+            if (image) {
+                image.caption = e.target.value;
+            }
+        }
+    });
+    
+    // Update formset management and create file inputs dynamically
+    function updateFormsetManagement() {
+        try {
+            // Find the formset management form - look for images-TOTAL_FORMS (based on related_name='images')
+            const totalFormsInputs = document.querySelectorAll('input[name*="TOTAL_FORMS"]');
+            let totalFormsInput = null;
+            let initialFormsInput = null;
+            let minNumFormsInput = null;
+            
+            // Look for the images formset (related_name='images' in PropertyImage model)
+            // The formset prefix will be 'images-' (from related_name='images')
+            totalFormsInputs.forEach(input => {
+                const name = input.name.toLowerCase();
+                // Look for images-TOTAL_FORMS (formset uses related_name='images')
+                if (name.includes('images-') && name.includes('total_forms')) {
+                    totalFormsInput = input;
+                    // Find corresponding management fields
+                    const prefix = input.name.replace('-TOTAL_FORMS', '');
+                    initialFormsInput = document.querySelector(`input[name="${prefix}-INITIAL_FORMS"]`);
+                    minNumFormsInput = document.querySelector(`input[name="${prefix}-MIN_NUM_FORMS"]`);
+                }
+            });
+            
+            // Fallback: use first TOTAL_FORMS if not found (shouldn't happen, but just in case)
+            if (!totalFormsInput && totalFormsInputs.length > 0) {
+                totalFormsInput = totalFormsInputs[0];
+                // Try to find corresponding INITIAL_FORMS
+                const prefix = totalFormsInput.name.replace('-TOTAL_FORMS', '');
+                initialFormsInput = document.querySelector(`input[name="${prefix}-INITIAL_FORMS"]`);
+                minNumFormsInput = document.querySelector(`input[name="${prefix}-MIN_NUM_FORMS"]`);
+            }
+            
+            if (!totalFormsInput) {
+                console.error('Formset management input (TOTAL_FORMS) not found!');
+                console.log('Available TOTAL_FORMS inputs:', Array.from(totalFormsInputs).map(i => i.name));
+                return;
+            }
+            
+            // Get the formset prefix (should be 'images' from related_name='images')
+            const formsetPrefix = totalFormsInput.name.replace('-TOTAL_FORMS', '');
+            console.log('Detected formset prefix:', formsetPrefix);
+            const form = document.getElementById('propertyEditForm');
+            
+            if (!form) {
+                console.warn('Form not found');
+                return;
+            }
+            
+            // IMPORTANT: Preserve management form fields (TOTAL_FORMS, INITIAL_FORMS, MIN_NUM_FORMS)
+            // Only remove data form inputs (numbered forms like images-0-image), NOT management fields
+            // Remove only dynamically created form inputs (data forms), not management fields
+            document.querySelectorAll(`input[name^="${formsetPrefix}-"]`).forEach(input => {
+                const name = input.name;
+                // Skip management form fields
+                if (name.includes('-TOTAL_FORMS') || name.includes('-INITIAL_FORMS') || name.includes('-MIN_NUM_FORMS') || name.includes('-MAX_NUM_FORMS')) {
+                    return; // Keep management fields
+                }
+                // Only remove if it's a data form field (has a number like images-0-image) and is dynamically created or from hidden container
+                if (name.match(/\d+/) && (input.dataset.dynamic === 'true' || input.closest('#hiddenFormsContainer'))) {
+                    input.remove();
+                }
+            });
+            
+            // Also clear hidden container
+            const hiddenContainer = document.getElementById('hiddenFormsContainer');
+            if (hiddenContainer) {
+                hiddenContainer.innerHTML = '';
+            }
+            
+            // Limit to max 10 images (matching max_num=10)
+            const imagesToSubmit = selectedImages.slice(0, 10);
+            
+            if (imagesToSubmit.length > 0) {
+                // Create file inputs for each selected image
+                imagesToSubmit.forEach((image, index) => {
+                    // Create file input
+                    const fileInput = document.createElement('input');
+                    fileInput.type = 'file';
+                    fileInput.name = `${formsetPrefix}-${index}-image`;
+                    fileInput.style.display = 'none';
+                    fileInput.dataset.dynamic = 'true';
+                    
+                    // Create FileList with the image file
+                    const dataTransfer = new DataTransfer();
+                    dataTransfer.items.add(image.file);
+                    fileInput.files = dataTransfer.files;
+                    
+                    form.appendChild(fileInput);
+                    
+                    // Create caption input
+                    const captionInput = document.createElement('input');
+                    captionInput.type = 'hidden';
+                    captionInput.name = `${formsetPrefix}-${index}-caption`;
+                    captionInput.value = image.caption || '';
+                    captionInput.dataset.dynamic = 'true';
+                    form.appendChild(captionInput);
+                    
+                    // Create is_primary input
+                    const primaryInput = document.createElement('input');
+                    primaryInput.type = 'hidden';
+                    primaryInput.name = `${formsetPrefix}-${index}-is_primary`;
+                    primaryInput.value = image.isPrimary ? 'on' : '';
+                    primaryInput.dataset.dynamic = 'true';
+                    form.appendChild(primaryInput);
+                    
+                    // Create order input
+                    const orderInput = document.createElement('input');
+                    orderInput.type = 'hidden';
+                    orderInput.name = `${formsetPrefix}-${index}-order`;
+                    orderInput.value = index;
+                    orderInput.dataset.dynamic = 'true';
+                    form.appendChild(orderInput);
+                });
+                
+                // Update total forms count to match exactly what we're submitting
+                totalFormsInput.value = imagesToSubmit.length;
+                
+                // Ensure INITIAL_FORMS is set (usually 0 for new properties)
+                if (initialFormsInput) {
+                    initialFormsInput.value = initialFormsInput.value || '0';
+                }
+            } else {
+                // No images selected, set to 0
+                totalFormsInput.value = 0;
+                if (initialFormsInput) {
+                    initialFormsInput.value = '0';
+                }
+            }
+            
+            console.log(`Formset updated: ${totalFormsInput.value} forms (max 10 allowed)`);
+            console.log(`Formset prefix: ${formsetPrefix}`);
+        } catch (error) {
+            console.error('Error in updateFormsetManagement:', error);
+            // Don't throw - let the form submit anyway
+        }
+    }
+    
+    // Update image count display
+    function updateImageCount() {
+        const imageCountInfo = document.getElementById('image-count-info');
+        if (imageCountInfo) {
+            const remaining = 10 - selectedImages.length;
+            const badgeClass = remaining > 0 ? 'bg-info' : 'bg-success';
+            imageCountInfo.innerHTML = `<span class="badge ${badgeClass}">${selectedImages.length} / 10 images uploaded</span>`;
+        }
+        
+        // Update drag-drop area text
+        const dragDropTitle = document.getElementById('dragDropTitle');
+        const dragDropSubtitle = document.getElementById('dragDropSubtitle');
+        
+        if (selectedImages.length > 0) {
+            dragDropTitle.textContent = `Add More Images (${selectedImages.length}/10 uploaded)`;
+            dragDropSubtitle.textContent = 'Drag & drop more images or click to browse';
+        } else {
+            dragDropTitle.textContent = 'Drag & Drop Images Here';
+            dragDropSubtitle.textContent = 'or click to browse files';
+        }
+    }
+    
+    // Form submission handler
+    console.log('=== INITIALIZING FORM HANDLER ===');
+    const form = document.querySelector('#propertyEditForm');
+    const submitBtn = document.querySelector('#submitBtn');
+    
+    console.log('Form element:', form);
+    console.log('Submit button:', submitBtn);
+    
+    if (form) {
+        console.log('✓ Form found, setting up submit handler');
+        console.log('Form action:', form.action);
+        console.log('Form method:', form.method);
+        
+        // Update formset before submission - MUST run synchronously
+        form.addEventListener('submit', function(e) {
+            console.log('=== FORM SUBMIT EVENT FIRED ===');
+            console.log('Updating formset management...');
+            updateFormsetManagement();
+            console.log('Formset updated, allowing form to submit...');
+            // Don't prevent default - let form submit normally
+        }, false);
+        
+        // Also handle button click as backup
+        if (submitBtn) {
+            submitBtn.addEventListener('click', function(e) {
+                console.log('=== SUBMIT BUTTON CLICKED ===');
+                // Don't prevent default - let form submit
+            }, false);
+        }
+        
+        // Add click handler to button for debugging - use capture phase to catch it early
+        if (submitBtn) {
+            console.log('Submit button details:');
+            console.log('  - Type:', submitBtn.type);
+            console.log('  - Disabled:', submitBtn.disabled);
+            console.log('  - Style pointer-events:', window.getComputedStyle(submitBtn).pointerEvents);
+            console.log('  - Style z-index:', window.getComputedStyle(submitBtn).zIndex);
+            console.log('  - Offset parent:', submitBtn.offsetParent);
+            
+            // Try multiple event types
+            ['mousedown', 'mouseup', 'click', 'touchstart'].forEach(eventType => {
+                submitBtn.addEventListener(eventType, function(e) {
+                    console.log(`🎯 ${eventType.toUpperCase()} on submit button!`);
+                    console.log('  - Event:', e);
+                    console.log('  - Target:', e.target);
+                    console.log('  - Current target:', e.currentTarget);
+                }, true); // Capture phase
+            });
+            
+            // Don't interfere with normal form submission
+            // Let the browser handle the submit naturally
+        } else {
+            console.error('❌ SUBMIT BUTTON NOT FOUND!');
+        }
+        
+        // Make images optional - don't block form submission
+        // Images are recommended but not required
+        // Let the form submit naturally without JavaScript interference
+    }
+    
+    // Initialize image count display
+    try {
+        updateImageCount();
+    } catch (e) {
+        console.error('Error initializing image count:', e);
+    }
+});
+
+// Load districts when region changes (with Select2 support)
+document.addEventListener('DOMContentLoaded', function() {
+    const regionSelect = document.getElementById('id_region');
+    const districtSelect = document.getElementById('id_district');
+    
+    if (regionSelect && districtSelect) {
+        // Initialize Select2 on region dropdown if not already initialized
+        if (typeof jQuery !== 'undefined' && jQuery.fn.select2 && !jQuery('#id_region').hasClass('select2-hidden-accessible')) {
+            jQuery('#id_region').select2({
+                theme: 'bootstrap-5',
+                width: '100%',
+                allowClear: true,
+                minimumResultsForSearch: 3,
+                placeholder: 'Select Region'
+            });
+        }
+        
+        // Initialize Select2 on district dropdown if not already initialized
+        if (typeof jQuery !== 'undefined' && jQuery.fn.select2 && !jQuery('#id_district').hasClass('select2-hidden-accessible')) {
+            jQuery('#id_district').select2({
+                theme: 'bootstrap-5',
+                width: '100%',
+                allowClear: true,
+                minimumResultsForSearch: 3,
+                placeholder: 'Select District'
+            });
+        }
+        
+        // Load districts on page load if region is already selected (for edit mode)
+        if (regionSelect.value) {
+            loadDistricts(regionSelect.value);
+        }
+        
+        // Handle region change - use jQuery event for Select2 compatibility
+        if (typeof jQuery !== 'undefined') {
+            jQuery('#id_region').on('change', function() {
+                const regionId = jQuery(this).val();
+                if (regionId) {
+                    loadDistricts(regionId);
+                } else {
+                    // Clear district options if no region selected
+                    clearDistricts();
+                }
+            });
+        } else {
+            // Fallback to native event listener
+            regionSelect.addEventListener('change', function() {
+                const regionId = this.value;
+                if (regionId) {
+                    loadDistricts(regionId);
+                } else {
+                    clearDistricts();
+                }
+            });
+        }
+    }
+    
+    function clearDistricts() {
+        const districtSelect = document.getElementById('id_district');
+        if (!districtSelect) return;
+        
+        // Destroy Select2 if initialized
+        if (typeof jQuery !== 'undefined' && jQuery.fn.select2 && jQuery('#id_district').hasClass('select2-hidden-accessible')) {
+            jQuery('#id_district').select2('destroy');
+        }
+        
+        districtSelect.innerHTML = '<option value="">Select District (select region first)</option>';
+        districtSelect.disabled = true;
+        
+        // Reinitialize Select2
+        if (typeof jQuery !== 'undefined' && jQuery.fn.select2) {
+            jQuery('#id_district').select2({
+                theme: 'bootstrap-5',
+                width: '100%',
+                allowClear: true,
+                minimumResultsForSearch: 3,
+                placeholder: 'Select District',
+                disabled: true
+            });
+        }
+    }
+    
+    function loadDistricts(regionId) {
+        const districtSelect = document.getElementById('id_district');
+        if (!districtSelect) return;
+        
+        // Destroy Select2 if initialized before updating options
+        if (typeof jQuery !== 'undefined' && jQuery.fn.select2 && jQuery('#id_district').hasClass('select2-hidden-accessible')) {
+            jQuery('#id_district').select2('destroy');
+        }
+        
+        // Show loading state
+        districtSelect.innerHTML = '<option value="">Loading districts...</option>';
+        districtSelect.disabled = true;
+        
+        // Fetch districts for the selected region
+        fetch(`/api/districts/by-region/?region_id=${regionId}`)
+            .then(response => response.json())
+            .then(data => {
+                districtSelect.disabled = false;
+                if (data.success && data.data.districts) {
+                    districtSelect.innerHTML = '<option value="">Select District</option>';
+                    data.data.districts.forEach(district => {
+                        const option = document.createElement('option');
+                        option.value = district.id;
+                        option.textContent = district.name;
+                        districtSelect.appendChild(option);
+                    });
+                    
+                    // If editing existing property, restore the selected district
+                    {% if property and property.district %}
+                    const currentDistrictId = {{ property.district.id|default:"null" }};
+                    if (currentDistrictId) {
+                        districtSelect.value = currentDistrictId;
+                    }
+                    {% endif %}
+                } else {
+                    districtSelect.innerHTML = '<option value="">No districts found</option>';
+                }
+                
+                // Reinitialize Select2 after updating options
+                if (typeof jQuery !== 'undefined' && jQuery.fn.select2) {
+                    jQuery('#id_district').select2({
+                        theme: 'bootstrap-5',
+                        width: '100%',
+                        allowClear: true,
+                        minimumResultsForSearch: 3,
+                        placeholder: 'Select District'
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Error loading districts:', error);
+                districtSelect.disabled = false;
+                districtSelect.innerHTML = '<option value="">Error loading districts</option>';
+                
+                // Reinitialize Select2 even on error
+                if (typeof jQuery !== 'undefined' && jQuery.fn.select2) {
+                    jQuery('#id_district').select2({
+                        theme: 'bootstrap-5',
+                        width: '100%',
+                        allowClear: true,
+                        minimumResultsForSearch: 3,
+                        placeholder: 'Select District'
+                    });
+                }
+            });
+    }
+});
+</script>
+
+{% endblock %}

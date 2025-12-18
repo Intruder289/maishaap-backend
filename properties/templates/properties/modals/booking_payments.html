@@ -1,0 +1,143 @@
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-info-circle me-2"></i>Booking Summary
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-sm-4"><strong>Reference:</strong></div>
+                    <div class="col-sm-8">{{ booking.booking_reference }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-sm-4"><strong>Customer:</strong></div>
+                    <div class="col-sm-8">{{ booking.customer.full_name }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-sm-4"><strong>Property:</strong></div>
+                    <div class="col-sm-8">{{ booking.property_obj.title }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-sm-4"><strong>Total Amount:</strong></div>
+                    <div class="col-sm-8">Tsh {{ booking.total_amount|floatformat:0 }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-sm-4"><strong>Paid Amount:</strong></div>
+                    <div class="col-sm-8">Tsh {{ booking.paid_amount|floatformat:0 }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-sm-4"><strong>Balance:</strong></div>
+                    <div class="col-sm-8">Tsh {{ booking.remaining_amount|floatformat:0 }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-chart-pie me-2"></i>Payment Status
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between">
+                        <span>Payment Progress</span>
+                        <span>{{ booking.paid_amount|floatformat:0 }} / {{ booking.total_amount|floatformat:0 }}</span>
+                    </div>
+                    <div class="progress">
+                        {% widthratio booking.paid_amount booking.total_amount 100 as progress_percent %}
+                        <div class="progress-bar {% if booking.payment_status == 'paid' %}bg-success{% elif booking.payment_status == 'partial' %}bg-warning{% else %}bg-secondary{% endif %}" 
+                             role="progressbar" style="width: {{ progress_percent }}%" 
+                             aria-valuenow="{{ progress_percent }}" aria-valuemin="0" aria-valuemax="100">
+                            {{ progress_percent }}%
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="text-center">
+                    {% if booking.payment_status == 'paid' %}
+                        <span class="badge bg-success">Fully Paid</span>
+                    {% elif booking.payment_status == 'partial' %}
+                        <span class="badge bg-warning">Partially Paid</span>
+                    {% elif booking.payment_status == 'overdue' %}
+                        <span class="badge bg-danger">Overdue</span>
+                    {% else %}
+                        <span class="badge bg-secondary">Pending Payment</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-3">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-credit-card me-2"></i>Payment History
+                </h6>
+            </div>
+            <div class="card-body">
+                {% if payments %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Amount</th>
+                                    <th>Method</th>
+                                    <th>Type</th>
+                                    <th>Reference</th>
+                                    <th>Status</th>
+                                    <th>Recorded By</th>
+                                    <th>Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for payment in payments %}
+                                <tr>
+                                    <td>{{ payment.payment_date|date:"M d, Y H:i" }}</td>
+                                    <td>Tsh {{ payment.amount|floatformat:0 }}</td>
+                                    <td>{{ payment.payment_method|title }}</td>
+                                    <td>
+                                        {% if payment.payment_type == 'payment' %}
+                                            <span class="badge bg-success">Payment</span>
+                                        {% elif payment.payment_type == 'refund' %}
+                                            <span class="badge bg-danger">Refund</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ payment.payment_type|title }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ payment.transaction_reference|default:"N/A" }}</td>
+                                    <td>
+                                        {% if payment.status == 'active' %}
+                                            <span class="badge bg-success">Active</span>
+                                        {% elif payment.status == 'refunded' %}
+                                            <span class="badge bg-danger">Refunded</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ payment.status|title }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ payment.recorded_by.get_full_name|default:payment.recorded_by.username }}</td>
+                                    <td>{{ payment.notes|default:"N/A" }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-credit-card fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No Payments Found</h5>
+                        <p class="text-muted">No payments have been recorded for this booking yet.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>

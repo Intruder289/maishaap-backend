@@ -1,0 +1,150 @@
+{% extends 'accounts/base.html' %}
+
+{% block title %}Edit Role - {{ role.name }}{% endblock %}
+
+{% block page_title %}Edit Role{% endblock %}
+
+{% block header_title %}Edit Role - {{ role.name }}{% endblock %}
+
+{% block content %}
+<div class="role-form-container">
+  <!-- Messages -->
+  {% if messages %}
+    <div class="messages">
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+          {{ message }}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <!-- Header -->
+  <div class="form-header">
+    <h1>Edit Role: {{ role.name }}</h1>
+    <a href="{% url 'accounts:role_list' %}" class="back-btn btn-primary">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+        <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Back to Roles
+    </a>
+  </div>
+
+  <!-- Role Info -->
+  <div class="role-info">
+    <h3>{{ role.name }}</h3>
+    <div class="meta">
+      <span>Created: {{ role.created_at|date:"M d, Y H:i" }}</span>
+      <span>Updated: {{ role.updated_at|date:"M d, Y H:i" }}</span>
+      <span>{{ role.permissions.count }} Permission{{ role.permissions.count|pluralize }}</span>
+    </div>
+  </div>
+
+  <!-- Form -->
+  <form method="post" class="role-form">
+    {% csrf_token %}
+    
+    <!-- Basic Information -->
+    <div class="form-group">
+      <label for="name">Role Name *</label>
+      <input type="text" id="name" name="name" required maxlength="100" 
+             value="{{ role.name }}" placeholder="Enter role name">
+    </div>
+    
+    <div class="form-group">
+      <label for="description">Description</label>
+      <textarea id="description" name="description" 
+                placeholder="Describe this role and its responsibilities...">{{ role.description }}</textarea>
+    </div>
+
+    <!-- Permissions Section -->
+    <div class="permissions-section">
+      <div class="permissions-header">
+        <h3>Permissions</h3>
+        <div class="permission-controls">
+          <button type="button" class="select-all-btn btn-primary" id="selectAllBtn">Select All</button>
+          <button type="button" class="clear-all-btn btn-primary" id="clearAllBtn">Clear All</button>
+        </div>
+      </div>
+      
+      <div class="permissions-grid" id="permissionsGrid">
+        {% for permission in permissions %}
+          <div class="permission-item {% if permission in role.permissions.all %}selected{% endif %}">
+            <input type="checkbox" 
+                   id="perm_{{ permission.id }}" 
+                   name="permissions" 
+                   value="{{ permission.id }}"
+                   {% if permission in role.permissions.all %}checked{% endif %}>
+            <div class="permission-info">
+              <div class="permission-name">{{ permission.codename|title }}</div>
+              <div class="permission-app">{{ permission.content_type.app_label|title }}</div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Form Actions -->
+    <div class="form-actions">
+      <a href="{% url 'accounts:role_list' %}" class="btn btn-primary-cancel">Cancel</a>
+      <button type="submit" class="btn btn-primary-submit">Update Role</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const selectAllBtn = document.getElementById('selectAllBtn');
+    const clearAllBtn = document.getElementById('clearAllBtn');
+    const permissionsGrid = document.getElementById('permissionsGrid');
+    const checkboxes = permissionsGrid.querySelectorAll('input[type="checkbox"]');
+    const permissionItems = permissionsGrid.querySelectorAll('.permission-item');
+    
+    // Update UI based on checkbox state
+    function updatePermissionItemUI(checkbox, item) {
+      if (checkbox.checked) {
+        item.classList.add('selected');
+      } else {
+        item.classList.remove('selected');
+      }
+    }
+    
+    // Select all functionality
+    selectAllBtn.addEventListener('click', function() {
+      checkboxes.forEach((checkbox, index) => {
+        checkbox.checked = true;
+        updatePermissionItemUI(checkbox, permissionItems[index]);
+      });
+    });
+    
+    // Clear all functionality
+    clearAllBtn.addEventListener('click', function() {
+      checkboxes.forEach((checkbox, index) => {
+        checkbox.checked = false;
+        updatePermissionItemUI(checkbox, permissionItems[index]);
+      });
+    });
+    
+    // Individual checkbox changes
+    checkboxes.forEach((checkbox, index) => {
+      checkbox.addEventListener('change', function() {
+        updatePermissionItemUI(checkbox, permissionItems[index]);
+      });
+    });
+    
+    // Form validation
+    const form = document.querySelector('.role-form');
+    form.addEventListener('submit', function(e) {
+      const nameField = document.getElementById('name');
+      if (!nameField.value.trim()) {
+        e.preventDefault();
+        alert('Role name is required.');
+        nameField.focus();
+        return false;
+      }
+    });
+  });
+</script>
+{% endblock %}

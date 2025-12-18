@@ -1,0 +1,118 @@
+<form method="post" action="{% url 'properties:customer_new_booking_modal' customer.id %}">
+    {% csrf_token %}
+    <div class="row g-3">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                Creating a new booking for <strong>{{ customer.full_name }}</strong>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <label class="form-label">Property *</label>
+            <select class="form-control" name="property" required>
+                <option value="">Select Property</option>
+                {% for property in hotel_properties %}
+                <option value="{{ property.id }}">{{ property.title }} - Tsh {{ property.rent_amount|floatformat:0 }}/night</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="col-md-6">
+            <label class="form-label">Number of Guests *</label>
+            <input type="number" class="form-control" name="number_of_guests" value="1" min="1" max="10" required>
+        </div>
+        
+        <div class="col-md-6">
+            <label class="form-label">Check-in Date *</label>
+            <input type="date" class="form-control" name="check_in_date" required>
+        </div>
+        
+        <div class="col-md-6">
+            <label class="form-label">Check-out Date *</label>
+            <input type="date" class="form-control" name="check_out_date" required>
+        </div>
+        
+        <div class="col-12">
+            <label class="form-label">Special Requests</label>
+            <textarea class="form-control" name="special_requests" rows="3" placeholder="Any special requests or notes for this booking..."></textarea>
+        </div>
+        
+        <div class="col-12">
+            <div class="alert alert-info">
+                <i class="fas fa-calculator me-2"></i>
+                <strong>Payment Calculation:</strong><br>
+                <span id="calculation-display">Select dates to see total amount</span>
+            </div>
+        </div>
+        
+        <div class="col-12">
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Note:</strong> The booking will be created with "Pending" status. You can update the status and payment information after creation.
+            </div>
+        </div>
+    </div>
+</form>
+
+<script>
+$(document).ready(function() {
+    // Set minimum date to today
+    const today = new Date().toISOString().split('T')[0];
+    $('input[name="check_in_date"]').attr('min', today);
+    
+    // Update check-out date minimum when check-in date changes
+    $('input[name="check_in_date"]').on('change', function() {
+        const checkInDate = $(this).val();
+        if (checkInDate) {
+            const nextDay = new Date(checkInDate);
+            nextDay.setDate(nextDay.getDate() + 1);
+            $('input[name="check_out_date"]').attr('min', nextDay.toISOString().split('T')[0]);
+        }
+        calculateTotal();
+    });
+    
+    // Calculate total when check-out date changes
+    $('input[name="check_out_date"]').on('change', function() {
+        calculateTotal();
+    });
+    
+    // Calculate total when property changes
+    $('select[name="property"]').on('change', function() {
+        calculateTotal();
+    });
+    
+    function calculateTotal() {
+        const checkInDate = $('input[name="check_in_date"]').val();
+        const checkOutDate = $('input[name="check_out_date"]').val();
+        const propertySelect = $('select[name="property"]');
+        
+        if (checkInDate && checkOutDate && propertySelect.val()) {
+            const checkIn = new Date(checkInDate);
+            const checkOut = new Date(checkOutDate);
+            const days = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
+            
+            if (days > 0) {
+                // Extract daily rate from property option text
+                const optionText = propertySelect.find('option:selected').text();
+                const rateMatch = optionText.match(/Tsh ([\d,]+)\/night/);
+                
+                if (rateMatch) {
+                    const dailyRate = parseInt(rateMatch[1].replace(/,/g, ''));
+                    const total = dailyRate * days;
+                    
+                    $('#calculation-display').html(`
+                        <strong>Daily Rate:</strong> Tsh ${dailyRate.toLocaleString()}<br>
+                        <strong>Duration:</strong> ${days} day${days > 1 ? 's' : ''}<br>
+                        <strong>Total Amount:</strong> <span class="text-primary fw-bold">Tsh ${total.toLocaleString()}</span>
+                    `);
+                }
+            } else {
+                $('#calculation-display').html('<span class="text-danger">Invalid date range</span>');
+            }
+        } else {
+            $('#calculation-display').html('Select dates and property to see total amount');
+        }
+    }
+});
+</script>

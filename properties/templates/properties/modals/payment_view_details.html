@@ -1,0 +1,118 @@
+<div class="row">
+    <div class="col-md-6">
+        <h6 class="text-muted mb-3">Payment Information</h6>
+        <div class="mb-3">
+            <label class="form-label fw-bold">Payment ID</label>
+            <p class="mb-0">#{{ payment.id }}</p>
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-bold">Amount</label>
+            <p class="mb-0">Tsh{{ payment.amount|floatformat:0 }}</p>
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-bold">Payment Type</label>
+            <p class="mb-0">
+                {% if payment.payment_type == 'rent' %}
+                    <span class="badge bg-info">Monthly Rent</span>
+                {% elif payment.payment_type == 'deposit' %}
+                    <span class="badge bg-warning">Security Deposit</span>
+                {% elif payment.payment_type == 'late_fee' %}
+                    <span class="badge bg-danger">Late Fee</span>
+                {% elif payment.payment_type == 'maintenance' %}
+                    <span class="badge bg-secondary">Maintenance</span>
+                {% elif payment.payment_type == 'utility' %}
+                    <span class="badge bg-primary">Utility</span>
+                {% else %}
+                    <span class="badge bg-light text-dark">{{ payment.payment_type|title }}</span>
+                {% endif %}
+            </p>
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-bold">Payment Method</label>
+            <p class="mb-0">
+                {% if payment.payment_method == 'bank_transfer' %}
+                    <span class="badge bg-success">Bank Transfer</span>
+                {% elif payment.payment_method == 'cash' %}
+                    <span class="badge bg-primary">Cash</span>
+                {% elif payment.payment_method == 'mobile_money' %}
+                    <span class="badge bg-info">Mobile Money</span>
+                {% elif payment.payment_method == 'check' %}
+                    <span class="badge bg-warning">Check</span>
+                {% elif payment.payment_method == 'card' %}
+                    <span class="badge bg-secondary">Card</span>
+                {% else %}
+                    <span class="badge bg-light text-dark">{{ payment.payment_method|title }}</span>
+                {% endif %}
+            </p>
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-bold">Status</label>
+            <p class="mb-0">
+                {% if payment.status == 'completed' %}
+                    <span class="badge bg-success">Paid</span>
+                {% elif payment.status == 'pending' %}
+                    <span class="badge bg-warning">Pending</span>
+                {% elif payment.status == 'overdue' %}
+                    <span class="badge bg-danger">Overdue</span>
+                {% elif payment.status == 'partial' %}
+                    <span class="badge bg-info">Partial</span>
+                {% else %}
+                    <span class="badge bg-secondary">{{ payment.status|title }}</span>
+                {% endif %}
+            </p>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <h6 class="text-muted mb-3">Transaction Details</h6>
+        <div class="mb-3">
+            <label class="form-label fw-bold">Payment Date</label>
+            <p class="mb-0">{{ payment.payment_date|date:"M d, Y H:i" }}</p>
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-bold">Transaction Reference</label>
+            <p class="mb-0">{{ payment.transaction_reference|default:"N/A" }}</p>
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-bold">Due Date</label>
+            <p class="mb-0">{{ payment.due_date|date:"M d, Y"|default:"N/A" }}</p>
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-bold">Currency</label>
+            <p class="mb-0">{{ payment.currency|default:"TZS" }}</p>
+        </div>
+        {% if payment.notes %}
+        <div class="mb-3">
+            <label class="form-label fw-bold">Notes</label>
+            <p class="mb-0">{{ payment.notes }}</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <h6 class="text-muted mb-3">Related Information</h6>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card border">
+                    <div class="card-body">
+                        <h6 class="card-title">Customer</h6>
+                        <p class="mb-1"><strong>{{ payment.booking.customer.full_name }}</strong></p>
+                        <p class="mb-1 text-muted">{{ payment.booking.customer.email }}</p>
+                        <p class="mb-0 text-muted">{{ payment.booking.customer.phone }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card border">
+                    <div class="card-body">
+                        <h6 class="card-title">Property</h6>
+                        <p class="mb-1"><strong>{{ payment.booking.property_obj.title }}</strong></p>
+                        <p class="mb-1 text-muted">{{ payment.booking.property_obj.address }}</p>
+                        <p class="mb-0 text-muted">{{ payment.booking.property_obj.property_type.name }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,48 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}Edit Document{% endblock %}
+
+{% block page_title %}Edit Document{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Edit Document</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="file_name" class="form-label">File Name</label>
+                        <input type="text" class="form-control" id="file_name" name="file_name" 
+                               value="{{ document.file_name }}" required>
+                        <small class="form-text text-muted">Enter a descriptive name for this document.</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Current File</label>
+                        <div>
+                            <a href="{{ document.file.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-eye me-1"></i>View Document
+                            </a>
+                            <a href="{{ document.file.url }}" download class="btn btn-sm btn-outline-secondary">
+                                <i class="fas fa-download me-1"></i>Download
+                            </a>
+                        </div>
+                        <small class="form-text text-muted">File: {{ document.file.name }}</small>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'documents:document_list' %}" class="btn btn-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary">Update Document</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

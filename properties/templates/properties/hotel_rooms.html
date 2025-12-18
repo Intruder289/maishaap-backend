@@ -1,0 +1,1219 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}Hotel Room Management - Maisha{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Hotel Selection Cards */
+.hotel-selection-card {
+    transition: all 0.3s ease;
+    border: 2px solid #e9ecef;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+}
+
+.hotel-selection-card:hover {
+    border-color: #007bff;
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(0, 123, 255, 0.15);
+    background: linear-gradient(135deg, #ffffff 0%, #e3f2fd 100%);
+}
+
+.hotel-selection-card:hover .card-title {
+    color: #007bff;
+}
+
+.hotel-selection-card:hover .fa-building {
+    color: #007bff !important;
+}
+
+/* Room Cards */
+.room-card {
+    transition: all 0.3s ease;
+    cursor: pointer;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    background: #ffffff;
+    position: relative;
+    overflow: hidden;
+}
+
+.room-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+}
+
+.room-card.selected {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    background: #f8f9ff;
+}
+
+.room-card.available {
+    border-color: #28a745;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fff8 100%);
+}
+
+.room-card.occupied {
+    border-color: #ffc107;
+    background: linear-gradient(135deg, #ffffff 0%, #fffdf0 100%);
+}
+
+.room-card.maintenance {
+    border-color: #dc3545;
+    background: linear-gradient(135deg, #ffffff 0%, #fff5f5 100%);
+}
+
+.room-card.out-of-order {
+    border-color: #6c757d;
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+}
+
+/* Status badges */
+.status-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-weight: 600;
+}
+
+.status-available {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-occupied {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.status-maintenance {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.status-out-of-order {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+/* Floor sections */
+.floor-section {
+    margin-bottom: 2rem;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+}
+
+.floor-header {
+    background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+    color: white;
+    padding: 1rem 1.5rem;
+    margin: 0;
+    font-weight: 600;
+}
+
+/* Empty state */
+.empty-state {
+    text-align: center;
+    padding: 3rem 2rem;
+    background: #f8f9fa;
+    border-radius: 12px;
+    border: 2px dashed #dee2e6;
+}
+
+.empty-state i {
+    font-size: 4rem;
+    color: #6c757d;
+    margin-bottom: 1rem;
+}
+
+/* Action buttons */
+.action-btn {
+    border-radius: 8px;
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    transition: all 0.3s ease;
+}
+
+.action-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Modal improvements */
+.modal-content {
+    border-radius: 12px;
+    border: none;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+}
+
+.modal-header {
+    border-radius: 12px 12px 0 0;
+    border-bottom: none;
+}
+
+.modal-footer {
+    border-radius: 0 0 12px 12px;
+    border-top: none;
+    background: #f8f9fa;
+}
+
+/* Form improvements */
+.form-control {
+    border-radius: 8px;
+    border: 2px solid #e9ecef;
+    transition: all 0.3s ease;
+}
+
+.form-control:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.15);
+}
+
+.card {
+    border-radius: 12px;
+    border: none;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.card-header {
+    border-radius: 12px 12px 0 0 !important;
+    border-bottom: none;
+    font-weight: 600;
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+    .hotel-selection-card {
+        margin-bottom: 1rem;
+    }
+}
+
+/* List view improvements */
+.table-hover tbody tr:hover {
+    background-color: rgba(0, 123, 255, 0.05);
+}
+
+.room-row {
+    cursor: pointer;
+}
+
+/* Avatar styling to match roles table */
+.avatar-sm {
+    width: 40px;
+    height: 40px;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+/* Status badge improvements */
+.status-available {
+    background-color: #28a745 !important;
+    color: white !important;
+}
+
+.status-occupied {
+    background-color: #ffc107 !important;
+    color: #212529 !important;
+}
+
+.status-maintenance {
+    background-color: #dc3545 !important;
+    color: white !important;
+}
+
+.status-reserved {
+    background-color: #17a2b8 !important;
+    color: white !important;
+}
+
+.status-out_of_order {
+    background-color: #6c757d !important;
+    color: white !important;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <!-- Page Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h4 class="mb-1 fw-semibold">
+                        <i class="fas fa-bed text-primary me-2"></i>Hotel Room Management
+                    </h4>
+                    {% if selected_property %}
+                        <h5 class="text-primary mb-0 fw-medium">
+                            <i class="fas fa-building me-2"></i>{{ selected_property.title }}
+                        </h5>
+                        <p class="text-muted mb-0 small">
+                            <i class="fas fa-map-marker-alt me-1"></i>{{ selected_property.address|default:"Address not specified" }}
+                        </p>
+                    {% else %}
+                        <h4 class="text-warning mb-0 fw-semibold">
+                            <i class="fas fa-exclamation-triangle me-2"></i>Select Hotel to Manage Rooms
+                        </h4>
+                        <p class="text-muted mb-0">Choose a hotel from the list below to view and manage its rooms</p>
+                    {% endif %}
+                </div>
+                <div>
+                    {% if selected_property %}
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-primary action-btn" data-bs-toggle="modal" data-bs-target="#addRoomModal">
+                        <i class="fas fa-plus me-2"></i>Add New Room
+                    </button>
+                            <div class="dropdown">
+                                <button class="btn btn-outline-secondary dropdown-toggle action-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="fas fa-exchange-alt me-2"></i>Change Hotel
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    {% for hotel in hotel_properties %}
+                                        <li>
+                                            <a class="dropdown-item" href="{% url 'properties:hotel_rooms' %}?property_id={{ hotel.id }}">
+                                                <div class="d-flex align-items-center">
+                                                    <i class="fas fa-building text-primary me-2"></i>
+                                                    <div>
+                                                        <div class="fw-semibold">{{ hotel.title }}</div>
+                                                        <small class="text-muted">{{ hotel.address|truncatechars:30 }}</small>
+                                                    </div>
+                                                </div>
+                                            </a>
+                                        </li>
+                                    {% endfor %}
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'properties:hotel_rooms' %}">
+                                            <i class="fas fa-list me-2"></i>View All Hotels
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Hotel Selection Interface -->
+            {% if not selected_property %}
+                {% if hotel_properties %}
+                    <div class="card mb-4">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-hotel me-2"></i>Available Hotels
+                    </h5>
+                </div>
+                        <div class="card-body">
+                            <div class="row">
+                                {% for hotel in hotel_properties %}
+                                    <div class="col-md-6 col-lg-4 mb-3">
+                                        <div class="card h-100 hotel-selection-card" onclick="selectHotel({{ hotel.id }})">
+                                            <div class="card-body text-center">
+                                                <i class="fas fa-building fa-3x text-primary mb-3"></i>
+                                                <h5 class="card-title fw-bold">{{ hotel.title }}</h5>
+                                                <p class="card-text text-muted">
+                                                    <i class="fas fa-map-marker-alt me-1"></i>
+                                                    {{ hotel.address|truncatechars:50 }}
+                                                </p>
+                                                <div class="d-flex justify-content-center">
+                                                    <span class="badge bg-primary">
+                                                        <i class="fas fa-bed me-1"></i>
+                                                        {{ hotel.total_rooms|default:"0" }} rooms
+                                                    </span>
+                                                </div>
+                                            </div>
+                                </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-hotel"></i>
+                        <h4 class="text-muted">No Hotels Available</h4>
+                        <p class="text-muted">No hotels have been created yet.</p>
+                        <a href="{% url 'properties:property_create' %}?type=hotel" class="btn btn-primary action-btn">
+                            <i class="fas fa-plus me-2"></i>Create First Hotel
+                        </a>
+                    </div>
+                {% endif %}
+            {% endif %}
+
+            <!-- Rooms Display -->
+                            {% if selected_property %}
+                <div class="card">
+                    <div class="card-header bg-white border-bottom">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0 text-dark">
+                                <i class="fas fa-bed me-2 text-primary"></i>Rooms in {{ selected_property.title }}
+                            </h5>
+                            <span class="badge bg-primary text-white">
+                                {{ rooms.count }} room{{ rooms.count|pluralize }}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        {% if rooms %}
+                            <!-- Rooms Table -->
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0" id="rooms-table">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Room</th>
+                                            <th>Type</th>
+                                            <th>Floor</th>
+                                            <th>Capacity</th>
+                                            <th>Bed Type</th>
+                                            <th>Rate</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="rooms-table-body">
+                                        {% for room in rooms %}
+                                            <tr data-room-id="{{ room.id }}">
+                                                <td>
+                                                    <div class="d-flex align-items-center">
+                                                        <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3 fw-bold">
+                                                            {{ room.room_number|first }}
+                                                        </div>
+                                                        <div>
+                                                            <strong>{{ room.room_number }}</strong><br>
+                                                            <small class="text-muted">Room</small>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <span class="text-muted">{{ room.room_type }}</span>
+                                                </td>
+                                                <td>
+                                                    {% if room.floor_number %}
+                                                        <span class="badge bg-info">
+                                                            <i class="fas fa-layer-group me-1"></i>
+                                                            Floor {{ room.floor_number }}
+                                                        </span>
+                            {% else %}
+                                                        <span class="badge bg-secondary">
+                                                            <i class="fas fa-home me-1"></i>
+                                                            Ground Floor
+                                                        </span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-warning text-dark">
+                                                        <i class="fas fa-users me-1"></i>
+                                                        {{ room.capacity }} Guest{{ room.capacity|pluralize }}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <span class="text-muted">{{ room.bed_type|default:"N/A" }}</span>
+                                                </td>
+                                                <td>
+                                                    <div>
+                                                        <strong class="text-success">Tsh{{ room.base_rate|floatformat:2 }}</strong><br>
+                                                        <small class="text-muted">per night</small>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <span class="badge status-{{ room.status }}">
+                                                        <i class="fas fa-circle me-1"></i>
+                                                        {{ room.status|title }}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <div class="dropdown">
+                                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                                            <i class="fas fa-ellipsis-v"></i>
+                                                        </button>
+                                                        <ul class="dropdown-menu">
+                                                            <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); viewRoomDetails({{ room.id }});"><i class="fas fa-eye me-2"></i>View Room</a></li>
+                                                            <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); editRoom({{ room.id }});"><i class="fas fa-edit me-2"></i>Edit Room</a></li>
+                                                            <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); manageRoomStatus({{ room.id }});"><i class="fas fa-cog me-2"></i>Manage Status</a></li>
+                                                            <li><hr class="dropdown-divider"></li>
+                                                            <li><a class="dropdown-item text-danger" href="#" onclick="event.preventDefault(); deleteRoom({{ room.id }});">
+                                                                <i class="fas fa-trash me-2"></i>Delete Room
+                                                            </a></li>
+                                                        </ul>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <!-- Pagination Controls -->
+                            {% if rooms.has_other_pages %}
+                            <div class="card-footer bg-white border-0 py-3">
+                                <div class="row align-items-center">
+                                    <div class="col-md-6">
+                                        <small class="text-muted">
+                                            Showing {{ rooms.start_index }} to {{ rooms.end_index }} of {{ rooms.paginator.count }} rooms
+                                        </small>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <nav aria-label="Rooms pagination">
+                                            <ul class="pagination pagination-sm justify-content-end mb-0">
+                                                {% if rooms.has_previous %}
+                                                    <li class="page-item">
+                                                        <a class="page-link" href="?page=1{% if request.GET.property_id %}&property_id={{ request.GET.property_id }}{% endif %}">
+                                                            <i class="fas fa-angle-double-left"></i>
+                                                        </a>
+                                                    </li>
+                                                    <li class="page-item">
+                                                        <a class="page-link" href="?page={{ rooms.previous_page_number }}{% if request.GET.property_id %}&property_id={{ request.GET.property_id }}{% endif %}">
+                                                            <i class="fas fa-angle-left"></i>
+                                                        </a>
+                                                    </li>
+                                                {% endif %}
+                                                
+                                                {% for num in rooms.paginator.page_range %}
+                                                    {% if rooms.number == num %}
+                                                        <li class="page-item active">
+                                                            <span class="page-link">{{ num }}</span>
+                                                        </li>
+                                                    {% elif num > rooms.number|add:'-3' and num < rooms.number|add:'3' %}
+                                                        <li class="page-item">
+                                                            <a class="page-link" href="?page={{ num }}{% if request.GET.property_id %}&property_id={{ request.GET.property_id }}{% endif %}">{{ num }}</a>
+                                                        </li>
+                                                    {% endif %}
+                                                {% endfor %}
+                                                
+                                                {% if rooms.has_next %}
+                                                    <li class="page-item">
+                                                        <a class="page-link" href="?page={{ rooms.next_page_number }}{% if request.GET.property_id %}&property_id={{ request.GET.property_id }}{% endif %}">
+                                                            <i class="fas fa-angle-right"></i>
+                                                        </a>
+                                                    </li>
+                                                    <li class="page-item">
+                                                        <a class="page-link" href="?page={{ rooms.paginator.num_pages }}{% if request.GET.property_id %}&property_id={{ request.GET.property_id }}{% endif %}">
+                                                            <i class="fas fa-angle-double-right"></i>
+                                                        </a>
+                                                    </li>
+                                                {% endif %}
+                                            </ul>
+                                        </nav>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                        {% else %}
+                            <div class="empty-state">
+                                <i class="fas fa-bed"></i>
+                                <h4 class="text-muted">No Rooms Found</h4>
+                                <p class="text-muted">This hotel doesn't have any rooms yet.</p>
+                                <button class="btn btn-primary action-btn" data-bs-toggle="modal" data-bs-target="#addRoomModal">
+                                    <i class="fas fa-plus me-2"></i>Add First Room
+                                </button>
+                    </div>
+                {% endif %}
+            </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Add Room Modal -->
+<div class="modal fade" id="addRoomModal" tabindex="-1" aria-labelledby="addRoomModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="addRoomModalLabel">
+                    <i class="fas fa-plus me-2"></i>Add New Room
+                    {% if selected_property %}
+                        <small class="text-light">to {{ selected_property.title }}</small>
+                    {% endif %}
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addRoomForm" method="post" action="{% url 'properties:add_room' %}">
+                    {% csrf_token %}
+                    
+                    <!-- Hotel Selection Section -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-primary text-white">
+                            <h6 class="mb-0">
+                                <i class="fas fa-building me-2"></i>Hotel Selection
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">
+                                    <i class="fas fa-hotel me-2"></i>Hotel *
+                                </label>
+                                <select class="form-control" name="hotel_id" id="hotelSelect" required>
+                                    <option value="">Choose Hotel...</option>
+                                    {% for hotel in hotel_properties %}
+                                        <option value="{{ hotel.id }}" {% if selected_property and selected_property.id == hotel.id %}selected{% endif %}>
+                                            {{ hotel.title }}
+                                        </option>
+                                    {% empty %}
+                                        <option value="" disabled>No hotels found</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Room Details Section -->
+                    <div class="card">
+                        <div class="card-header bg-info text-white">
+                            <h6 class="mb-0">
+                                <i class="fas fa-bed me-2"></i>Room Details
+                            </h6>
+                </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold">Room Number *</label>
+                                        <input type="text" class="form-control" name="room_number" required placeholder="e.g., 101, 201, A1">
+                                        <small class="form-text text-muted">Must be unique within the hotel</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold">Room Type *</label>
+                                        <select class="form-control" name="room_type" required>
+                                            <option value="">Select Room Type</option>
+                                            <option value="Single Room">Single Room</option>
+                                            <option value="Double Room">Double Room</option>
+                                            <option value="Suite">Suite</option>
+                                            <option value="Deluxe Room">Deluxe Room</option>
+                                            <option value="Executive Suite">Executive Suite</option>
+                                            <option value="Presidential Suite">Presidential Suite</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold">Floor Number</label>
+                                        <input type="number" class="form-control" name="floor_number" min="0" placeholder="0">
+                                        <small class="form-text text-muted">Leave empty if hotel doesn't have floors</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold">Capacity *</label>
+                                        <input type="number" class="form-control" name="capacity" min="1" required placeholder="2">
+                                        <small class="form-text text-muted">Maximum guests</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold">Base Rate *</label>
+                                        <input type="number" class="form-control" name="base_rate" min="0" step="0.01" required placeholder="100.00">
+                                        <small class="form-text text-muted">Per night</small>
+                        </div>
+                    </div>
+                </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold">Bed Type</label>
+                                        <input type="text" class="form-control" name="bed_type" placeholder="e.g., King, Queen, Twin">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold">Amenities</label>
+                                        <textarea class="form-control" name="amenities" rows="3" placeholder="List room amenities (e.g., WiFi, TV, Mini-bar)"></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary action-btn" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary action-btn" onclick="submitAddRoomForm()">
+                    <i class="fas fa-plus me-2"></i>Add Room
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+<!-- Room Details Modal -->
+<div class="modal fade" id="roomDetailsModal" tabindex="-1" aria-labelledby="roomDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="roomDetailsModalLabel">
+                    <i class="fas fa-bed me-2"></i>Room Details
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Room Number:</strong> <span id="modalRoomNumber">-</span></p>
+                        <p><strong>Room Type:</strong> <span id="modalRoomType">-</span></p>
+                        <p><strong>Floor:</strong> <span id="modalFloorNumber">-</span></p>
+                        <p><strong>Capacity:</strong> <span id="modalCapacity">-</span></p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Bed Type:</strong> <span id="modalBedType">-</span></p>
+                        <p><strong>Base Rate:</strong> <span id="modalBaseRate">-</span></p>
+                        <p><strong>Status:</strong> <span id="modalStatus">-</span></p>
+                    </div>
+                </div>
+                            <div class="row">
+                    <div class="col-12">
+                        <p><strong>Amenities:</strong></p>
+                        <p id="modalAmenities">-</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary action-btn" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-warning action-btn" id="roomActionBtn">
+                    <i class="fas fa-cog me-2"></i>Manage Room
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Room Modal -->
+<div class="modal fade" id="editRoomModal" tabindex="-1" aria-labelledby="editRoomModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="editRoomModalLabel">
+                    <i class="fas fa-edit me-2"></i>Edit Room
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="editRoomForm">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <input type="hidden" id="editRoomId" name="room_id">
+                    
+                                <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Room Number *</label>
+                                <input type="text" class="form-control" id="editRoomNumber" name="room_number" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Room Type *</label>
+                                <select class="form-control" id="editRoomType" name="room_type" required>
+                                    <option value="single">Single Room</option>
+                                    <option value="double">Double Room</option>
+                                    <option value="suite">Suite</option>
+                                    <option value="deluxe">Deluxe Room</option>
+                                </select>
+                            </div>
+                        </div>
+                                </div>
+                    
+                                <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Capacity *</label>
+                                <input type="number" class="form-control" id="editCapacity" name="capacity" min="1" max="10" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Floor Number</label>
+                                <input type="number" class="form-control" id="editFloorNumber" name="floor_number" min="0">
+                                <small class="form-text text-muted">Leave empty if hotel doesn't have floors</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Base Rate *</label>
+                                <input type="number" class="form-control" id="editBaseRate" name="base_rate" min="0" step="0.01" required>
+                        </div>
+                    </div>
+                </div>
+                
+                            <div class="row">
+                                <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Bed Type</label>
+                                <select class="form-control" id="editBedType" name="bed_type">
+                                    <option value="">Select Bed Type</option>
+                                    <option value="single">Single Bed</option>
+                                    <option value="double">Double Bed</option>
+                                    <option value="queen">Queen Bed</option>
+                                    <option value="king">King Bed</option>
+                                    <option value="twin">Twin Beds</option>
+                                </select>
+                            </div>
+                                </div>
+                                <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Status</label>
+                                <select class="form-control" id="editStatus" name="status">
+                                    <option value="available">Available</option>
+                                    <option value="occupied">Occupied</option>
+                                    <option value="maintenance">Maintenance</option>
+                                    <option value="reserved">Reserved</option>
+                                    <option value="out_of_order">Out of Order</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Amenities</label>
+                        <textarea class="form-control" id="editAmenities" name="amenities" rows="3" placeholder="WiFi, TV, Air Conditioning, etc."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="fas fa-save me-2"></i>Update Room
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Manage Room Status Modal -->
+<div class="modal fade" id="manageStatusModal" tabindex="-1" aria-labelledby="manageStatusModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="manageStatusModalLabel">
+                    <i class="fas fa-cog me-2"></i>Manage Room Status
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="manageStatusForm">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <input type="hidden" id="statusRoomId" name="room_id">
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Room</label>
+                        <input type="text" class="form-control" id="statusRoomNumber" readonly>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Current Status</label>
+                        <input type="text" class="form-control" id="currentStatus" readonly>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">New Status *</label>
+                        <select class="form-control" id="newStatus" name="status" required>
+                            <option value="available">Available</option>
+                            <option value="occupied">Occupied</option>
+                            <option value="maintenance">Maintenance</option>
+                            <option value="reserved">Reserved</option>
+                            <option value="out_of_order">Out of Order</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Reason for Change</label>
+                        <textarea class="form-control" id="statusReason" name="reason" rows="3" placeholder="Optional: Reason for status change"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="fas fa-save me-2"></i>Update Status
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Room Confirmation Modal -->
+<div class="modal fade" id="deleteRoomModal" tabindex="-1" aria-labelledby="deleteRoomModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteRoomModalLabel">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Delete Room
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Warning!</strong> This action cannot be undone.
+                </div>
+                <p>Are you sure you want to delete room <strong id="deleteRoomNumber">-</strong>?</p>
+                <div class="bg-light p-3 rounded">
+                    <h6>Room Details:</h6>
+                    <ul class="mb-0" id="deleteRoomDetails">
+                        <li><strong>Room Number:</strong> <span id="deleteRoomNum">-</span></li>
+                        <li><strong>Type:</strong> <span id="deleteRoomType">-</span></li>
+                        <li><strong>Capacity:</strong> <span id="deleteRoomCapacity">-</span></li>
+                        <li><strong>Status:</strong> <span id="deleteRoomStatus">-</span></li>
+                    </ul>
+                </div>
+                <div class="mt-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="confirmDelete">
+                        <label class="form-check-label" for="confirmDelete">
+                            I understand this action cannot be undone
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn" disabled>
+                    <i class="fas fa-trash me-2"></i>Delete Room
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% csrf_token %}
+<script>
+// Define jQuery alias
+var $ = jQuery.noConflict();
+// Global functions for room management
+window.viewRoomDetails = function(roomId) {
+    console.log('viewRoomDetails called with roomId:', roomId);
+    
+    // Show loading state
+    $('#modalRoomNumber').text('Loading...');
+    $('#modalRoomType').text('Loading...');
+    $('#modalCapacity').text('Loading...');
+    $('#modalBedType').text('Loading...');
+    $('#modalBaseRate').text('Loading...');
+    $('#modalStatus').text('Loading...');
+    $('#modalFloorNumber').text('Loading...');
+    $('#modalAmenities').text('Loading...');
+    
+    // Fetch room details from API
+    fetch(`/properties/api/room/${roomId}/`, {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val(),
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('API response:', data);
+        if (data.success) {
+            const room = data.room;
+            
+            // Populate modal with API data
+            $('#modalRoomNumber').text(room.room_number);
+            $('#modalRoomType').text(room.room_type);
+            $('#modalCapacity').text(room.capacity);
+            $('#modalBedType').text(room.bed_type);
+            $('#modalBaseRate').text('Tsh' + room.base_rate.toFixed(2));
+            $('#modalStatus').text(room.status.charAt(0).toUpperCase() + room.status.slice(1));
+            $('#modalFloorNumber').text(room.floor_number ? `Floor ${room.floor_number}` : 'Ground Floor');
+            $('#modalAmenities').text(room.amenities);
+            
+            // Show modal
+            $('#roomDetailsModal').modal('show');
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error loading room details');
+    });
+};
+
+window.editRoom = function(roomId) {
+    console.log('editRoom called with roomId:', roomId);
+    
+    // Fetch room details from API
+    fetch(`/properties/api/room/${roomId}/`, {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val(),
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('API response:', data);
+        if (data.success) {
+            const room = data.room;
+            
+            // Populate the edit form
+            $('#editRoomId').val(room.id);
+            $('#editRoomNumber').val(room.room_number);
+            $('#editRoomType').val(room.room_type);
+            $('#editCapacity').val(room.capacity);
+            $('#editFloorNumber').val(room.floor_number || '');
+            $('#editBedType').val(room.bed_type || '');
+            $('#editBaseRate').val(room.base_rate);
+            $('#editStatus').val(room.status);
+            $('#editAmenities').val(room.amenities);
+            
+            // Show the modal
+            $('#editRoomModal').modal('show');
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error loading room details');
+    });
+};
+
+window.manageRoomStatus = function(roomId) {
+    console.log('manageRoomStatus called with roomId:', roomId);
+    
+    // Fetch room details from API
+    fetch(`/properties/api/room/${roomId}/`, {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val(),
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('API response:', data);
+        if (data.success) {
+            const room = data.room;
+            
+            // Populate the status form
+            $('#statusRoomId').val(room.id);
+            $('#statusRoomNumber').val(room.room_number);
+            $('#currentStatus').val(room.status.charAt(0).toUpperCase() + room.status.slice(1));
+            $('#newStatus').val(room.status);
+            $('#statusReason').val('');
+            
+            // Show the modal
+            $('#manageStatusModal').modal('show');
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error loading room details');
+    });
+};
+
+window.deleteRoom = function(roomId) {
+    console.log('deleteRoom called with roomId:', roomId);
+    
+    // Fetch room details from API
+    fetch(`/properties/api/room/${roomId}/`, {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val(),
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('API response:', data);
+        if (data.success) {
+            const room = data.room;
+            
+            // Populate the delete modal
+            $('#deleteRoomNumber').text(room.room_number);
+            $('#deleteRoomNum').text(room.room_number);
+            $('#deleteRoomType').text(room.room_type);
+            $('#deleteRoomCapacity').text(room.capacity);
+            $('#deleteRoomStatus').text(room.status.charAt(0).toUpperCase() + room.status.slice(1));
+            
+            // Reset confirmation checkbox
+            $('#confirmDelete').prop('checked', false);
+            $('#confirmDeleteBtn').prop('disabled', true);
+            
+            // Store room ID for deletion
+            $('#deleteRoomModal').data('room-id', roomId);
+            
+            // Show the modal
+            $('#deleteRoomModal').modal('show');
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error loading room details');
+    });
+};
+
+// Initialize when document is ready
+$(document).ready(function() {
+    console.log('Hotel rooms page initialized');
+    
+    // Room card click handler
+    $('.room-card').on('click', function() {
+        $('.room-card').removeClass('selected');
+        $(this).addClass('selected');
+        
+        const roomNumber = $(this).data('room');
+        const status = $(this).data('status');
+        
+        // This function doesn't exist anymore, so we'll remove this
+        // showRoomDetails(roomNumber, status);
+    });
+    
+    // Auto-select hotel when modal opens
+    $('#addRoomModal').on('show.bs.modal', function() {
+        {% if selected_property %}
+            const hotelSelect = document.getElementById('hotelSelect');
+            if (hotelSelect) {
+            hotelSelect.value = '{{ selected_property.id }}';
+            }
+        {% else %}
+            const hotelSelect = document.getElementById('hotelSelect');
+            if (hotelSelect && hotelSelect.options.length > 1) {
+                hotelSelect.selectedIndex = 1;
+            }
+        {% endif %}
+    });
+    
+    // Submit add room form
+    window.submitAddRoomForm = function() {
+        const form = document.getElementById('addRoomForm');
+        const hotelSelect = document.getElementById('hotelSelect');
+        
+        if (!hotelSelect || !hotelSelect.value) {
+            alert('Please select a hotel first!');
+            if (hotelSelect) hotelSelect.focus();
+            return;
+        }
+        
+        if (form.checkValidity()) {
+            form.submit();
+        } else {
+            form.reportValidity();
+        }
+    };
+    
+    // Select hotel function
+    window.selectHotel = function(hotelId) {
+        // Redirect to the same page with the selected hotel
+        window.location.href = '{% url "properties:hotel_rooms" %}?property_id=' + hotelId;
+    };
+    
+    // Handle delete confirmation checkbox
+    $(document).on('change', '#confirmDelete', function() {
+        $('#confirmDeleteBtn').prop('disabled', !$(this).is(':checked'));
+    });
+    
+    // Handle delete confirmation button
+    $(document).on('click', '#confirmDeleteBtn', function() {
+        const roomId = $('#deleteRoomModal').data('room-id');
+        if (roomId) {
+            // Make AJAX call to delete the room
+            fetch(`/properties/api/room/${roomId}/delete/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val(),
+                    'Content-Type': 'application/json',
+                },
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+            $('#deleteRoomModal').modal('hide');
+                    // Reload the page to update the table
+                    window.location.reload();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error deleting room');
+            });
+        }
+    });
+    
+    // Handle edit room form submission
+    $('#editRoomForm').on('submit', function(e) {
+        e.preventDefault();
+        const roomId = $('#editRoomId').val();
+        const formData = new FormData(this);
+        
+        // Make AJAX call to update the room
+        fetch(`/properties/api/room/${roomId}/edit/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val(),
+            },
+            body: formData,
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+        $('#editRoomModal').modal('hide');
+                // Reload the page to update the table
+                window.location.reload();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error updating room');
+        });
+    });
+    
+    // Handle manage status form submission
+    $('#manageStatusForm').on('submit', function(e) {
+        e.preventDefault();
+        const roomId = $('#statusRoomId').val();
+        const formData = new FormData(this);
+        
+        // Make AJAX call to update the room status
+        fetch(`/properties/api/room/${roomId}/status/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val(),
+            },
+            body: formData,
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+        $('#manageStatusModal').modal('hide');
+                // Reload the page to update the table
+                window.location.reload();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error updating room status');
+        });
+    });
+    
+}); // Close $(document).ready function
+</script>
+{% endblock %}

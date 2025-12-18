@@ -1,0 +1,395 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Hotel Reports Dashboard{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item active" aria-current="page">Hotel Reports</li>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="row g-3 mb-4 align-items-center justify-content-between">
+    <div class="col-auto">
+        <div class="d-flex align-items-center">
+            <h2 class="mb-0">Hotel Reports Dashboard</h2>
+        </div>
+    </div>
+</div>
+
+<!-- Date Filter Section -->
+<div class="card mb-4">
+    <div class="card-header">
+        <div class="d-flex align-items-center">
+            <span class="fas fa-calendar-alt text-primary me-2"></span>
+            <h5 class="mb-0">Filter Reports</h5>
+        </div>
+    </div>
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Start Date</label>
+                <input type="date" class="form-control" name="start_date" value="{{ start_date|date:'Y-m-d' }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">End Date</label>
+                <input type="date" class="form-control" name="end_date" value="{{ end_date|date:'Y-m-d' }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Report Type</label>
+                <select class="form-select" name="report_type">
+                    <option value="all" {% if report_type == 'all' %}selected{% endif %}>All Reports</option>
+                    <option value="payments" {% if report_type == 'payments' %}selected{% endif %}>Payment Reports</option>
+                    <option value="bookings" {% if report_type == 'bookings' %}selected{% endif %}>Booking Reports</option>
+                    <option value="properties" {% if report_type == 'properties' %}selected{% endif %}>Property Reports</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">&nbsp;</label>
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary">
+                        <span class="fas fa-filter me-2"></span>Apply Filter
+                    </button>
+                </div>
+            </div>
+        </form>
+        
+        <!-- Quick Date Filters -->
+        <div class="mt-3">
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setDateRange('today')">Today</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setDateRange('week')">This Week</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setDateRange('month')">This Month</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setDateRange('quarter')">This Quarter</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setDateRange('year')">This Year</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="bg-success-subtle rounded-3 p-3">
+                            <span class="fas fa-dollar-sign text-success fs-7"></span>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-1">Total Revenue</h6>
+                        <h4 class="mb-0">{{ total_revenue|floatformat:0|intcomma }} Tsh</h4>
+                        <p class="fs--1 mb-0 text-500">{{ total_payments }} payments</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="bg-primary-subtle rounded-3 p-3">
+                            <span class="fas fa-calendar-check text-primary fs-7"></span>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-1">Total Bookings</h6>
+                        <h4 class="mb-0">{{ total_bookings }}</h4>
+                        <p class="fs--1 mb-0 text-500">{{ confirmed_bookings }} confirmed</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="bg-info-subtle rounded-3 p-3">
+                            <span class="fas fa-home text-info fs-7"></span>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-1">Total Hotels</h6>
+                        <h4 class="mb-0">{{ total_hotels }}</h4>
+                        <p class="fs--1 mb-0 text-500">{{ occupied_hotels }} occupied</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="bg-warning-subtle rounded-3 p-3">
+                            <span class="fas fa-percentage text-warning fs-7"></span>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <h6 class="mb-1">Occupancy Rate</h6>
+                        <h4 class="mb-0">{{ occupancy_rate|floatformat:1 }}%</h4>
+                        <p class="fs--1 mb-0 text-500">{{ available_hotels }} available</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Reports Sections -->
+<div class="row g-3">
+    <!-- Payment Reports -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center">
+                        <span class="fas fa-money-bill-wave text-success me-2"></span>
+                        <h5 class="mb-0">Payment Reports</h5>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-outline-success" onclick="exportPaymentReport()">
+                            <span class="fas fa-download me-1"></span>Export
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if rent_payments %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Tenant</th>
+                                    <th>Property</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for payment in rent_payments %}
+                                <tr>
+                                    <td>{{ payment.payment_date|date:"M d" }}</td>
+                                    <td>{{ payment.booking.customer.full_name|default:"N/A" }}</td>
+                                    <td>{{ payment.booking.property_obj.title|default:"N/A" }}</td>
+                                    <td>{{ payment.amount|floatformat:0|intcomma }} Tsh</td>
+                                    <td>
+                                        <span class="badge bg-success-subtle text-success">
+                                            {{ payment.get_status_display|default:"Completed" }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <div class="bg-light rounded-3 p-3 mb-3 d-inline-block">
+                            <span class="fas fa-money-bill-wave text-500 fs-2"></span>
+                        </div>
+                        <h6 class="mb-2">No Payment Records</h6>
+                        <p class="text-500 fs--1 mb-0">No payments found for the selected date range</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Booking Reports -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center">
+                        <span class="fas fa-calendar-check text-primary me-2"></span>
+                        <h5 class="mb-0">Booking Reports</h5>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-outline-primary" onclick="exportBookingReport()">
+                            <span class="fas fa-download me-1"></span>Export
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if bookings %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Tenant</th>
+                                    <th>Property</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for booking in bookings %}
+                                <tr>
+                                    <td>{{ booking.check_in_date|date:"M d" }}</td>
+                                    <td>{{ booking.customer.full_name|default:"N/A" }}</td>
+                                    <td>{{ booking.property_obj.title|default:"N/A" }}</td>
+                                    <td>{{ booking.total_amount|floatformat:0|intcomma }} Tsh</td>
+                                    <td>
+                                        <span class="badge {% if booking.booking_status == 'confirmed' %}bg-success-subtle text-success{% elif booking.booking_status == 'pending' %}bg-warning-subtle text-warning{% else %}bg-danger-subtle text-danger{% endif %}">
+                                            {{ booking.get_booking_status_display }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <div class="bg-light rounded-3 p-3 mb-3 d-inline-block">
+                            <span class="fas fa-calendar-check text-500 fs-2"></span>
+                        </div>
+                        <h6 class="mb-2">No Booking Records</h6>
+                        <p class="text-500 fs--1 mb-0">No bookings found for the selected date range</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Revenue by Hotel -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex align-items-center">
+                    <span class="fas fa-chart-bar text-info me-2"></span>
+                    <h5 class="mb-0">Revenue by Hotel</h5>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if revenue_by_hotel %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Hotel Name</th>
+                                    <th>Revenue (Tsh)</th>
+                                    <th>Bookings</th>
+                                    <th>Avg per Booking</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for hotel in revenue_by_hotel %}
+                                <tr>
+                                    <td>{{ hotel.hotel_name }}</td>
+                                    <td>{{ hotel.revenue|floatformat:0|intcomma }}</td>
+                                    <td>{{ hotel.bookings }}</td>
+                                    <td>
+                                        {% if hotel.bookings > 0 %}
+                                            {{ hotel.avg_per_booking|floatformat:0|intcomma }} Tsh
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <div class="bg-light rounded-3 p-3 mb-3 d-inline-block">
+                            <span class="fas fa-chart-bar text-500 fs-2"></span>
+                        </div>
+                        <h6 class="mb-2">No Revenue Data</h6>
+                        <p class="text-500 fs--1 mb-0">No revenue data found for the selected date range</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Quick date range functions
+function setDateRange(range) {
+    const today = new Date();
+    const startDateInput = document.querySelector('input[name="start_date"]');
+    const endDateInput = document.querySelector('input[name="end_date"]');
+    
+    let startDate, endDate;
+    
+    switch(range) {
+        case 'today':
+            startDate = endDate = today;
+            break;
+        case 'week':
+            startDate = new Date(today);
+            startDate.setDate(today.getDate() - today.getDay());
+            endDate = today;
+            break;
+        case 'month':
+            startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+            endDate = today;
+            break;
+        case 'quarter':
+            const quarter = Math.floor(today.getMonth() / 3);
+            startDate = new Date(today.getFullYear(), quarter * 3, 1);
+            endDate = today;
+            break;
+        case 'year':
+            startDate = new Date(today.getFullYear(), 0, 1);
+            endDate = today;
+            break;
+    }
+    
+    startDateInput.value = startDate.toISOString().split('T')[0];
+    endDateInput.value = endDate.toISOString().split('T')[0];
+    
+    // Submit the form
+    document.querySelector('form').submit();
+}
+
+// Export functions
+function exportPaymentReport() {
+    const startDate = document.querySelector('input[name="start_date"]').value;
+    const endDate = document.querySelector('input[name="end_date"]').value;
+    
+    const params = new URLSearchParams({
+        start_date: startDate,
+        end_date: endDate
+    });
+    
+    window.open(`{% url 'reports:export_payment' %}?${params}`, '_blank');
+}
+
+function exportBookingReport() {
+    const startDate = document.querySelector('input[name="start_date"]').value;
+    const endDate = document.querySelector('input[name="end_date"]').value;
+    
+    const params = new URLSearchParams({
+        start_date: startDate,
+        end_date: endDate
+    });
+    
+    window.open(`{% url 'reports:export_booking' %}?${params}`, '_blank');
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Hotel Reports Dashboard loaded');
+});
+</script>
+{% endblock %}

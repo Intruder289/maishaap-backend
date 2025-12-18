@@ -1,0 +1,189 @@
+{% extends "accounts/base.html" %}
+{% load static %}
+{% load currency_filters %}
+
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block page_description %}Property management overview and statistics{% endblock %}
+
+{% block page_actions %}
+<div class="d-flex gap-2">
+  {% if perms.properties.add_property or user.is_superuser %}
+  <a href="{% url 'properties:property_create' %}" class="btn btn-primary">
+    <i class="fas fa-plus me-2"></i>Add Property
+  </a>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Stats Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex align-items-center">
+          <div class="flex-shrink-0">
+            <div class="bg-primary-subtle rounded-3 p-3">
+              <i class="fas fa-home text-primary fs-4"></i>
+            </div>
+          </div>
+          <div class="flex-grow-1 ms-3">
+            <h6 class="mb-1">Total Properties</h6>
+            <h4 class="mb-0">{{ stats.total_properties }}</h4>
+            <small class="text-muted">
+              {{ stats.available_properties }} available, {{ stats.rented_properties }} rented
+            </small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-6 col-lg-3">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex align-items-center">
+          <div class="flex-shrink-0">
+            <div class="bg-success-subtle rounded-3 p-3">
+              <i class="fas fa-dollar-sign text-success fs-4"></i>
+            </div>
+          </div>
+          <div class="flex-grow-1 ms-3">
+            <h6 class="mb-1">Monthly Revenue</h6>
+            <h4 class="mb-0">{{ stats.monthly_revenue|currency_tzs }}</h4>
+            <small class="text-muted">{{ stats.unpaid_invoices }} unpaid invoices</small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-6 col-lg-3">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex align-items-center">
+          <div class="flex-shrink-0">
+            <div class="bg-warning-subtle rounded-3 p-3">
+              <i class="fas fa-tools text-warning fs-4"></i>
+            </div>
+          </div>
+          <div class="flex-grow-1 ms-3">
+            <h6 class="mb-1">Pending Requests</h6>
+            <h4 class="mb-0">{{ pending_requests }}</h4>
+            <small class="text-muted">{{ stats.maintenance_requests }} maintenance, {{ stats.recent_complaints }} complaints</small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-6 col-lg-3">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex align-items-center">
+          <div class="flex-shrink-0">
+            <div class="bg-info-subtle rounded-3 p-3">
+              <i class="fas fa-users text-info fs-4"></i>
+            </div>
+          </div>
+          <div class="flex-grow-1 ms-3">
+            <h6 class="mb-1">Active Tenants</h6>
+            <h4 class="mb-0">{{ stats.active_tenants }}</h4>
+            <small class="text-muted">{{ stats.active_leases }} active leases</small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Additional Stats Row -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex align-items-center">
+          <div class="flex-shrink-0">
+            <div class="bg-danger-subtle rounded-3 p-3">
+              <i class="fas fa-exclamation-triangle text-danger fs-4"></i>
+            </div>
+          </div>
+          <div class="flex-grow-1 ms-3">
+            <h6 class="mb-1">Overdue Payments</h6>
+            <h4 class="mb-0">{{ stats.overdue_payments }}</h4>
+            <small class="text-muted">Requires attention</small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-6 col-lg-3">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex align-items-center">
+          <div class="flex-shrink-0">
+            <div class="bg-secondary-subtle rounded-3 p-3">
+              <i class="fas fa-calendar-check text-secondary fs-4"></i>
+            </div>
+          </div>
+          <div class="flex-grow-1 ms-3">
+            <h6 class="mb-1">Pending Bookings</h6>
+            <h4 class="mb-0">{{ stats.pending_bookings }}</h4>
+            <small class="text-muted">Awaiting confirmation</small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  {% if user.is_staff or user.is_superuser %}
+  <div class="col-6 col-lg-3">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex align-items-center">
+          <div class="flex-shrink-0">
+            <div class="bg-dark-subtle rounded-3 p-3">
+              <i class="fas fa-user-friends text-dark fs-4"></i>
+            </div>
+          </div>
+          <div class="flex-grow-1 ms-3">
+            <h6 class="mb-1">Total Users</h6>
+            <h4 class="mb-0">{{ stats.total_users }}</h4>
+            <small class="text-muted">Active users</small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+  
+  <div class="col-6 col-lg-3">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex align-items-center">
+          <div class="flex-shrink-0">
+            <div class="bg-light rounded-3 p-3">
+              <i class="fas fa-chart-line text-muted fs-4"></i>
+            </div>
+          </div>
+          <div class="flex-grow-1 ms-3">
+            <h6 class="mb-1">Occupancy Rate</h6>
+            <h4 class="mb-0">
+              {% if stats.total_properties > 0 %}
+                {{ stats.rented_properties|floatformat:0 }}/{{ stats.total_properties }}
+              {% else %}
+                0/0
+              {% endif %}
+            </h4>
+            <small class="text-muted">Properties occupied</small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+{% endblock %}

@@ -1,0 +1,67 @@
+<form id="editPaymentForm">
+    {% csrf_token %}
+    <div class="row g-3">
+        <div class="col-md-6">
+            <label for="editAmount" class="form-label">Amount *</label>
+            <input type="number" class="form-control" id="editAmount" value="{{ payment.amount }}" step="0.01" min="0" required>
+        </div>
+        <div class="col-md-6">
+            <label for="editPaymentMethod" class="form-label">Payment Method *</label>
+            <select class="form-control" id="editPaymentMethod" required>
+                {% for value, label in payment_method_choices %}
+                    <option value="{{ value }}" {% if value == payment.payment_method %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-6">
+            <label for="editPaymentType" class="form-label">Payment Type *</label>
+            <select class="form-control" id="editPaymentType" required>
+                {% for value, label in payment_type_choices %}
+                    <option value="{{ value }}" {% if value == payment.payment_type %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-6">
+            <label for="editStatus" class="form-label">Status</label>
+            <select class="form-control" id="editStatus">
+                {% for value, label in payment_status_choices %}
+                    <option value="{{ value }}" {% if value == payment.status %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-6">
+            <label for="editPaymentDate" class="form-label">Payment Date *</label>
+            <input type="datetime-local" class="form-control" id="editPaymentDate" value="{{ payment.payment_date|date:'Y-m-d\TH:i' }}" required>
+        </div>
+        <div class="col-md-6">
+            <label for="editTransactionReference" class="form-label">Transaction Reference</label>
+            <input type="text" class="form-control" id="editTransactionReference" value="{{ payment.transaction_reference|default:'' }}" placeholder="Transaction reference">
+        </div>
+        <div class="col-12">
+            <label for="editNotes" class="form-label">Notes</label>
+            <textarea class="form-control" id="editNotes" rows="3" placeholder="Payment notes...">{{ payment.notes|default:'' }}</textarea>
+        </div>
+    </div>
+</form>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <h6 class="text-muted mb-3">Current Payment Information</h6>
+        <div class="card border">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p class="mb-1"><strong>Customer:</strong> {{ payment.booking.customer.full_name }}</p>
+                        <p class="mb-1"><strong>Property:</strong> {{ payment.booking.property_obj.title }}</p>
+                        <p class="mb-1"><strong>Booking:</strong> {{ payment.booking.booking_reference }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p class="mb-1"><strong>Original Amount:</strong> Tsh{{ payment.amount|floatformat:0 }}</p>
+                        <p class="mb-1"><strong>Payment Date:</strong> {{ payment.payment_date|date:"M d, Y H:i" }}</p>
+                        <p class="mb-1"><strong>Status:</strong> {{ payment.status|title }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

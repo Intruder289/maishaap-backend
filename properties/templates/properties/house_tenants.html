@@ -1,0 +1,990 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}House Tenants Management{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Breadcrumb Navigation -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'properties:house_dashboard' %}"><i class="fas fa-tachometer-alt me-1"></i>Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'properties:house_bookings' %}"><i class="fas fa-calendar-check me-1"></i>Bookings</a></li>
+            <li class="breadcrumb-item active" aria-current="page"><i class="fas fa-users me-1"></i>Tenants</li>
+            <li class="breadcrumb-item"><a href="{% url 'properties:house_payments' %}"><i class="fas fa-credit-card me-1"></i>Payments</a></li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <div class="col-12">
+            <!-- Page Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="mb-1">
+                        <i class="fas fa-users text-primary me-2"></i>House Tenants Management
+                    </h2>
+                    <p class="text-muted mb-0">Manage residential property tenants and their information</p>
+                </div>
+            </div>
+            
+            <!-- Tenant Database Table -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="row flex-between-center">
+                        <div class="col">
+                            <h6 class="mb-2">Tenant Database</h6>
+                            <h5 class="mb-0">Manage and monitor all house tenants</h5>
+                        </div>
+                        <div class="col-auto">
+                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTenantModal">
+                                <span class="fas fa-plus me-2"></span>Add Tenant
+                            </button>
+                            <button type="button" class="btn btn-secondary ms-2" onclick="clearAllFilters()">
+                                <span class="fas fa-times me-2"></span>Clear All
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Search and Filters -->
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label for="search-input" class="form-label">Search</label>
+                            <input type="text" class="form-control" id="search-input" placeholder="Search tenants..." value="{{ search_query }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="status-filter" class="form-label">Status</label>
+                            <select class="form-select" id="status-filter">
+                                <option value="">All Statuses</option>
+                                <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
+                                <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
+                                <option value="vip" {% if status_filter == 'vip' %}selected{% endif %}>VIP</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="tenant-type-filter" class="form-label">Tenant Type</label>
+                            <select class="form-select" id="tenant-type-filter">
+                                <option value="">All Types</option>
+                                <option value="family" {% if tenant_type_filter == 'family' %}selected{% endif %}>Family</option>
+                                <option value="single" {% if tenant_type_filter == 'single' %}selected{% endif %}>Single</option>
+                                <option value="couple" {% if tenant_type_filter == 'couple' %}selected{% endif %}>Couple</option>
+                                <option value="student" {% if tenant_type_filter == 'student' %}selected{% endif %}>Student</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="page-size-select" class="form-label">Items per page</label>
+                            <select class="form-select" id="page-size-select" onchange="changePageSize()">
+                                <option value="5" {% if request.GET.page_size == '5' or not request.GET.page_size %}selected{% endif %}>5</option>
+                                <option value="10" {% if request.GET.page_size == '10' %}selected{% endif %}>10</option>
+                                <option value="25" {% if request.GET.page_size == '25' %}selected{% endif %}>25</option>
+                                <option value="50" {% if request.GET.page_size == '50' %}selected{% endif %}>50</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Tenant</th>
+                                    <th>Contact</th>
+                                    <th>Property</th>
+                                    <th>Type</th>
+                                    <th>Move-in Date</th>
+                                    <th>Lease End</th>
+                                    <th>Monthly Rent</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for tenant in tenants %}
+                                <tr data-tenant-id="{{ tenant.id }}">
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3 fw-bold">
+                                                {{ tenant.full_name|first|upper }}
+                                            </div>
+                                            <div>
+                                                <strong>
+                                                    <a href="#" class="text-decoration-none">
+                                                        {{ tenant.full_name }}
+                                                    </a>
+                                                </strong>
+                                                <div class="text-muted small">ID: {{ tenant.id }}</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <i class="fas fa-envelope text-muted me-2"></i>
+                                            <div>
+                                                <div class="fw-bold">{{ tenant.email|default:"N/A" }}</div>
+                                                <div class="text-muted small">{{ tenant.phone|default:"N/A" }}</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {% with tenant.customer_bookings.all|first as latest_booking %}
+                                            {% if latest_booking %}
+                                                <div class="d-flex align-items-center">
+                                                    <i class="fas fa-home text-muted me-2"></i>
+                                                    <div>
+                                                        <div class="fw-bold">{{ latest_booking.property_obj.title }}</div>
+                                                        <div class="text-muted small">{{ latest_booking.property_obj.address|truncatechars:30 }}</div>
+                                                    </div>
+                                                </div>
+                                            {% else %}
+                                                <div class="text-muted">No property assigned</div>
+                                            {% endif %}
+                                        {% endwith %}
+                                    </td>
+                                    <td>
+                                        {% with tenant.customer_bookings.all|first as latest_booking %}
+                                            {% if latest_booking and latest_booking.total_amount >= 1000000 %}
+                                                <span class="badge bg-success">VIP</span>
+                                            {% elif latest_booking and latest_booking.total_amount >= 500000 %}
+                                                <span class="badge bg-primary">Premium</span>
+                                            {% else %}
+                                                <span class="badge bg-warning">Standard</span>
+                                            {% endif %}
+                                        {% endwith %}
+                                    </td>
+                                    <td>
+                                        {% with tenant.customer_bookings.all|first as latest_booking %}
+                                            {% if latest_booking %}
+                                                <div class="fw-bold">{{ latest_booking.check_in_date|date:"M d, Y" }}</div>
+                                                <div class="text-muted small">{{ latest_booking.check_in_date|timesince }} ago</div>
+                                            {% else %}
+                                                <div class="text-muted">N/A</div>
+                                            {% endif %}
+                                        {% endwith %}
+                                    </td>
+                                    <td>
+                                        {% with tenant.customer_bookings.all|first as latest_booking %}
+                                            {% if latest_booking %}
+                                                <div class="fw-bold">{{ latest_booking.check_out_date|date:"M d, Y" }}</div>
+                                                <div class="text-muted small">{{ latest_booking.check_out_date|timeuntil }}</div>
+                                            {% else %}
+                                                <div class="text-muted">N/A</div>
+                                            {% endif %}
+                                        {% endwith %}
+                                    </td>
+                                    <td>
+                                        {% with tenant.customer_bookings.all|first as latest_booking %}
+                                            {% if latest_booking %}
+                                                <div class="fw-bold">Tsh{{ latest_booking.total_amount|floatformat:0 }}</div>
+                                                <div class="text-muted small">per month</div>
+                                            {% else %}
+                                                <div class="text-muted">N/A</div>
+                                            {% endif %}
+                                        {% endwith %}
+                                    </td>
+                                    <td>
+                                        {% with tenant.customer_bookings.all|first as latest_booking %}
+                                            {% if latest_booking %}
+                                                {% if latest_booking.booking_status == 'confirmed' %}
+                                                    <span class="badge bg-success">Active</span>
+                                                {% elif latest_booking.booking_status == 'checked_in' %}
+                                                    <span class="badge bg-primary">Checked In</span>
+                                                {% elif latest_booking.booking_status == 'checked_out' %}
+                                                    <span class="badge bg-info">Checked Out</span>
+                                                {% elif latest_booking.booking_status == 'cancelled' %}
+                                                    <span class="badge bg-danger">Cancelled</span>
+                                                {% else %}
+                                                    <span class="badge bg-warning">Pending</span>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="badge bg-secondary">No Booking</span>
+                                            {% endif %}
+                                        {% endwith %}
+                                    </td>
+                                    <td>
+                                        <div class="dropdown">
+                                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                                <i class="fas fa-ellipsis-v"></i>
+                                            </button>
+                                            <ul class="dropdown-menu">
+                                                <li><a class="dropdown-item" href="#" onclick="openViewProfileModal({{ tenant.id }})">
+                                                    <i class="fas fa-eye me-2"></i>View Profile
+                                                </a></li>
+                                                <li><a class="dropdown-item" href="#" onclick="openEditTenantModal({{ tenant.id }})">
+                                                    <i class="fas fa-edit me-2"></i>Edit Tenant
+                                                </a></li>
+                                                {% with tenant.customer_bookings.all|first as latest_booking %}
+                                                    {% if latest_booking %}
+                                                        <li><a class="dropdown-item" href="#" onclick="openPropertyDetailsModal({{ latest_booking.property_obj.id }})">
+                                                            <i class="fas fa-home me-2"></i>Property Details
+                                                        </a></li>
+                                                        <li><a class="dropdown-item" href="#" onclick="openBookingDetailsModal({{ latest_booking.id }})">
+                                                            <i class="fas fa-calendar me-2"></i>Booking Details
+                                                        </a></li>
+                                                    {% endif %}
+                                                {% endwith %}
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li><a class="dropdown-item" href="#" onclick="openLeaseHistoryModal({{ tenant.id }})">
+                                                    <i class="fas fa-calendar-alt me-2"></i>Lease History
+                                                </a></li>
+                                                <li><a class="dropdown-item" href="#" onclick="openPaymentHistoryModal({{ tenant.id }})">
+                                                    <i class="fas fa-money-bill-wave me-2"></i>Payment History
+                                                </a></li>
+                                                <li><hr class="dropdown-divider"></li>
+                                                {% with tenant.customer_bookings.all|first as latest_booking %}
+                                                    {% if latest_booking and latest_booking.total_amount < 1000000 %}
+                                                        <li><a class="dropdown-item" href="#" onclick="openMakeVipModal({{ tenant.id }})">
+                                                            <i class="fas fa-crown me-2"></i>Make VIP
+                                                        </a></li>
+                                                    {% elif latest_booking and latest_booking.total_amount >= 1000000 %}
+                                                        <li><a class="dropdown-item" href="#" onclick="openRemoveVipModal({{ tenant.id }})">
+                                                            <i class="fas fa-star me-2"></i>Remove VIP
+                                                        </a></li>
+                                                    {% endif %}
+                                                {% endwith %}
+                                            </ul>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="9" class="text-center py-4">
+                                        <div class="text-muted">
+                                            <i class="fas fa-users fa-2x mb-3"></i>
+                                            <p>No tenants found.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Pagination -->
+                    {% if tenants.has_other_pages %}
+                    <div class="card-footer bg-white border-0 py-3">
+                        <div class="row align-items-center">
+                            <div class="col-md-6">
+                                <div class="text-muted">
+                                    Showing {{ tenants.start_index }} to {{ tenants.end_index }} of {{ tenants.paginator.count }} entries
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <nav aria-label="Page navigation" class="d-flex justify-content-end">
+                                    <ul class="pagination pagination-sm mb-0">
+                                        {% if tenants.has_previous %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if tenant_type_filter %}&tenant_type={{ tenant_type_filter }}{% endif %}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}" title="First Page">
+                                                <i class="fas fa-angle-double-left"></i>
+                                            </a>
+                                        </li>
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ tenants.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if tenant_type_filter %}&tenant_type={{ tenant_type_filter }}{% endif %}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}" title="Previous Page">
+                                                <i class="fas fa-angle-left"></i>
+                                            </a>
+                                        </li>
+                                        {% endif %}
+                                        
+                                        <!-- Page numbers -->
+                                        {% for num in tenants.paginator.page_range %}
+                                            {% if tenants.number == num %}
+                                        <li class="page-item active">
+                                            <span class="page-link">{{ num }}</span>
+                                        </li>
+                                            {% elif num > tenants.number|add:'-3' and num < tenants.number|add:'3' %}
+                                            <li class="page-item">
+                                                <a class="page-link" href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if tenant_type_filter %}&tenant_type={{ tenant_type_filter }}{% endif %}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}">{{ num }}</a>
+                                            </li>
+                                            {% endif %}
+                                        {% endfor %}
+                                        
+                                        {% if tenants.has_next %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ tenants.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if tenant_type_filter %}&tenant_type={{ tenant_type_filter }}{% endif %}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}" title="Next Page">
+                                                <i class="fas fa-angle-right"></i>
+                                            </a>
+                                        </li>
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ tenants.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if tenant_type_filter %}&tenant_type={{ tenant_type_filter }}{% endif %}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}" title="Last Page">
+                                                <i class="fas fa-angle-double-right"></i>
+                                            </a>
+                                        </li>
+                                        {% endif %}
+                                    </ul>
+                                </nav>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Tenant Modal -->
+    <div class="modal fade" id="addTenantModal" tabindex="-1" aria-labelledby="addTenantModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addTenantModalLabel">Add New Tenant</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="firstName" class="form-label">First Name *</label>
+                                <input type="text" class="form-control" id="firstName" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="lastName" class="form-label">Last Name *</label>
+                                <input type="text" class="form-control" id="lastName" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="email" class="form-label">Email *</label>
+                                <input type="email" class="form-control" id="email" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="phone" class="form-label">Phone Number *</label>
+                                <input type="tel" class="form-control" id="phone" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="propertySelect" class="form-label">Property *</label>
+                                <select class="form-control" id="propertySelect" required>
+                                    <option value="">Select Property</option>
+                                    {% for property in house_properties %}
+                                    <option value="{{ property.id }}">{{ property.title }} - {{ property.address }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="tenantType" class="form-label">Tenant Type *</label>
+                                <select class="form-control" id="tenantType" required>
+                                    <option value="">Select Type</option>
+                                    <option value="family">Family</option>
+                                    <option value="single">Single</option>
+                                    <option value="couple">Couple</option>
+                                    <option value="student">Student</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="moveInDate" class="form-label">Move-in Date *</label>
+                                <input type="date" class="form-control" id="moveInDate" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="leaseDuration" class="form-label">Lease Duration *</label>
+                                <select class="form-control" id="leaseDuration" required>
+                                    <option value="">Select Duration</option>
+                                    <option value="6">6 Months</option>
+                                    <option value="12">12 Months</option>
+                                    <option value="24">24 Months</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="monthlyRent" class="form-label">Monthly Rent *</label>
+                                <input type="number" class="form-control" id="monthlyRent" step="0.01" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="securityDeposit" class="form-label">Security Deposit *</label>
+                                <input type="number" class="form-control" id="securityDeposit" step="0.01" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="employmentStatus" class="form-label">Employment Status</label>
+                                <select class="form-control" id="employmentStatus">
+                                    <option value="employed">Employed</option>
+                                    <option value="self_employed">Self-Employed</option>
+                                    <option value="student">Student</option>
+                                    <option value="retired">Retired</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="emergencyContact" class="form-label">Emergency Contact</label>
+                                <input type="tel" class="form-control" id="emergencyContact" placeholder="Emergency contact phone">
+                            </div>
+                            <div class="col-12">
+                                <label for="address" class="form-label">Address</label>
+                                <textarea class="form-control" id="address" rows="2"></textarea>
+                            </div>
+                            <div class="col-12">
+                                <label for="notes" class="form-label">Notes</label>
+                                <textarea class="form-control" id="notes" rows="3" placeholder="Special requirements, pets, maintenance preferences, etc..."></textarea>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary">Add Tenant</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Profile Modal -->
+    <div class="modal fade" id="viewProfileModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-eye me-2"></i>Tenant Profile
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="viewProfileContent">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Tenant Modal -->
+    <div class="modal fade" id="editTenantModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-edit me-2"></i>Edit Tenant
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="editTenantContent">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="saveTenantChanges()">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Property Details Modal -->
+    <div class="modal fade" id="propertyDetailsModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-home me-2"></i>Property Details
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="propertyDetailsContent">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Booking Details Modal -->
+    <div class="modal fade" id="bookingDetailsModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-calendar me-2"></i>Booking Details
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="bookingDetailsContent">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lease History Modal -->
+    <div class="modal fade" id="leaseHistoryModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-calendar-alt me-2"></i>Lease History
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="leaseHistoryContent">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment History Modal -->
+    <div class="modal fade" id="paymentHistoryModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-money-bill-wave me-2"></i>Payment History
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="paymentHistoryContent">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" onclick="addNewPayment()">Add Payment</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Make VIP Modal -->
+    <div class="modal fade" id="makeVipModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-crown me-2"></i>Make VIP Tenant
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="makeVipContent">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-warning" onclick="makeTenantVip()">Make VIP</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Remove VIP Modal -->
+    <div class="modal fade" id="removeVipModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-star me-2"></i>Remove VIP Status
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="removeVipContent">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" onclick="removeTenantVip()">Remove VIP</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Global variables
+let currentTenantId = null;
+let currentPropertyId = null;
+let currentBookingId = null;
+
+// Modal Functions
+window.openViewProfileModal = function(tenantId) {
+    console.log('Opening View Profile Modal for tenant:', tenantId);
+    currentTenantId = tenantId;
+    $('#viewProfileModal').modal('show');
+    loadViewProfileContent(tenantId);
+}
+
+window.openEditTenantModal = function(tenantId) {
+    console.log('Opening Edit Tenant Modal for tenant:', tenantId);
+    currentTenantId = tenantId;
+    $('#editTenantModal').modal('show');
+    loadEditTenantContent(tenantId);
+}
+
+window.openPropertyDetailsModal = function(propertyId) {
+    console.log('Opening Property Details Modal for property:', propertyId);
+    currentPropertyId = propertyId;
+    $('#propertyDetailsModal').modal('show');
+    loadPropertyDetailsContent(propertyId);
+}
+
+window.openBookingDetailsModal = function(bookingId) {
+    console.log('Opening Booking Details Modal for booking:', bookingId);
+    currentBookingId = bookingId;
+    $('#bookingDetailsModal').modal('show');
+    loadBookingDetailsContent(bookingId);
+}
+
+window.openLeaseHistoryModal = function(tenantId) {
+    console.log('Opening Lease History Modal for tenant:', tenantId);
+    currentTenantId = tenantId;
+    $('#leaseHistoryModal').modal('show');
+    loadLeaseHistoryContent(tenantId);
+}
+
+window.openPaymentHistoryModal = function(tenantId) {
+    console.log('Opening Payment History Modal for tenant:', tenantId);
+    currentTenantId = tenantId;
+    $('#paymentHistoryModal').modal('show');
+    loadPaymentHistoryContent(tenantId);
+}
+
+window.openMakeVipModal = function(tenantId) {
+    console.log('Opening Make VIP Modal for tenant:', tenantId);
+    currentTenantId = tenantId;
+    $('#makeVipModal').modal('show');
+    loadMakeVipContent(tenantId);
+}
+
+window.openRemoveVipModal = function(tenantId) {
+    console.log('Opening Remove VIP Modal for tenant:', tenantId);
+    currentTenantId = tenantId;
+    $('#removeVipModal').modal('show');
+    loadRemoveVipContent(tenantId);
+}
+
+// AJAX Content Loading Functions
+function loadViewProfileContent(tenantId) {
+    console.log('Loading view profile for tenant:', tenantId);
+    $.ajax({
+        url: `/properties/api/tenant/${tenantId}/profile/`,
+        method: 'GET',
+        success: function(data) {
+            console.log('View profile loaded successfully');
+            $('#viewProfileContent').html(data);
+        },
+        error: function(xhr, status, error) {
+            console.error('Error loading view profile:', error, xhr);
+            $('#viewProfileContent').html(`
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Error loading tenant profile: ${error}<br>
+                    Status: ${xhr.status}<br>
+                    Response: ${xhr.responseText}
+                </div>
+            `);
+        }
+    });
+}
+
+function loadEditTenantContent(tenantId) {
+    $.ajax({
+        url: `/properties/api/tenant/${tenantId}/edit/`,
+        method: 'GET',
+        success: function(data) {
+            $('#editTenantContent').html(data);
+        },
+        error: function(xhr, status, error) {
+            $('#editTenantContent').html(`
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Error loading edit form: ${error}
+                </div>
+            `);
+        }
+    });
+}
+
+function loadPropertyDetailsContent(propertyId) {
+    $.ajax({
+        url: `/properties/api/property/${propertyId}/details/`,
+        method: 'GET',
+        success: function(data) {
+            $('#propertyDetailsContent').html(data);
+        },
+        error: function(xhr, status, error) {
+            $('#propertyDetailsContent').html(`
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Error loading property details: ${error}
+                </div>
+            `);
+        }
+    });
+}
+
+function loadBookingDetailsContent(bookingId) {
+    $.ajax({
+        url: `/properties/api/booking/${bookingId}/details/`,
+        method: 'GET',
+        success: function(data) {
+            $('#bookingDetailsContent').html(data);
+        },
+        error: function(xhr, status, error) {
+            $('#bookingDetailsContent').html(`
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Error loading booking details: ${error}
+                </div>
+            `);
+        }
+    });
+}
+
+function loadLeaseHistoryContent(tenantId) {
+    $.ajax({
+        url: `/properties/api/tenant/${tenantId}/lease-history/`,
+        method: 'GET',
+        success: function(data) {
+            $('#leaseHistoryContent').html(data);
+        },
+        error: function(xhr, status, error) {
+            $('#leaseHistoryContent').html(`
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Error loading lease history: ${error}
+                </div>
+            `);
+        }
+    });
+}
+
+function loadPaymentHistoryContent(tenantId) {
+    $.ajax({
+        url: `/properties/api/tenant/${tenantId}/payment-history/`,
+        method: 'GET',
+        success: function(data) {
+            $('#paymentHistoryContent').html(data);
+        },
+        error: function(xhr, status, error) {
+            $('#paymentHistoryContent').html(`
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Error loading payment history: ${error}
+                </div>
+            `);
+        }
+    });
+}
+
+function loadMakeVipContent(tenantId) {
+    $.ajax({
+        url: `/properties/api/tenant/${tenantId}/make-vip/`,
+        method: 'GET',
+        success: function(data) {
+            $('#makeVipContent').html(data);
+        },
+        error: function(xhr, status, error) {
+            $('#makeVipContent').html(`
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Error loading VIP form: ${error}
+                </div>
+            `);
+        }
+    });
+}
+
+function loadRemoveVipContent(tenantId) {
+    $.ajax({
+        url: `/properties/api/tenant/${tenantId}/remove-vip/`,
+        method: 'GET',
+        success: function(data) {
+            $('#removeVipContent').html(data);
+        },
+        error: function(xhr, status, error) {
+            $('#removeVipContent').html(`
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Error loading VIP removal form: ${error}
+                </div>
+            `);
+        }
+    });
+}
+
+// Action Functions
+function saveTenantChanges() {
+    const form = $('#editTenantContent form');
+    if (form.length === 0) {
+        alert('No form found to save');
+        return;
+    }
+    
+    $.ajax({
+        url: form.attr('action'),
+        method: 'POST',
+        data: form.serialize(),
+        success: function(response) {
+            if (response.success) {
+                $('#editTenantModal').modal('hide');
+                location.reload(); // Refresh the page to show updated data
+            } else {
+                alert('Error saving changes: ' + response.message);
+            }
+        },
+        error: function(xhr, status, error) {
+            alert('Error saving changes: ' + error);
+        }
+    });
+}
+
+function addNewPayment() {
+    // Open a new payment modal or redirect to payment page
+    window.open(`/properties/tenant/${currentTenantId}/payment/`, '_blank');
+}
+
+function makeTenantVip() {
+    $.ajax({
+        url: `/properties/api/tenant/${currentTenantId}/make-vip/`,
+        method: 'POST',
+        data: {
+            'csrfmiddlewaretoken': $('[name=csrfmiddlewaretoken]').val()
+        },
+        success: function(response) {
+            if (response.success) {
+                $('#makeVipModal').modal('hide');
+                location.reload();
+            } else {
+                alert('Error making tenant VIP: ' + response.message);
+            }
+        },
+        error: function(xhr, status, error) {
+            alert('Error making tenant VIP: ' + error);
+        }
+    });
+}
+
+function removeTenantVip() {
+    $.ajax({
+        url: `/properties/api/tenant/${currentTenantId}/remove-vip/`,
+        method: 'POST',
+        data: {
+            'csrfmiddlewaretoken': $('[name=csrfmiddlewaretoken]').val()
+        },
+        success: function(response) {
+            if (response.success) {
+                $('#removeVipModal').modal('hide');
+                location.reload();
+            } else {
+                alert('Error removing VIP status: ' + response.message);
+            }
+        },
+        error: function(xhr, status, error) {
+            alert('Error removing VIP status: ' + error);
+        }
+    });
+}
+
+$(document).ready(function() {
+    console.log('House Tenants page initialized');
+    
+    // Search input handler
+    var searchTimeout;
+    $('#search-input').on('input', function() {
+        var searchValue = $(this).val();
+        console.log('Search input changed:', searchValue);
+        
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(function() {
+            console.log('Search timeout triggered');
+            applyFilters();
+        }, 500);
+    });
+    
+    // Filter change handlers
+    $('#status-filter, #tenant-type-filter').on('change', function() {
+        var filterName = $(this).attr('id');
+        var filterValue = $(this).val();
+        console.log(filterName + ' changed:', filterValue);
+        applyFilters();
+    });
+    
+    // Clear all filters function
+    window.clearAllFilters = function() {
+        console.log('Clearing all filters');
+        $('#search-input').val('');
+        $('#status-filter').val('');
+        $('#tenant-type-filter').val('');
+        applyFilters();
+    };
+    
+    // Apply filters function
+    function applyFilters() {
+        var search = $('#search-input').val() || '';
+        var status = $('#status-filter').val() || '';
+        var tenantType = $('#tenant-type-filter').val() || '';
+        var pageSize = $('#page-size-select').val() || '5';
+        
+        console.log('Applying filters:', {search: search, status: status, tenantType: tenantType, pageSize: pageSize});
+        
+        // Build URL with parameters
+        var url = new URL(window.location);
+        url.searchParams.set('page', '1'); // Reset to first page
+        
+        if (search) {
+            url.searchParams.set('search', search);
+        } else {
+            url.searchParams.delete('search');
+        }
+        if (status) {
+            url.searchParams.set('status', status);
+        } else {
+            url.searchParams.delete('status');
+        }
+        if (tenantType) {
+            url.searchParams.set('tenant_type', tenantType);
+        } else {
+            url.searchParams.delete('tenant_type');
+        }
+        if (pageSize) {
+            url.searchParams.set('page_size', pageSize);
+        }
+        
+        // Redirect to new URL
+        window.location.href = url.toString();
+    }
+    
+    // Page size change function
+    window.changePageSize = function() {
+        console.log('Page size changed');
+        applyFilters();
+    };
+    
+    // Auto-refresh every 30 seconds
+    setInterval(function() {
+        console.log('Refreshing house tenants data...');
+    }, 30000);
+});
+</script>
+{% endblock %}

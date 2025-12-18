@@ -1,0 +1,191 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Complaints Dashboard - Maisha{% endblock %}
+
+{% block content %}
+<!-- FontAwesome Icons -->
+
+<div class="container-fluid" data-page="complaints:dashboard">
+    <!-- Professional Page Header -->
+    <div class="row mb-4">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="h2 mb-2">
+                    <i class="fas fa-comments"></i>
+                    Complaints Dashboard
+                </h1>
+                <p class="text-body-emphasis">
+                    Monitor and manage all customer complaints and feedback
+                </p>
+            </div>
+            <div>
+                <a href="{% url 'complaints:complaint_list' %}" class="btn btn-primary">
+                    <i class="fas fa-list"></i>
+                    View All Complaints
+                </a>
+                {% if user.role.name.lower == 'tenant' %}
+                <a href="{% url 'complaints:complaint_create' %}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i>
+                    New Complaint
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard-Style Statistics Cards -->
+    <div class="stats-grid">
+        <div class="stat-card" 
+             data-trend="stable"
+             data-card-type="total"
+             tabindex="0"
+             role="button"
+             aria-label="View total complaints">
+            <div class="stat-icon total">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+                </svg>
+            </div>
+            <div class="stat-info">
+                <h3>{{ stats.total|default:0 }}</h3>
+                <p>Total Complaints</p>
+                <span class="stat-change neutral">All registered complaints</span>
+            </div>
+        </div>
+        
+        <div class="stat-card" 
+             data-trend="warning"
+             data-card-type="pending"
+             tabindex="0"
+             role="button"
+             aria-label="View pending complaints">
+            <div class="stat-icon pending">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15h2v2h-2zm0-8h2v6h-2z"/>
+                </svg>
+            </div>
+            <div class="stat-info">
+                <h3>{{ stats.pending|default:0 }}</h3>
+                <p>Pending Complaints</p>
+                <span class="stat-change warning">Awaiting review</span>
+            </div>
+        </div>
+        
+        <div class="stat-card" 
+             data-trend="up"
+             data-card-type="progress"
+             tabindex="0"
+             role="button"
+             aria-label="View complaints in progress">
+            <div class="stat-icon progress">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+            </div>
+            <div class="stat-info">
+                <h3>{{ stats.in_progress|default:0 }}</h3>
+                <p>In Progress</p>
+                <span class="stat-change positive">Being addressed</span>
+            </div>
+        </div>
+        
+        <div class="stat-card" 
+             data-trend="up"
+             data-card-type="resolved"
+             tabindex="0"
+             role="button"
+             aria-label="View resolved complaints">
+            <div class="stat-icon resolved">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+            </div>
+            <div class="stat-info">
+                <h3>{{ stats.resolved|default:0 }}</h3>
+                <p>Resolved</p>
+                <span class="stat-change positive">Successfully resolved</span>
+            </div>
+        </div>
+    </div>
+
+            <!-- Recent Complaints -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Recent Complaints</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if recent_complaints %}
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>ID</th>
+                                                <th>Title</th>
+                                                <th>User</th>
+                                                <th>Category</th>
+                                                <th>Priority</th>
+                                                <th>Status</th>
+                                                <th>Created</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for complaint in recent_complaints %}
+                                                <tr>
+                                                    <td>#{{ complaint.id }}</td>
+                                                    <td>
+                                                        <a href="{% url 'complaints:complaint_detail' complaint.pk %}" class="text-decoration-none">
+                                                            {{ complaint.title|truncatechars:50 }}
+                                                        </a>
+                                                    </td>
+                                                    <td>{{ complaint.user.get_full_name|default:complaint.user.username }}</td>
+                                                    <td>
+                                                        <span class="badge bg-light text-dark">{{ complaint.get_category_display }}</span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-{% if complaint.priority == 'urgent' %}danger{% elif complaint.priority == 'high' %}warning{% elif complaint.priority == 'medium' %}primary{% else %}secondary{% endif %}">
+                                                            {{ complaint.get_priority_display }}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-{% if complaint.status == 'pending' %}warning{% elif complaint.status == 'in_progress' %}info{% elif complaint.status == 'resolved' %}success{% elif complaint.status == 'closed' %}secondary{% else %}danger{% endif %}">
+                                                            {{ complaint.get_status_display }}
+                                                        </span>
+                                                    </td>
+                                                    <td>{{ complaint.created_at|date:"M d, Y" }}</td>
+                                                    <td>
+                                                        <a href="{% url 'complaints:complaint_detail' complaint.pk %}" class="btn btn-sm btn btn-primary-outline-primary">
+                                                            View
+                                                        </a>
+                                                    </td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <div class="text-center py-4">
+                                    <i class="fas fa-inbox fa-2x text-muted mb-2"></i>
+                                    <p class="text-muted">No recent complaints</p>
+                                </div>
+                            {% endif %}
+                        </div>
+                        {% if recent_complaints %}
+                            <div class="card-footer">
+                                <a href="{% url 'complaints:complaint_list' %}" class="btn btn-primary">
+                                    View All Complaints
+                                </a>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

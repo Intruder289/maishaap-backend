@@ -1,0 +1,405 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}Lodge Accommodation Status{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <!-- Page Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="mb-1">
+                        <i class="fas fa-mountain text-primary me-2"></i>Lodge Accommodation Status
+                    </h2>
+                    <p class="text-muted mb-0">Monitor cabin, tent site, and chalet availability</p>
+                </div>
+                <div>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addAccommodationModal">
+                        <i class="fas fa-plus me-2"></i>Add Accommodation
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Accommodation Status Overview -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-0">{{ available_rooms }}</h4>
+                                    <p class="mb-0">Available</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-check-circle fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-0">{{ occupied_rooms }}</h4>
+                                    <p class="mb-0">Occupied</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-user fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-danger text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-0">{{ maintenance_rooms }}</h4>
+                                    <p class="mb-0">Maintenance</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-tools fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-0">{{ total_rooms }}</h4>
+                                    <p class="mb-0">Total Rooms</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-bed fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Filter Section -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Area</label>
+                            <select class="form-select" id="areaFilter">
+                                <option value="">All Areas</option>
+                                <option value="mountain">Mountain View</option>
+                                <option value="riverside">Riverside</option>
+                                <option value="forest">Forest Edge</option>
+                                <option value="valley">Valley</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Accommodation Type</label>
+                            <select class="form-select" id="accommodationTypeFilter">
+                                <option value="">All Types</option>
+                                <option value="cabin">Cabin</option>
+                                <option value="tent">Tent Site</option>
+                                <option value="chalet">Chalet</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Status</label>
+                            <select class="form-select" id="statusFilter">
+                                <option value="">All Status</option>
+                                <option value="available">Available</option>
+                                <option value="occupied">Occupied</option>
+                                <option value="maintenance">Maintenance</option>
+                                <option value="out_of_order">Out of Order</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">&nbsp;</label>
+                            <button class="btn btn-outline-secondary w-100" onclick="clearFilters()">
+                                <i class="fas fa-times me-1"></i>Clear Filters
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Rooms Grid -->
+            <div class="row" id="roomsGrid">
+                {% if rooms_by_type %}
+                    {% for room_type, rooms_list in rooms_by_type.items %}
+                        <div class="col-12 mb-4">
+                            <h5>
+                                <i class="fas fa-bed me-2"></i>{{ room_type|title }} Rooms
+                                <span class="badge bg-secondary ms-2">{{ rooms_list|length }}</span>
+                            </h5>
+                            <div class="row g-3">
+                                {% for room in rooms_list %}
+                                    <div class="col-md-3 col-lg-2">
+                                        <div class="card accommodation-card {{ room.status }}" 
+                                             data-accommodation="{{ room.room_number }}" 
+                                             data-status="{{ room.status }}" 
+                                             data-type="{{ room.room_type }}"
+                                             data-room-id="{{ room.id }}">
+                                            <div class="card-body text-center">
+                                                <h6 class="card-title">{{ room.room_number }}</h6>
+                                                <p class="card-text">{{ room.room_type|title }}</p>
+                                                
+                                                {% if room.status == 'available' %}
+                                                    <span class="badge bg-success">Available</span>
+                                                    <small class="d-block text-muted">{{ room.capacity }} guests</small>
+                                                {% elif room.status == 'occupied' %}
+                                                    <span class="badge bg-warning">Occupied</span>
+                                                    {% if room.current_booking %}
+                                                        <small class="d-block text-muted">{{ room.current_booking.customer.first_name }} {{ room.current_booking.customer.last_name }}</small>
+                                                    {% else %}
+                                                        <small class="d-block text-muted">Guest</small>
+                                                    {% endif %}
+                                                {% elif room.status == 'maintenance' %}
+                                                    <span class="badge bg-danger">Maintenance</span>
+                                                    <small class="d-block text-muted">Under repair</small>
+                                                {% elif room.status == 'out_of_order' %}
+                                                    <span class="badge bg-secondary">Out of Order</span>
+                                                    <small class="d-block text-muted">Not available</small>
+                                                {% else %}
+                                                    <span class="badge bg-info">{{ room.status|title }}</span>
+                                                {% endif %}
+                                                
+                                                {% if room.base_rate %}
+                                                    <small class="d-block text-muted mt-1">Tsh{{ room.base_rate|floatformat:0 }}/night</small>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <i class="fas fa-bed fa-3x text-muted mb-3"></i>
+                                <h5 class="text-muted">No rooms found</h5>
+                                <p class="text-muted">
+                                    {% if selected_property %}
+                                        No rooms have been added to {{ selected_property.title }} yet.
+                                    {% else %}
+                                        No lodge rooms found in the system.
+                                    {% endif %}
+                                </p>
+                                <a href="{% url 'properties:add_lodge_room' %}" class="btn btn-primary">
+                                    <i class="fas fa-plus me-2"></i>Add First Room
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Accommodation Modal -->
+<div class="modal fade" id="addAccommodationModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Accommodation</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addAccommodationForm">
+                    <div class="mb-3">
+                        <label class="form-label">Accommodation Name *</label>
+                        <input type="text" class="form-control" required placeholder="e.g., Cabin 5, Tent Site F">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Accommodation Type *</label>
+                        <select class="form-control" required>
+                            <option value="">Select Type</option>
+                            <option value="cabin">Cabin</option>
+                            <option value="tent">Tent Site</option>
+                            <option value="chalet">Chalet</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Area *</label>
+                        <select class="form-control" required>
+                            <option value="">Select Area</option>
+                            <option value="mountain">Mountain View</option>
+                            <option value="riverside">Riverside</option>
+                            <option value="forest">Forest Edge</option>
+                            <option value="valley">Valley</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Capacity *</label>
+                        <input type="number" class="form-control" min="1" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Base Rate *</label>
+                        <input type="number" class="form-control" step="0.01" min="0" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" rows="3" placeholder="Describe the accommodation features..."></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Available Activities</label>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="hiking">
+                                    <label class="form-check-label" for="hiking">Hiking</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="camping">
+                                    <label class="form-check-label" for="camping">Camping</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="bird_watching">
+                                    <label class="form-check-label" for="bird_watching">Bird Watching</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="nature_photography">
+                                    <label class="form-check-label" for="nature_photography">Nature Photography</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary">Add Accommodation</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.accommodation-card {
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.accommodation-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.accommodation-card.available {
+    border-color: #28a745;
+}
+
+.accommodation-card.occupied {
+    border-color: #ffc107;
+}
+
+.accommodation-card.maintenance {
+    border-color: #dc3545;
+}
+
+.accommodation-card.out-of-order {
+    border-color: #6c757d;
+}
+
+.accommodation-card.selected {
+    border-color: #007bff;
+    background-color: #f8f9fa;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    console.log('Lodge Accommodations page initialized');
+    
+    // Room card click handler
+    $('.accommodation-card').on('click', function() {
+        $('.accommodation-card').removeClass('selected');
+        $(this).addClass('selected');
+        
+        const roomNumber = $(this).data('accommodation');
+        const status = $(this).data('status');
+        const type = $(this).data('type');
+        const roomId = $(this).data('room-id');
+        
+        console.log(`Room ${roomNumber} clicked - Status: ${status}, Type: ${type}, ID: ${roomId}`);
+        
+        // Show room details modal or perform action
+        showRoomDetails(roomNumber, status, type, roomId);
+    });
+    
+    // Filter functionality
+    $('#areaFilter, #accommodationTypeFilter, #statusFilter').on('change', function() {
+        filterAccommodations();
+    });
+    
+    function filterAccommodations() {
+        const areaFilter = $('#areaFilter').val();
+        const accommodationTypeFilter = $('#accommodationTypeFilter').val();
+        const statusFilter = $('#statusFilter').val();
+        
+        $('.accommodation-card').each(function() {
+            let showCard = true;
+            const card = $(this);
+            const accommodationName = card.data('accommodation');
+            const status = card.data('status');
+            const type = card.data('type');
+            const area = card.closest('.col-12').find('h5').text().toLowerCase();
+            
+            // Area filter
+            if (areaFilter && !area.includes(areaFilter)) {
+                showCard = false;
+            }
+            
+            // Accommodation type filter
+            if (accommodationTypeFilter && type !== accommodationTypeFilter) {
+                showCard = false;
+            }
+            
+            // Status filter
+            if (statusFilter && status !== statusFilter) {
+                showCard = false;
+            }
+            
+            card.parent().toggle(showCard);
+        });
+    }
+    
+    // Clear filters
+    window.clearFilters = function() {
+        $('#areaFilter, #accommodationTypeFilter, #statusFilter').val('');
+        $('.accommodation-card').parent().show();
+        $('.accommodation-card').removeClass('selected');
+    };
+    
+    // Show room details
+    function showRoomDetails(roomNumber, status, type, roomId) {
+        // This would typically open a modal with room details
+        console.log(`Showing details for Room ${roomNumber} with status ${status} and type ${type}`);
+        
+        // For now, just show an alert with room information
+        alert(`Room ${roomNumber}\nType: ${type}\nStatus: ${status}\nRoom ID: ${roomId}\n\nClick "OK" to view full details or perform actions.`);
+    }
+    
+    // Auto-refresh every 30 seconds
+    setInterval(function() {
+        console.log('Refreshing lodge accommodation data...');
+    }, 30000);
+});
+</script>
+{% endblock %}

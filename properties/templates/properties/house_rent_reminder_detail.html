@@ -1,0 +1,358 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}Reminder Details{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1"><i class="fas fa-info-circle text-primary me-2"></i>Reminder Details</h2>
+            <p class="text-muted mb-0">View detailed information about this rent reminder.</p>
+        </div>
+        <div>
+            <a href="{% url 'properties:house_rent_reminders_list' %}" class="btn btn-outline-secondary me-2">
+                <i class="fas fa-arrow-left me-2"></i>Back to List
+            </a>
+            {% if reminder.reminder_status == 'scheduled' %}
+            <button class="btn btn-warning me-2" onclick="cancelReminder()">
+                <i class="fas fa-ban me-2"></i>Cancel Reminder
+            </button>
+            {% endif %}
+            {% if reminder.reminder_status == 'failed' %}
+            <button class="btn btn-primary" onclick="retryReminder()">
+                <i class="fas fa-redo me-2"></i>Retry Reminder
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Main Details -->
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Reminder Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="text-muted">Property</h6>
+                            <p class="mb-3">
+                                <a href="{% url 'properties:property_detail' reminder.property_obj.id %}">
+                                    {{ reminder.property_obj.title }}
+                                </a>
+                            </p>
+                            
+                            <h6 class="text-muted">Tenant</h6>
+                            <p class="mb-3">{{ reminder.customer.full_name }}</p>
+                            
+                            <h6 class="text-muted">Reminder Type</h6>
+                            <p class="mb-3">
+                                <span class="badge bg-secondary">
+                                    <i class="fas fa-{{ reminder.reminder_type|default:'envelope' }} me-1"></i>
+                                    {{ reminder.get_reminder_type_display }}
+                                </span>
+                            </p>
+                            
+                            <h6 class="text-muted">Status</h6>
+                            <p class="mb-3">
+                                {% if reminder.reminder_status == 'sent' %}
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-check me-1"></i>Sent
+                                    </span>
+                                {% elif reminder.reminder_status == 'scheduled' %}
+                                    <span class="badge bg-warning">
+                                        <i class="fas fa-clock me-1"></i>Scheduled
+                                    </span>
+                                {% elif reminder.reminder_status == 'failed' %}
+                                    <span class="badge bg-danger">
+                                        <i class="fas fa-times me-1"></i>Failed
+                                    </span>
+                                {% elif reminder.reminder_status == 'cancelled' %}
+                                    <span class="badge bg-secondary">
+                                        <i class="fas fa-ban me-1"></i>Cancelled
+                                    </span>
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-muted">Scheduled Date</h6>
+                            <p class="mb-3">{{ reminder.scheduled_date|date:"M d, Y H:i" }}</p>
+                            
+                            <h6 class="text-muted">Due Date</h6>
+                            <p class="mb-3">
+                                <span class="{% if reminder.is_overdue %}text-danger{% else %}text-success{% endif %}">
+                                    {{ reminder.due_date|date:"M d, Y" }}
+                                </span>
+                            </p>
+                            
+                            <h6 class="text-muted">Days Before Due</h6>
+                            <p class="mb-3">{{ reminder.days_before_due }}</p>
+                            
+                            <h6 class="text-muted">Sequence</h6>
+                            <p class="mb-3">
+                                <span class="badge bg-info">#{{ reminder.reminder_sequence }}</span>
+                            </p>
+                            
+                            {% if reminder.is_overdue %}
+                            <h6 class="text-muted">Days Overdue</h6>
+                            <p class="mb-3 text-danger">{{ reminder.days_overdue }} days</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Message Content -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Message Content</h5>
+                </div>
+                <div class="card-body">
+                    <h6 class="text-muted">Subject</h6>
+                    <p class="mb-3">{{ reminder.subject }}</p>
+                    
+                    <h6 class="text-muted">Message</h6>
+                    <div class="border p-3 bg-light">
+                        {{ reminder.message_content|linebreaks }}
+                    </div>
+                    
+                    {% if reminder.custom_message %}
+                    <h6 class="text-muted mt-3">Custom Message</h6>
+                    <div class="border p-3 bg-light">
+                        {{ reminder.custom_message|linebreaks }}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Delivery Information -->
+            {% if reminder.reminder_status == 'sent' %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Delivery Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="text-muted">Sent Date</h6>
+                            <p class="mb-3">{{ reminder.sent_date|date:"M d, Y H:i" }}</p>
+                            
+                            <h6 class="text-muted">Delivery Status</h6>
+                            <p class="mb-3">
+                                <span class="badge bg-success">{{ reminder.delivery_status|default:"Delivered" }}</span>
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            {% if reminder.delivery_reference %}
+                            <h6 class="text-muted">Delivery Reference</h6>
+                            <p class="mb-3">{{ reminder.delivery_reference }}</p>
+                            {% endif %}
+                            
+                            {% if reminder.delivery_error %}
+                            <h6 class="text-muted">Error Message</h6>
+                            <p class="mb-3 text-danger">{{ reminder.delivery_error }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Tenant Response -->
+            {% if reminder.tenant_response %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Tenant Response</h5>
+                </div>
+                <div class="card-body">
+                    <p>{{ reminder.tenant_response|linebreaks }}</p>
+                    {% if reminder.response_date %}
+                    <small class="text-muted">Response received: {{ reminder.response_date|date:"M d, Y H:i" }}</small>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-md-4">
+            <!-- Quick Actions -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'properties:property_detail' reminder.property_obj.id %}" 
+                           class="btn btn-outline-primary">
+                            <i class="fas fa-building me-2"></i>View Property
+                        </a>
+                        <a href="{% url 'properties:house_bookings' %}?property_id={{ reminder.property_obj.id }}" 
+                           class="btn btn-outline-info">
+                            <i class="fas fa-calendar me-2"></i>View Bookings
+                        </a>
+                        <button class="btn btn-outline-success" onclick="markAsPaid()">
+                            <i class="fas fa-check me-2"></i>Mark as Paid
+                        </button>
+                        <button class="btn btn-outline-warning" onclick="sendFollowUp()">
+                            <i class="fas fa-paper-plane me-2"></i>Send Follow-up
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Related Information -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Related Information</h5>
+                </div>
+                <div class="card-body">
+                    <h6 class="text-muted">Booking Details</h6>
+                    <p class="mb-3">
+                        <strong>Check-in:</strong> {{ reminder.booking.check_in_date|date:"M d, Y" }}<br>
+                        <strong>Check-out:</strong> {{ reminder.booking.check_out_date|date:"M d, Y" }}<br>
+                        <strong>Total Amount:</strong> Tsh {{ reminder.booking.total_amount|floatformat:0 }}
+                    </p>
+                    
+                    <h6 class="text-muted">Customer Contact</h6>
+                    <p class="mb-3">
+                        <strong>Email:</strong> {{ reminder.customer.email }}<br>
+                        <strong>Phone:</strong> {{ reminder.customer.phone }}
+                    </p>
+                </div>
+            </div>
+
+            <!-- Activity Timeline -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Activity Timeline</h5>
+                </div>
+                <div class="card-body">
+                    <div class="timeline">
+                        <div class="timeline-item">
+                            <div class="timeline-marker bg-primary"></div>
+                            <div class="timeline-content">
+                                <h6 class="timeline-title">Reminder Created</h6>
+                                <p class="timeline-text">{{ reminder.created_at|date:"M d, Y H:i" }}</p>
+                            </div>
+                        </div>
+                        
+                        {% if reminder.scheduled_date %}
+                        <div class="timeline-item">
+                            <div class="timeline-marker bg-warning"></div>
+                            <div class="timeline-content">
+                                <h6 class="timeline-title">Scheduled</h6>
+                                <p class="timeline-text">{{ reminder.scheduled_date|date:"M d, Y H:i" }}</p>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if reminder.sent_date %}
+                        <div class="timeline-item">
+                            <div class="timeline-marker bg-success"></div>
+                            <div class="timeline-content">
+                                <h6 class="timeline-title">Sent</h6>
+                                <p class="timeline-text">{{ reminder.sent_date|date:"M d, Y H:i" }}</p>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if reminder.response_date %}
+                        <div class="timeline-item">
+                            <div class="timeline-marker bg-info"></div>
+                            <div class="timeline-content">
+                                <h6 class="timeline-title">Response Received</h6>
+                                <p class="timeline-text">{{ reminder.response_date|date:"M d, Y H:i" }}</p>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.timeline {
+    position: relative;
+    padding-left: 30px;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.timeline-marker {
+    position: absolute;
+    left: -35px;
+    top: 5px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.timeline-content {
+    padding-left: 15px;
+}
+
+.timeline-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+.timeline-text {
+    font-size: 12px;
+    color: #6c757d;
+    margin: 0;
+}
+</style>
+
+<script>
+function cancelReminder() {
+    if (confirm('Are you sure you want to cancel this reminder?')) {
+        fetch('{% url "properties:cancel_reminder" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({reminder_id: {{ reminder.id }}})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        });
+    }
+}
+
+function retryReminder() {
+    if (confirm('Are you sure you want to retry this reminder?')) {
+        // Implementation for retry functionality
+        alert('Retry functionality will be implemented');
+    }
+}
+
+function markAsPaid() {
+    if (confirm('Mark this rent as paid?')) {
+        // Implementation for marking as paid
+        alert('Mark as paid functionality will be implemented');
+    }
+}
+
+function sendFollowUp() {
+    if (confirm('Send a follow-up reminder?')) {
+        // Implementation for follow-up
+        alert('Follow-up functionality will be implemented');
+    }
+}
+</script>
+{% endblock %}

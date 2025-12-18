@@ -1,0 +1,60 @@
+{% load static %}
+{% load currency_filters %}
+{% load humanize %}
+
+{% for property in properties %}
+<tr data-item-id="{{ property.id }}">
+  <td>
+    <div class="d-flex align-items-center">
+      {% with primary_image=property.get_primary_image %}
+        {% if primary_image %}
+          <img src="{{ primary_image.image.url }}" 
+               alt="{{ property.title }}" 
+               class="rounded me-3" 
+               style="width: 50px; height: 50px; object-fit: cover;">
+        {% else %}
+          <img src="{% static 'img/generic/4.png' %}" 
+               alt="{{ property.title }}" 
+               class="rounded me-3"
+               style="width: 50px; height: 50px; object-fit: cover;">
+        {% endif %}
+      {% endwith %}
+      <div>
+        <h6 class="mb-0">{{ property.title }}</h6>
+        <small class="text-600">{{ property.address|truncatechars:30 }}</small>
+      </div>
+    </div>
+  </td>
+  <td>
+    <span class="badge bg-primary-subtle text-primary">{{ property.property_type.name }}</span>
+  </td>
+  <td class="text-600">{{ property.address|truncatechars:30 }}</td>
+  <td class="fw-bold">Tsh {{ property.rent_amount|floatformat:0|intcomma }}</td>
+  <td>
+    <span class="badge {% if property.status == 'available' %}bg-success-subtle text-success{% else %}bg-warning-subtle text-warning{% endif %}">
+      {{ property.get_status_display|default:property.status|title }}
+    </span>
+  </td>
+  <td>
+    {% include 'components/dropdown_actions.html' with 
+       view_url=property.get_absolute_url|default:"#"
+       edit_url="/properties/edit/"|add:property.id|add:"/"
+       toggle_status_url="/api/v1/properties/"|add:property.id|add:"/toggle-status/"
+       delete_url="/api/v1/properties/"|add:property.id|add:"/delete/"
+       item_id=property.id 
+       item_name="property"
+       is_active=property.is_active %}
+  </td>
+</tr>
+{% empty %}
+<tr>
+  <td colspan="6" class="text-center text-600 py-5">
+    <div class="py-4">
+      <i class="fas fa-home fs-1 text-300 mb-3"></i>
+      <h5>No properties found</h5>
+      <p class="text-600">No properties match your search criteria.</p>
+    </div>
+  </td>
+</tr>
+{% endfor %}
+

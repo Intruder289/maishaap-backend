@@ -1,0 +1,216 @@
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-info-circle me-2"></i>Booking Information
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-sm-4"><strong>Reference:</strong></div>
+                    <div class="col-sm-8">{{ booking.booking_reference }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-sm-4"><strong>Status:</strong></div>
+                    <div class="col-sm-8">
+                        {% if booking.booking_status == 'confirmed' %}
+                            <span class="badge bg-success">Confirmed</span>
+                        {% elif booking.booking_status == 'checked_in' %}
+                            <span class="badge bg-primary">Checked In</span>
+                        {% elif booking.booking_status == 'checked_out' %}
+                            <span class="badge bg-info">Checked Out</span>
+                        {% elif booking.booking_status == 'pending' %}
+                            <span class="badge bg-warning">Pending</span>
+                        {% elif booking.booking_status == 'cancelled' %}
+                            <span class="badge bg-danger">Cancelled</span>
+                        {% else %}
+                            <span class="badge bg-secondary">{{ booking.booking_status|title }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-sm-4"><strong>Created:</strong></div>
+                    <div class="col-sm-8">{{ booking.created_at|date:"M d, Y H:i" }}</div>
+                </div>
+                {% if booking.confirmed_at %}
+                <div class="row mb-3">
+                    <div class="col-sm-4"><strong>Confirmed:</strong></div>
+                    <div class="col-sm-8">{{ booking.confirmed_at|date:"M d, Y H:i" }}</div>
+                </div>
+                {% endif %}
+                {% if booking.checked_in_at %}
+                <div class="row mb-3">
+                    <div class="col-sm-4"><strong>Checked In:</strong></div>
+                    <div class="col-sm-8">{{ booking.checked_in_at|date:"M d, Y H:i" }}</div>
+                </div>
+                {% endif %}
+                {% if booking.checked_out_at %}
+                <div class="row mb-3">
+                    <div class="col-sm-4"><strong>Checked Out:</strong></div>
+                    <div class="col-sm-8">{{ booking.checked_out_at|date:"M d, Y H:i" }}</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-calendar me-2"></i>Rental Period
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-sm-4"><strong>Check-in:</strong></div>
+                    <div class="col-sm-8">{{ booking.check_in_date|date:"M d, Y" }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-sm-4"><strong>Check-out:</strong></div>
+                    <div class="col-sm-8">{{ booking.check_out_date|date:"M d, Y" }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-sm-4"><strong>Duration:</strong></div>
+                    <div class="col-sm-8">{{ booking.duration_months }} month{{ booking.duration_months|pluralize }} ({{ booking.duration_days }} days)</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-sm-4"><strong>Guests:</strong></div>
+                    <div class="col-sm-8">{{ booking.number_of_guests }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-3">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-user me-2"></i>Customer Information
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-sm-4"><strong>Name:</strong></div>
+                    <div class="col-sm-8">{{ booking.customer.full_name }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-sm-4"><strong>Email:</strong></div>
+                    <div class="col-sm-8">{{ booking.customer.email }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-sm-4"><strong>Phone:</strong></div>
+                    <div class="col-sm-8">{{ booking.customer.phone }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-home me-2"></i>Property Information
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-sm-4"><strong>Property:</strong></div>
+                    <div class="col-sm-8">{{ booking.property_obj.title }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-sm-4"><strong>Address:</strong></div>
+                    <div class="col-sm-8">{{ booking.property_obj.address }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-sm-4"><strong>Type:</strong></div>
+                    <div class="col-sm-8">{{ booking.property_obj.property_type.name }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-3">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-dollar-sign me-2"></i>Financial Details
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-sm-4"><strong>Monthly Rate:</strong></div>
+                    <div class="col-sm-8">Tsh {{ booking.monthly_rate|floatformat:0 }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-sm-4"><strong>Duration:</strong></div>
+                    <div class="col-sm-8">{{ booking.duration_months }} month{{ booking.duration_months|pluralize }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-sm-4"><strong>Calculation:</strong></div>
+                    <div class="col-sm-8">{{ booking.monthly_rate|floatformat:0 }} × {{ booking.duration_months }} = Tsh {{ booking.calculated_total_amount|floatformat:0 }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-sm-4"><strong>Total Amount:</strong></div>
+                    <div class="col-sm-8">
+                        Tsh {{ booking.total_amount|floatformat:0 }}
+                        {% if booking.total_amount != booking.calculated_total_amount %}
+                            <span class="badge bg-warning ms-2">Needs Update</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-sm-4"><strong>Paid Amount:</strong></div>
+                    <div class="col-sm-8">Tsh {{ booking.paid_amount|floatformat:0 }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-sm-4"><strong>Balance:</strong></div>
+                    <div class="col-sm-8">Tsh {{ booking.remaining_amount|floatformat:0 }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-sm-4"><strong>Payment Status:</strong></div>
+                    <div class="col-sm-8">
+                        {% if booking.payment_status == 'paid' %}
+                            <span class="badge bg-success">Paid</span>
+                        {% elif booking.payment_status == 'partial' %}
+                            <span class="badge bg-warning">Partial</span>
+                        {% elif booking.payment_status == 'overdue' %}
+                            <span class="badge bg-danger">Overdue</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Pending</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% if booking.total_amount != booking.calculated_total_amount %}
+                <div class="alert alert-warning mt-3">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Amount Mismatch:</strong> The stored total amount (Tsh {{ booking.total_amount|floatformat:0 }}) doesn't match the calculated amount (Tsh {{ booking.calculated_total_amount|floatformat:0 }}). 
+                    <button class="btn btn-sm btn-warning ms-2" onclick="updateBookingTotal({{ booking.id }})">Update Total</button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-sticky-note me-2"></i>Special Requests
+                </h6>
+            </div>
+            <div class="card-body">
+                {% if booking.special_requests %}
+                    <p>{{ booking.special_requests|linebreaks }}</p>
+                {% else %}
+                    <p class="text-muted">No special requests</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,213 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}Register Property Owner - Maisha{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="row mb-4">
+    <div class="col">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+          <li class="breadcrumb-item"><a href="{% url 'accounts:dashboard' %}">Dashboard</a></li>
+          <li class="breadcrumb-item"><a href="{% url 'accounts:owner_list' %}">Property Owners</a></li>
+          <li class="breadcrumb-item active">Register Owner</li>
+        </ol>
+      </nav>
+      <h2 class="mb-0">
+        <i class="fas fa-user-plus me-2"></i>Register New Property Owner
+      </h2>
+      <p class="text-muted">Create a new property owner account. The owner will be automatically approved and activated.</p>
+    </div>
+  </div>
+
+  <!-- Display Messages -->
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        <i class="fas fa-{% if message.tags == 'error' %}exclamation-circle{% elif message.tags == 'success' %}check-circle{% else %}info-circle{% endif %} me-2"></i>
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <div class="row">
+    <div class="col-lg-8 col-xl-6">
+      <div class="card">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0">
+            <i class="fas fa-user-tie me-2"></i>Owner Information
+          </h5>
+        </div>
+        <div class="card-body">
+          <form method="post" id="registerOwnerForm">
+            {% csrf_token %}
+            
+            <!-- Basic Information -->
+            <div class="mb-4">
+              <h6 class="text-primary mb-3">
+                <i class="fas fa-user me-2"></i>Basic Information
+              </h6>
+              
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label for="username" class="form-label">Username <span class="text-danger">*</span></label>
+                  <input type="text" 
+                         class="form-control" 
+                         id="username" 
+                         name="username" 
+                         required
+                         placeholder="Enter username">
+                  <small class="form-text text-muted">Unique username for login</small>
+                </div>
+                
+                <div class="col-md-6">
+                  <label for="email" class="form-label">Email <span class="text-danger">*</span></label>
+                  <input type="email" 
+                         class="form-control" 
+                         id="email" 
+                         name="email" 
+                         required
+                         placeholder="owner@example.com">
+                  <small class="form-text text-muted">Valid email address</small>
+                </div>
+                
+                <div class="col-md-6">
+                  <label for="first_name" class="form-label">First Name</label>
+                  <input type="text" 
+                         class="form-control" 
+                         id="first_name" 
+                         name="first_name"
+                         placeholder="Enter first name">
+                </div>
+                
+                <div class="col-md-6">
+                  <label for="last_name" class="form-label">Last Name</label>
+                  <input type="text" 
+                         class="form-control" 
+                         id="last_name" 
+                         name="last_name"
+                         placeholder="Enter last name">
+                </div>
+                
+                <div class="col-md-12">
+                  <label for="phone" class="form-label">Phone Number</label>
+                  <input type="tel" 
+                         class="form-control" 
+                         id="phone" 
+                         name="phone"
+                         placeholder="+255 712 345 678">
+                  <small class="form-text text-muted">Optional contact number</small>
+                </div>
+              </div>
+            </div>
+
+            <!-- Password Section -->
+            <div class="mb-4">
+              <h6 class="text-primary mb-3">
+                <i class="fas fa-lock me-2"></i>Password
+              </h6>
+              
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label for="password" class="form-label">Password <span class="text-danger">*</span></label>
+                  <input type="password" 
+                         class="form-control" 
+                         id="password" 
+                         name="password" 
+                         required
+                         placeholder="Enter password"
+                         minlength="8">
+                  <small class="form-text text-muted">Minimum 8 characters</small>
+                </div>
+                
+                <div class="col-md-6">
+                  <label for="confirm_password" class="form-label">Confirm Password <span class="text-danger">*</span></label>
+                  <input type="password" 
+                         class="form-control" 
+                         id="confirm_password" 
+                         name="confirm_password" 
+                         required
+                         placeholder="Confirm password"
+                         minlength="8">
+                  <small class="form-text text-muted" id="password-match-text"></small>
+                </div>
+              </div>
+            </div>
+
+            <!-- Info Box -->
+            <div class="alert alert-info mb-4">
+              <i class="fas fa-info-circle me-2"></i>
+              <strong>Note:</strong> The owner will be automatically:
+              <ul class="mb-0 mt-2">
+                <li>Approved and activated</li>
+                <li>Assigned the "Property Owner" role</li>
+                <li>Given access to manage their properties</li>
+              </ul>
+            </div>
+
+            <!-- Submit Buttons -->
+            <div class="d-flex justify-content-between">
+              <a href="{% url 'accounts:owner_list' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-times me-2"></i>Cancel
+              </a>
+              
+              <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save me-2"></i>Register Owner
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Password confirmation validation
+document.getElementById('confirm_password').addEventListener('input', function() {
+  const password = document.getElementById('password').value;
+  const confirmPassword = this.value;
+  const matchText = document.getElementById('password-match-text');
+  
+  if (password && confirmPassword) {
+    if (password !== confirmPassword) {
+      this.classList.add('is-invalid');
+      this.classList.remove('is-valid');
+      matchText.textContent = 'Passwords do not match';
+      matchText.classList.add('text-danger');
+      matchText.classList.remove('text-success');
+    } else {
+      this.classList.remove('is-invalid');
+      this.classList.add('is-valid');
+      matchText.textContent = 'Passwords match';
+      matchText.classList.remove('text-danger');
+      matchText.classList.add('text-success');
+    }
+  } else {
+    this.classList.remove('is-invalid', 'is-valid');
+    matchText.textContent = '';
+  }
+});
+
+// Form validation
+document.getElementById('registerOwnerForm').addEventListener('submit', function(e) {
+  const password = document.getElementById('password').value;
+  const confirmPassword = document.getElementById('confirm_password').value;
+  
+  if (password !== confirmPassword) {
+    e.preventDefault();
+    alert('Passwords do not match. Please correct and try again.');
+    return false;
+  }
+  
+  if (password.length < 8) {
+    e.preventDefault();
+    alert('Password must be at least 8 characters long.');
+    return false;
+  }
+});
+</script>
+{% endblock %}
+

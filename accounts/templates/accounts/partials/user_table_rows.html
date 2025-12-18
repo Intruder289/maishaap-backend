@@ -1,0 +1,72 @@
+{% for user in users %}
+<tr data-item-id="{{ user.id }}">
+  <td>
+    <div class="d-flex align-items-center">
+      {% if user.profile_photo %}
+      <img src="{{ user.profile_photo.url }}" alt="{{ user.get_username }}" class="rounded-circle me-3" width="40" height="40">
+      {% else %}
+      <div class="bg-200 rounded-circle me-3 d-flex align-items-center justify-content-center">
+        <span class="fas fa-user text-600"></span>
+      </div>
+      {% endif %}
+      <div>
+        <h6 class="mb-0">{{ user.get_full_name|default:user.get_username }}</h6>
+        <small class="text-600">@{{ user.get_username }}</small>
+      </div>
+    </div>
+  </td>
+  <td>
+    <span class="text-600">{{ user.email }}</span>
+  </td>
+  <td>
+    {% if user.is_superuser %}
+    <span class="badge bg-danger-subtle text-danger">Super Admin</span>
+    {% elif user.is_staff %}
+    <span class="badge bg-warning-subtle text-warning">Staff</span>
+    {% else %}
+    <span class="badge bg-primary-subtle text-primary">User</span>
+    {% endif %}
+  </td>
+  <td>
+    <span class="badge badge {% if user.is_active %}bg-success-subtle text-success{% else %}bg-danger-subtle text-danger{% endif %}">
+      {% if user.is_active %}
+        <span class="fas fa-check-circle me-1"></span>
+        Active
+      {% else %}
+        <span class="fas fa-times-circle me-1"></span>
+        Inactive
+      {% endif %}
+    </span>
+  </td>
+  <td>
+    {% if user.last_login %}
+    <span class="text-600">{{ user.last_login|date:"M j, Y" }}</span>
+    <br>
+    <small class="text-500">{{ user.last_login|date:"g:i A" }}</small>
+    {% else %}
+    <span class="text-500">Never</span>
+    {% endif %}
+  </td>
+  <td>
+    {% include 'components/dropdown_actions.html' with 
+       view_url="/users/"|add:user.id|add:"/"
+       edit_url="/users/edit/"|add:user.id|add:"/"
+       toggle_status_url="/api/v1/users/"|add:user.id|add:"/toggle-status/"
+       delete_url="/api/v1/users/"|add:user.id|add:"/delete/"
+       item_id=user.id 
+       item_name="user"
+       is_active=user.is_active %}
+  </td>
+</tr>
+{% empty %}
+<tr>
+  <td colspan="6" class="text-center py-4">
+    <div class="text-600">
+      <span class="fas fa-users fs-3 mb-3 d-block"></span>
+      <p class="mb-0">No users found</p>
+      <small>No users match your search criteria</small>
+    </div>
+  </td>
+</tr>
+{% endfor %}
+

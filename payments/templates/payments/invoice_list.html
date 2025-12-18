@@ -1,0 +1,264 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+{% load humanize %}
+{% load currency_filters %}
+
+{% block title %}Invoice Management - Maisha{% endblock %}
+
+{% block page_title %}Invoice Management{% endblock %}
+
+{% block page_actions %}
+<button class="btn btn-primary" type="button">
+  <span class="fas fa-plus me-2"></span>
+  Create Invoice
+</button>
+{% endblock %}
+
+{% block content %}
+<!-- Invoice Summary Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between">
+          <div>
+            <h6 class="mb-2 text-500">Total Invoices</h6>
+            <h4 class="mb-0">{{ invoices|length|default:0 }}</h4>
+            <p class="fs--1 mb-0 text-success">
+              <span class="me-1 fas fa-caret-up"></span>
+              +18% this month
+            </p>
+          </div>
+          <div class="d-flex align-items-center">
+            <div class="avatar avatar-lg">
+              <div class="avatar-name rounded-circle bg-primary-subtle text-primary">
+                <span data-feather="file-text"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-6 col-lg-3">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between">
+          <div>
+            <h6 class="mb-2 text-500">Paid Invoices</h6>
+            <h4 class="mb-0">{{ paid_invoices|default:0 }}</h4>
+            <p class="fs--1 mb-0 text-success">
+              <span class="me-1 fas fa-check-circle"></span>
+              85% payment rate
+            </p>
+          </div>
+          <div class="d-flex align-items-center">
+            <div class="avatar avatar-lg">
+              <div class="avatar-name rounded-circle bg-success-subtle text-success">
+                <span data-feather="check-circle"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-6 col-lg-3">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between">
+          <div>
+            <h6 class="mb-2 text-500">Unpaid Invoices</h6>
+            <h4 class="mb-0">{{ unpaid_invoices|default:0 }}</h4>
+            <p class="fs--1 mb-0 text-warning">
+              <span class="me-1 fas fa-exclamation-triangle"></span>
+              Requires follow-up
+            </p>
+          </div>
+          <div class="d-flex align-items-center">
+            <div class="avatar avatar-lg">
+              <div class="avatar-name rounded-circle bg-warning-subtle text-warning">
+                <span data-feather="clock"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-6 col-lg-3">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between">
+          <div>
+            <h6 class="mb-2 text-500">Outstanding Amount</h6>
+            <h4 class="mb-0">{{ outstanding_amount|currency_tzs }}</h4>
+            <p class="fs--1 mb-0 text-info">
+              <span class="me-1 fas fa-dollar-sign"></span>
+              Collection pending
+            </p>
+          </div>
+          <div class="d-flex align-items-center">
+            <div class="avatar avatar-lg">
+              <div class="avatar-name rounded-circle bg-info-subtle text-info">
+                <span data-feather="dollar-sign"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Invoices Table -->
+{% include 'components/table_components.html' with table_id='invoice-table' search_placeholder='Search invoices...' %}
+
+{% block table_header %}
+<thead class="bg-200">
+  <tr>
+    <th class="border-0">Invoice ID</th>
+    <th class="border-0">Tenant</th>
+    <th class="border-0">Amount</th>
+    <th class="border-0">Due Date</th>
+    <th class="border-0">Days Remaining</th>
+    <th class="border-0">Status</th>
+    <th class="border-0">Property</th>
+    <th class="border-0">Actions</th>
+  </tr>
+</thead>
+{% endblock %}
+
+{% block table_rows %}
+<tbody>
+  {% for invoice in invoices %}
+  <tr>
+    <td>
+      <div class="d-flex align-items-center">
+        <div class="avatar avatar-sm me-3">
+          <div class="avatar-name rounded-circle bg-primary-subtle text-primary">
+            <span class="fw-bold">#{{ invoice.id }}</span>
+          </div>
+        </div>
+        <div>
+          <h6 class="mb-0">Invoice #{{ invoice.id }}</h6>
+          <small class="text-600">{{ invoice.created_at|date:"M j, Y" }}</small>
+        </div>
+      </div>
+    </td>
+    <td>
+      <div class="d-flex align-items-center">
+        {% if invoice.tenant.profile_photo %}
+        <img src="{{ invoice.tenant.profile_photo.url }}" alt="{{ invoice.tenant.get_username }}" class="rounded-circle me-2" width="32" height="32">
+        {% else %}
+        <div class="bg-200 rounded-circle me-2 d-flex align-items-center justify-content-center">
+          <span class="fas fa-user text-600"></span>
+        </div>
+        {% endif %}
+        <div>
+          <h6 class="mb-0">{{ invoice.tenant.get_full_name|default:invoice.tenant.username }}</h6>
+          <small class="text-600">{{ invoice.tenant.email|default:"No email" }}</small>
+        </div>
+      </div>
+    </td>
+    <td>
+      <span class="fw-bold text-success">{{ invoice.amount|currency_tzs }}</span>
+    </td>
+    <td>
+      <span class="text-600">{{ invoice.due_date|date:"M j, Y" }}</span>
+    </td>
+    <td>
+      {% now "Y-m-d" as today %}
+      {% with days_diff=invoice.due_date|timeuntil %}
+        {% if invoice.due_date < today|date:"Y-m-d"|date %}
+          <span class="badge bg-danger-subtle text-danger">
+            <span class="fas fa-exclamation-triangle me-1"></span>
+            {{ invoice.due_date|timesince }} overdue
+          </span>
+        {% elif days_diff == "0 days" %}
+          <span class="badge bg-warning-subtle text-warning">
+            <span class="fas fa-clock me-1"></span>
+            Due today
+          </span>
+        {% else %}
+          <span class="badge bg-success-subtle text-success">
+            <span class="fas fa-calendar-check me-1"></span>
+            {{ days_diff }}
+          </span>
+        {% endif %}
+      {% endwith %}
+    </td>
+    <td>
+      {% now "Y-m-d" as today %}
+      {% if invoice.status == 'paid' %}
+      <span class="badge bg-success-subtle text-success">
+        <span class="fas fa-check-circle me-1"></span>
+        Paid
+      </span>
+      {% elif invoice.status == 'cancelled' %}
+      <span class="badge bg-secondary-subtle text-secondary">
+        <span class="fas fa-ban me-1"></span>
+        Cancelled
+      </span>
+      {% elif invoice.due_date < today|date:"Y-m-d"|date %}
+      <span class="badge bg-danger-subtle text-danger">
+        <span class="fas fa-exclamation-triangle me-1"></span>
+        Overdue
+      </span>
+      {% else %}
+      <span class="badge bg-warning-subtle text-warning">
+        <span class="fas fa-clock me-1"></span>
+        Unpaid
+      </span>
+      {% endif %}
+    </td>
+    <td>
+      <span class="text-600">
+        {% if invoice.lease_id %}
+          Lease #{{ invoice.lease_id }}
+        {% elif invoice.booking_id %}
+          Booking #{{ invoice.booking_id }}
+        {% else %}
+          Direct Invoice
+        {% endif %}
+      </span>
+    </td>
+    <td>
+      {% include 'components/dropdown_actions.html' with 
+         view_url="/payments/invoices/"|add:invoice.id|add:"/"
+         edit_url="/payments/invoices/"|add:invoice.id|add:"/edit/"
+         delete_url="/payments/invoices/"|add:invoice.id|add:"/delete/"
+         item_id=invoice.id 
+         item_name="Invoice #"|add:invoice.id|stringformat:"s" %}
+    </td>
+  </tr>
+  {% empty %}
+  <tr>
+    <td colspan="8" class="text-center py-4">
+      <div class="text-600">
+        <span class="fas fa-file-invoice-dollar fs-3 mb-3 d-block"></span>
+        <p class="mb-0">No invoices found</p>
+        <small>Invoice records will appear here</small>
+      </div>
+    </td>
+  </tr>
+  {% endfor %}
+</tbody>
+{% endblock %}
+
+{% block table_empty_message %}
+<tr>
+  <td colspan="8" class="text-center py-4">
+    <div class="text-600">
+      <span class="fas fa-file-invoice-dollar fs-3 mb-3 d-block"></span>
+      <p class="mb-0">No invoices found</p>
+      <small>Invoice records will appear here</small>
+    </div>
+  </td>
+</tr>
+{% endblock %}
+
+{% endblock %}

@@ -1,0 +1,1371 @@
+{% extends "accounts/base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Roles & Permissions - Maisha{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item active">Roles & Permissions</li>
+{% endblock %}
+
+{% block content %}
+<!-- ============================================-->
+<!--                Page Header-->
+<!-- ============================================-->
+<div class="row">
+  <div class="col-12">
+    <div class="mb-9">
+      <h2 class="mb-2">Roles & Permissions</h2>
+      <p class="text-body-emphasis">Manage user roles and their permissions across the system</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================-->
+<!--                Stats Cards-->
+<!-- ============================================-->
+<div class="row g-3 mb-6">
+  <div class="col-6 col-lg-3">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between">
+          <div>
+            <h6 class="mb-2 text-500">Total Roles</h6>
+            <h4 class="mb-0" id="total-roles">{% if total_roles_count %}{{ total_roles_count }}{% else %}{{ roles|length }}{% endif %}</h4>
+            <p class="fs--1 mb-0 text-primary">
+              <span class="me-1" data-feather="shield"></span>
+              All roles
+            </p>
+          </div>
+          <div class="d-flex align-items-center">
+            <div class="avatar avatar-lg">
+              <div class="avatar-name rounded-circle bg-primary-subtle text-primary">
+                <span data-feather="shield"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+        
+  <div class="col-6 col-lg-3">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between">
+          <div>
+            <h6 class="mb-2 text-500">Active Roles</h6>
+            <h4 class="mb-0" id="active-roles">{% if total_roles_count %}{{ total_roles_count }}{% else %}{{ roles|length }}{% endif %}</h4>
+            <p class="fs--1 mb-0 text-success">
+              <span class="me-1" data-feather="check-circle"></span>
+              Active roles
+            </p>
+          </div>
+          <div class="d-flex align-items-center">
+            <div class="avatar avatar-lg">
+              <div class="avatar-name rounded-circle bg-success-subtle text-success">
+                <span data-feather="check-circle"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-lg-3">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between">
+          <div>
+            <h6 class="mb-2 text-500">Total Permissions</h6>
+            <h4 class="mb-0" id="total-permissions">{{ total_permissions }}</h4>
+            <p class="fs--1 mb-0 text-info">
+              <span class="me-1" data-feather="key"></span>
+              System permissions
+            </p>
+          </div>
+          <div class="d-flex align-items-center">
+            <div class="avatar avatar-lg">
+              <div class="avatar-name rounded-circle bg-info-subtle text-info">
+                <span data-feather="key"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-lg-3">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between">
+          <div>
+            <h6 class="mb-2 text-500">Navigation Items</h6>
+            <h4 class="mb-0" id="navigation-items">{{ navigation_items.count }}</h4>
+            <p class="fs--1 mb-0 text-warning">
+              <span class="me-1" data-feather="navigation"></span>
+              Menu items
+            </p>
+          </div>
+          <div class="d-flex align-items-center">
+            <div class="avatar avatar-lg">
+              <div class="avatar-name rounded-circle bg-warning-subtle text-warning">
+                <span data-feather="navigation"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================-->
+<!--                Roles Table-->
+<!-- ============================================-->
+<div class="card">
+  <div class="card-header">
+    <div class="row flex-between-center">
+      <div class="col">
+        <h6 class="mb-2">Roles & Permissions</h6>
+        <h5 class="mb-0">Manage system roles and their access permissions</h5>
+      </div>
+      <div class="col-auto">
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addRoleModal">
+          <span class="fas fa-plus me-2"></span>Add Role
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Search -->
+  <div class="card-body">
+    <form method="get" action="{% url 'accounts:role_list' %}">
+      {% if current_page_size and current_page_size != 5 %}
+      <input type="hidden" name="page_size" value="{{ current_page_size }}">
+      {% endif %}
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Search</label>
+          <div class="position-relative">
+            <input class="form-control pe-5" 
+                   type="search" 
+                   name="search"
+                   value="{{ search_query }}"
+                   placeholder="Search roles...">
+            <span class="position-absolute top-50 end-0 translate-middle-y me-3">
+              <i class="fas fa-search"></i>
+            </span>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Status</label>
+          <select class="form-select" id="statusFilter" name="status">
+            <option value="">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">&nbsp;</label>
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">
+              <i class="fas fa-search me-1"></i>Search
+            </button>
+            <a href="{% url 'accounts:role_list' %}" class="btn btn-outline-secondary">
+              <i class="fas fa-times me-1"></i>Clear
+            </a>
+            <button type="button" class="btn btn-outline-primary" onclick="exportRoles()">
+              <i class="fas fa-download me-1"></i>Export
+            </button>
+          </div>
+        </div>
+      </div>
+    </form>
+  </div>
+  
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0" id="roles-table">
+        <thead class="table-light">
+          <tr>
+            <th>Role</th>
+            <th>Description</th>
+            <th>Permissions</th>
+            <th>Users</th>
+            <th>Created</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="roles-table-body">
+          {% for role in roles %}
+          <tr data-role-id="{% if role.is_system %}{{ role.id }}{% else %}{{ role.id }}{% endif %}">
+            <td>
+              <div class="d-flex align-items-center">
+                <div class="avatar-sm {% if role.is_system %}bg-danger{% else %}bg-primary{% endif %} text-white rounded-circle d-flex align-items-center justify-content-center me-3 fw-bold">
+                  {{ role.name|first|upper }}
+                </div>
+                <div>
+                  <strong>{{ role.name }}</strong><br>
+                  <small class="text-muted">{% if role.is_system %}System Role{% else %}Custom Role{% endif %}</small>
+                </div>
+              </div>
+            </td>
+            <td>
+              <span class="text-muted">{{ role.description|truncatechars:50 }}</span>
+            </td>
+            <td>
+              <span class="badge bg-warning text-dark">
+                <i class="fas fa-shield-alt me-1"></i>
+                {{ role.permissions_count }} Permission{{ role.permissions_count|pluralize }}
+              </span>
+            </td>
+            <td>
+              <span class="badge bg-info">
+                <i class="fas fa-users me-1"></i>
+                {{ role.users_count }} User{{ role.users_count|pluralize }}
+              </span>
+            </td>
+            <td>
+              <div>
+                {% if role.created_at %}
+                  <strong>{{ role.created_at|date:"M j, Y" }}</strong><br>
+                  <small class="text-muted">{{ role.created_at|date:"g:i A" }}</small>
+                {% else %}
+                  <strong>System</strong><br>
+                  <small class="text-muted">Built-in</small>
+                {% endif %}
+              </div>
+            </td>
+            <td>
+              {% if role.is_system %}
+                <div class="dropdown">
+                  <button class="btn btn-link btn btn-primary-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="fas fa-ellipsis-h"></span>
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end">
+                    <li><span class="dropdown-item-text text-muted"><i class="fas fa-info-circle me-2"></i>System roles cannot be edited</span></li>
+                  </ul>
+                </div>
+              {% else %}
+                <div class="dropdown">
+                  <button class="btn btn-link btn btn-primary-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="fas fa-ellipsis-h"></span>
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" href="#" onclick="viewRole({{ role.id }}); return false;"><i class="fas fa-eye me-2 text-primary"></i>View Role</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="editRole({{ role.id }}); return false;"><i class="fas fa-edit me-2 text-warning"></i>Edit Role</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="managePermissions({{ role.id }}); return false;"><i class="fas fa-shield-alt me-2 text-info"></i>Manage Permissions</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                      <a class="dropdown-item text-danger delete-action" 
+                         href="#" 
+                         data-url="{% url 'accounts_ajax:api_role_delete' role.id %}"
+                         data-item-id="{{ role.id }}"
+                         data-item-name="role">
+                        <i class="fas fa-trash me-2"></i>Delete Role
+                      </a>
+                    </li>
+                  </ul>
+                </div>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="text-center py-5">
+              <div class="text-muted">
+                <span data-feather="shield" class="mb-3 d-block"></span>
+                <h5>No roles found</h5>
+                <p class="mb-0">No roles match your search criteria</p>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  
+  <!-- Pagination -->
+  {% if paginator.num_pages > 1 %}
+  <div class="card-footer bg-white border-0 py-3">
+    <div class="row align-items-center">
+      <div class="col-md-6">
+        <div class="d-flex align-items-center">
+          <span class="text-muted me-3">Show:</span>
+          <form method="get" action="{% url 'accounts:role_list' %}" class="d-inline">
+            {% if search_query %}
+            <input type="hidden" name="search" value="{{ search_query }}">
+            {% endif %}
+            <select class="form-select form-select-sm me-3" name="page_size" id="page-size-selector" onchange="this.form.submit()">
+              <option value="5" {% if current_page_size == 5 or not current_page_size %}selected{% endif %}>5</option>
+              <option value="10" {% if current_page_size == 10 %}selected{% endif %}>10</option>
+              <option value="25" {% if current_page_size == 25 %}selected{% endif %}>25</option>
+              <option value="50" {% if current_page_size == 50 %}selected{% endif %}>50</option>
+              <option value="100" {% if current_page_size == 100 %}selected{% endif %}>100</option>
+            </select>
+          </form>
+          <span class="text-muted">per page</span>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="text-muted text-end mb-2">
+          Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ paginator.count }} results
+        </div>
+        <nav aria-label="Pagination">
+          <ul class="pagination pagination-sm mb-0 justify-content-end">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+              <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if current_page_size and current_page_size != 5 %}&page_size={{ current_page_size }}{% endif %}">
+                <span data-feather="chevron-left"></span>
+              </a>
+            </li>
+            {% else %}
+            <li class="page-item disabled">
+              <span class="page-link">
+                <span data-feather="chevron-left"></span>
+              </span>
+            </li>
+            {% endif %}
+            
+            {% for num in page_obj.paginator.page_range %}
+              {% if page_obj.number == num %}
+              <li class="page-item active">
+                <span class="page-link">{{ num }}</span>
+              </li>
+              {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}{% if current_page_size and current_page_size != 5 %}&page_size={{ current_page_size }}{% endif %}">{{ num }}</a>
+              </li>
+              {% endif %}
+            {% endfor %}
+            
+            {% if page_obj.has_next %}
+            <li class="page-item">
+              <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if current_page_size and current_page_size != 5 %}&page_size={{ current_page_size }}{% endif %}">
+                <span data-feather="chevron-right"></span>
+              </a>
+            </li>
+            {% else %}
+            <li class="page-item disabled">
+              <span class="page-link">
+                <span data-feather="chevron-right"></span>
+              </span>
+            </li>
+            {% endif %}
+          </ul>
+        </nav>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ============================================-->
+<!--                Add Role Modal-->
+<!-- ============================================-->
+<div class="modal fade" id="addRoleModal" tabindex="-1" aria-labelledby="addRoleModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-warning text-dark">
+        <h5 class="modal-title" id="addRoleModalLabel">
+          <span class="me-2" data-feather="shield"></span>Add New Role
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="addRoleForm">
+        {% csrf_token %}
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="id_name" class="form-label">Role Name</label>
+            <input type="text" class="form-control" id="id_name" name="name" required>
+          </div>
+
+          <div class="mb-3">
+            <label for="id_description" class="form-label">Description</label>
+            <textarea class="form-control" id="id_description" name="description" rows="3"></textarea>
+          </div>
+        </div>
+            
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <span class="me-2" data-feather="save"></span>Create Role
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================-->
+<!--                Edit Role Modal-->
+<!-- ============================================-->
+<div class="modal fade" id="editRoleModal" tabindex="-1" aria-labelledby="editRoleModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-warning text-dark">
+        <h5 class="modal-title" id="editRoleModalLabel">
+          <span class="me-2" data-feather="shield"></span>Edit Role
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="editRoleForm">
+        {% csrf_token %}
+        <input type="hidden" id="edit_role_id" name="role_id">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="edit_name" class="form-label">Role Name</label>
+            <input type="text" class="form-control" id="edit_name" name="name" required>
+          </div>
+          
+          <div class="mb-3">
+            <label for="edit_description" class="form-label">Description</label>
+            <textarea class="form-control" id="edit_description" name="description" rows="3"></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <span class="me-2" data-feather="save"></span>Update Role
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================-->
+<!--                Manage Permissions Modal-->
+<!-- ============================================-->
+<div class="modal fade" id="managePermissionsModal" tabindex="-1" aria-labelledby="managePermissionsModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl" style="max-width: 90vw; width: 90vw;">
+    <div class="modal-content">
+      <div class="modal-header bg-warning text-dark">
+        <h5 class="modal-title" id="managePermissionsModalLabel">
+          <span class="me-2" data-feather="shield"></span>Manage Permissions
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="managePermissionsForm">
+        {% csrf_token %}
+        <input type="hidden" id="permissions_role_id" name="role_id">
+        <div class="modal-body">
+          <div class="row">
+            <div class="col-md-4">
+              <h6 class="mb-3 text-primary">
+                <i class="fas fa-cog me-2"></i>System Permissions
+              </h6>
+              <div class="mb-2">
+                <div class="position-relative">
+                  <input type="search" class="form-control form-control-sm" id="permissions-search" placeholder="Search permissions...">
+                  <span class="position-absolute top-50 end-0 translate-middle-y me-3"><i class="fas fa-search"></i></span>
+                </div>
+              </div>
+              <div class="permissions-container max-height-400">
+                <div class="row">
+                  <div class="col-6">
+                    {% for permission in permissions %}
+                      {% if forloop.counter0|divisibleby:2 %}
+                      <div class="form-check mb-2">
+                        <input class="form-check-input permission-checkbox" type="checkbox" name="permissions" value="{{ permission.id }}" id="perm_{{ permission.id }}">
+                        <label class="form-check-label small text-wrap" for="perm_{{ permission.id }}" style="word-break: break-word; line-height: 1.2;">
+                          <span class="fw-bold">{{ permission.name }}</span>
+                          <br><small class="text-muted">{{ permission.content_type.app_label|title }}</small>
+                        </label>
+                      </div>
+                      {% endif %}
+                    {% endfor %}
+                  </div>
+                  <div class="col-6">
+                    {% for permission in permissions %}
+                      {% if not forloop.counter0|divisibleby:2 %}
+                      <div class="form-check mb-2">
+                        <input class="form-check-input permission-checkbox" type="checkbox" name="permissions" value="{{ permission.id }}" id="perm_{{ permission.id }}">
+                        <label class="form-check-label small text-wrap" for="perm_{{ permission.id }}" style="word-break: break-word; line-height: 1.2;">
+                          <span class="fw-bold">{{ permission.name }}</span>
+                          <br><small class="text-muted">{{ permission.content_type.app_label|title }}</small>
+                        </label>
+                      </div>
+                      {% endif %}
+                    {% endfor %}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <h6 class="mb-3 text-success">
+                <i class="fas fa-compass me-2"></i>Navigation Access
+              </h6>
+              <div class="mb-2">
+                <div class="position-relative">
+                  <input type="search" class="form-control form-control-sm" id="navigation-search" placeholder="Search navigation items...">
+                  <span class="position-absolute top-50 end-0 translate-middle-y me-3"><i class="fas fa-search"></i></span>
+                </div>
+              </div>
+              <div class="navigation-container max-height-400">
+                {% for nav_item in navigation_items %}
+                <div class="form-check mb-2 navigation-item" data-nav-name="{{ nav_item.name|lower }}">
+                  <input class="form-check-input navigation-checkbox" type="checkbox" name="navigation_permissions" value="{{ nav_item.id }}" id="nav_{{ nav_item.id }}">
+                  <label class="form-check-label small" for="nav_{{ nav_item.id }}">
+                    {{ nav_item.name }}
+                  </label>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+            <div class="col-md-4">
+              <h6 class="mb-3 text-info">
+                <i class="fas fa-shield-alt me-2"></i>Additional Permissions
+              </h6>
+              <div class="mb-2">
+                <div class="position-relative">
+                  <input type="search" class="form-control form-control-sm" id="additional-permissions-search" placeholder="Search additional permissions...">
+                  <span class="position-absolute top-50 end-0 translate-middle-y me-3"><i class="fas fa-search"></i></span>
+                </div>
+              </div>
+              <div class="additional-permissions-container max-height-400">
+                <div class="form-check mb-2 additional-permission-item" data-perm-name="export data">
+                  <input class="form-check-input" type="checkbox" name="additional_permissions" value="can_export" id="add_export">
+                  <label class="form-check-label small" for="add_export">
+                    Export Data
+                  </label>
+                </div>
+                <div class="form-check mb-2 additional-permission-item" data-perm-name="import data">
+                  <input class="form-check-input" type="checkbox" name="additional_permissions" value="can_import" id="add_import">
+                  <label class="form-check-label small" for="add_import">
+                    Import Data
+                  </label>
+                </div>
+                <div class="form-check mb-2 additional-permission-item" data-perm-name="system backup">
+                  <input class="form-check-input" type="checkbox" name="additional_permissions" value="can_backup" id="add_backup">
+                  <label class="form-check-label small" for="add_backup">
+                    System Backup
+                  </label>
+                </div>
+                <div class="form-check mb-2 additional-permission-item" data-perm-name="audit logs">
+                  <input class="form-check-input" type="checkbox" name="additional_permissions" value="can_audit" id="add_audit">
+                  <label class="form-check-label small" for="add_audit">
+                    Audit Logs
+                  </label>
+                </div>
+                <div class="form-check mb-2 additional-permission-item" data-perm-name="system configuration">
+                  <input class="form-check-input" type="checkbox" name="additional_permissions" value="can_configure" id="add_config">
+                  <label class="form-check-label small" for="add_config">
+                    System Configuration
+                  </label>
+                </div>
+                <div class="form-check mb-2 additional-permission-item" data-perm-name="system maintenance">
+                  <input class="form-check-input" type="checkbox" name="additional_permissions" value="can_maintain" id="add_maintain">
+                  <label class="form-check-label small" for="add_maintain">
+                    System Maintenance
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <span class="me-2" data-feather="save"></span>Save Permissions
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- View Role Modal -->
+<div class="modal fade" id="viewRoleModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-eye me-2"></i>View Role Details
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row">
+          <div class="col-md-6">
+            <h6>Role Information</h6>
+            <table class="table table-sm">
+              <tr>
+                <td><strong>Name:</strong></td>
+                <td id="view-role-name">-</td>
+              </tr>
+              <tr>
+                <td><strong>Description:</strong></td>
+                <td id="view-role-description">-</td>
+              </tr>
+              <tr>
+                <td><strong>Created:</strong></td>
+                <td id="view-role-created">-</td>
+              </tr>
+              <tr>
+                <td><strong>Permissions:</strong></td>
+                <td id="view-role-permissions-count">-</td>
+              </tr>
+              <tr>
+                <td><strong>Users:</strong></td>
+                <td id="view-role-users-count">-</td>
+              </tr>
+            </table>
+          </div>
+          <div class="col-md-6">
+            <h6>Assigned Permissions</h6>
+            <div id="view-role-permissions-list" class="max-height-200 overflow-auto">
+              <p class="text-muted">Loading permissions...</p>
+            </div>
+          </div>
+        </div>
+        <div class="row mt-3">
+          <div class="col-12">
+            <h6>Assigned Users</h6>
+            <div id="view-role-users-list" class="max-height-200 overflow-auto">
+              <p class="text-muted">Loading users...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" onclick="editRoleFromView()">
+          <i class="fas fa-edit me-2"></i>Edit Role
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Role Confirmation Modal -->
+<div class="modal fade" id="deleteRoleModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title">
+          <i class="fas fa-exclamation-triangle me-2"></i>Delete Role
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-warning">
+          <i class="fas fa-exclamation-triangle me-2"></i>
+          <strong>Warning!</strong> This action cannot be undone.
+        </div>
+        <p>Are you sure you want to delete the role <strong id="delete-role-name">-</strong>?</p>
+        <div class="bg-light p-3 rounded">
+          <h6>Role Details:</h6>
+          <ul class="mb-0">
+            <li><strong>Name:</strong> <span id="delete-role-name-detail">-</span></li>
+            <li><strong>Description:</strong> <span id="delete-role-description">-</span></li>
+            <li><strong>Permissions:</strong> <span id="delete-role-permissions-count">-</span></li>
+            <li><strong>Assigned Users:</strong> <span id="delete-role-users-count">-</span></li>
+          </ul>
+        </div>
+        <div class="mt-3">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="confirm-delete">
+            <label class="form-check-label" for="confirm-delete">
+              I understand this action cannot be undone
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirm-delete-btn" disabled>
+          <i class="fas fa-trash me-2"></i>Delete Role
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.avatar-sm {
+    width: 40px;
+    height: 40px;
+    font-size: 14px;
+    font-weight: bold;
+}
+.max-height-200 {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.max-height-400 {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.permissions-container {
+    overflow-x: hidden;
+}
+
+.permissions-container .form-check-label {
+    white-space: normal;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+}
+
+#managePermissionsModal .modal-content {
+    max-height: 80vh;
+    overflow-y: auto;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    let currentPage = 1;
+    let currentPageSize = 5;
+    let currentSearch = '';
+    
+    // AJAX Search functionality
+    $('.ajax-search').on('input', function() {
+        currentSearch = $(this).val();
+        currentPage = 1;
+        loadRoles();
+    });
+    
+    // Status filter functionality
+    $('#statusFilter').on('change', function() {
+        currentPage = 1;
+        loadRoles();
+    });
+    
+    // Clear filters function
+    window.clearFilters = function() {
+        $('.ajax-search').val('');
+        $('#statusFilter').val('');
+        currentSearch = '';
+        currentPage = 1;
+        loadRoles();
+    };
+    
+    // Export roles function
+    window.exportRoles = function() {
+        alert('Export functionality will be implemented');
+    };
+    
+    // Page size change
+    $('#page-size-selector').on('change', function() {
+        currentPageSize = $(this).val();
+        currentPage = 1;
+        loadRoles();
+    });
+    
+    // Load roles via AJAX
+    function loadRoles() {
+        const params = new URLSearchParams({
+            search: currentSearch,
+            page: currentPage,
+            per_page: currentPageSize
+        });
+        
+        $.ajax({
+            url: '{% url "accounts_api:api_role_search" %}?' + params.toString(),
+            method: 'GET',
+            success: function(response) {
+                updateTable(response);
+                updatePagination(response);
+            },
+            error: function() {
+                console.error('Error loading roles');
+            }
+        });
+    }
+    
+    // Update table content
+    function updateTable(response) {
+        const tbody = $('#roles-table-body');
+        tbody.empty();
+        
+        if (response.roles && response.roles.length > 0) {
+            response.roles.forEach(function(role) {
+                const row = createRoleRow(role);
+                tbody.append(row);
+            });
+        } else {
+            tbody.append(`
+                <tr>
+                    <td colspan="6" class="text-center py-5">
+                        <div class="text-muted">
+                            <span data-feather="shield" class="mb-3 d-block"></span>
+                            <h5>No roles found</h5>
+                            <p class="mb-0">No roles match your search criteria</p>
+                        </div>
+                    </td>
+                </tr>
+            `);
+        }
+    }
+    
+    // Create role row HTML
+    function createRoleRow(role) {
+        return `
+            <tr data-role-id="${role.id}">
+                <td>
+                    <div class="d-flex align-items-center">
+                        <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3 fw-bold">
+                            ${role.name[0].toUpperCase()}
+                        </div>
+                        <div>
+                            <strong>${role.name}</strong><br>
+                            <small class="text-muted">Custom Role</small>
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    <span class="text-muted">${role.description || 'No description provided'}</span>
+                </td>
+                <td>
+                    <span class="badge bg-warning text-dark">
+                        <i class="fas fa-shield-alt me-1"></i>
+                        ${role.permissions_count} Permission${role.permissions_count !== 1 ? 's' : ''}
+                    </span>
+                </td>
+                <td>
+                    <span class="badge bg-info">
+                        <i class="fas fa-users me-1"></i>
+                        ${role.users_count} User${role.users_count !== 1 ? 's' : ''}
+                    </span>
+                </td>
+                <td>
+                    <div>
+                        <strong>${role.created_at}</strong><br>
+                        <small class="text-muted">${role.created_time || ''}</small>
+                    </div>
+                </td>
+                <td>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" onclick="viewRole(${role.id})"><i class="fas fa-eye me-2"></i>View Role</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="editRole(${role.id})"><i class="fas fa-edit me-2"></i>Edit Role</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="managePermissions(${role.id})"><i class="fas fa-shield-alt me-2"></i>Manage Permissions</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger" href="#" onclick="deleteRole(${role.id})">
+                                <i class="fas fa-trash me-2"></i>Delete Role
+                            </a></li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }
+    
+    // Update pagination
+    function updatePagination(response) {
+        const paginationNav = $('#pagination-nav ul');
+        paginationNav.empty();
+        
+        // Previous button
+        if (response.has_previous) {
+            paginationNav.append(`<li class="page-item"><a class="page-link" href="#" data-page="${response.current_page - 1}"><span data-feather="chevron-left"></span></a></li>`);
+        } else {
+            paginationNav.append(`<li class="page-item disabled"><span class="page-link"><span data-feather="chevron-left"></span></span></li>`);
+        }
+        
+        // Page numbers
+        for (let i = 1; i <= response.total_pages; i++) {
+            if (i === response.current_page) {
+                paginationNav.append(`<li class="page-item active"><span class="page-link">${i}</span></li>`);
+            } else {
+                paginationNav.append(`<li class="page-item"><a class="page-link" href="#" data-page="${i}">${i}</a></li>`);
+            }
+        }
+        
+        // Next button
+        if (response.has_next) {
+            paginationNav.append(`<li class="page-item"><a class="page-link" href="#" data-page="${response.current_page + 1}"><span data-feather="chevron-right"></span></a></li>`);
+        } else {
+            paginationNav.append(`<li class="page-item disabled"><span class="page-link"><span data-feather="chevron-right"></span></span></li>`);
+        }
+        
+        // Update results info
+        const startIndex = ((response.current_page - 1) * currentPageSize) + 1;
+        const endIndex = Math.min(response.current_page * currentPageSize, response.total_count);
+        $('#results-info').text(`Showing ${startIndex} to ${endIndex} of ${response.total_count} results`);
+    }
+    
+    // Pagination click handler
+    $(document).on('click', '.pagination pagination-sm a', function(e) {
+        e.preventDefault();
+        currentPage = parseInt($(this).data('page'));
+        loadRoles();
+    });
+    
+    // Add Role Form submission
+    $('#addRoleForm').on('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const submitBtn = $(this).find('button[type="submit"]');
+        const originalText = submitBtn.html();
+        
+        submitBtn.html('<span class="me-2" data-feather="loader"></span>Creating...');
+        submitBtn.prop('disabled', true);
+        
+        $.ajax({
+            url: '{% url "accounts_api:api_role_create" %}',
+            method: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            headers: {
+                'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    $('#addRoleModal').modal('hide');
+                    $('#addRoleForm')[0].reset();
+                    loadRoles(); // Reload the table
+                    
+                    // Show success message
+                    const alertDiv = $('<div class="alert alert-success alert-dismissible fade show" role="alert">' +
+                        '<span class="me-2" data-feather="check-circle"></span>' + response.message +
+                        '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' +
+                        '</div>');
+                    $('.card').first().before(alertDiv);
+                    
+                    setTimeout(() => alertDiv.fadeOut(), 5000);
+                } else {
+                    alert('Error: ' + response.message);
+                }
+            },
+            error: function() {
+                alert('An error occurred while creating the role.');
+            },
+            complete: function() {
+                submitBtn.html(originalText);
+                submitBtn.prop('disabled', false);
+            }
+        });
+    });
+    
+    // Edit Role Form submission
+    $('#editRoleForm').on('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const submitBtn = $(this).find('button[type="submit"]');
+        const originalText = submitBtn.html();
+        
+        submitBtn.html('<span class="me-2" data-feather="loader"></span>Updating...');
+        submitBtn.prop('disabled', true);
+        
+        $.ajax({
+            url: '{% url "accounts_api:api_role_update" %}',
+            method: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            headers: {
+                'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    $('#editRoleModal').modal('hide');
+                    loadRoles(); // Reload the table
+                    
+                    // Show success message
+                    const alertDiv = $('<div class="alert alert-success alert-dismissible fade show" role="alert">' +
+                        '<span class="me-2" data-feather="check-circle"></span>' + response.message +
+                        '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' +
+                        '</div>');
+                    $('.card').first().before(alertDiv);
+                    
+                    setTimeout(() => alertDiv.fadeOut(), 5000);
+                } else {
+                    alert('Error: ' + response.message);
+                }
+            },
+            error: function() {
+                alert('An error occurred while updating the role.');
+            },
+            complete: function() {
+                submitBtn.html(originalText);
+                submitBtn.prop('disabled', false);
+            }
+        });
+    });
+    
+    // Manage Permissions Form submission
+    $('#managePermissionsForm').on('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const submitBtn = $(this).find('button[type="submit"]');
+        const originalText = submitBtn.html();
+        
+        submitBtn.html('<span class="me-2" data-feather="loader"></span>Saving...');
+        submitBtn.prop('disabled', true);
+        
+        $.ajax({
+            url: '{% url "accounts_api:api_role_permissions" %}',
+            method: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            headers: {
+                'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    $('#managePermissionsModal').modal('hide');
+                    loadRoles(); // Reload the table
+                    
+                    // Show success message
+                    const alertDiv = $('<div class="alert alert-success alert-dismissible fade show" role="alert">' +
+                        '<span class="me-2" data-feather="check-circle"></span>' + response.message +
+                        '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' +
+                        '</div>');
+                    $('.card').first().before(alertDiv);
+                    
+                    setTimeout(() => alertDiv.fadeOut(), 5000);
+                } else {
+                    alert('Error: ' + response.message);
+                }
+            },
+            error: function() {
+                alert('An error occurred while saving permissions.');
+            },
+            complete: function() {
+                submitBtn.html(originalText);
+                submitBtn.prop('disabled', false);
+            }
+        });
+    });
+    
+    // Filter System Permissions inside Manage Permissions modal
+    $(document).on('input', '#permissions-search', function() {
+        const query = $(this).val().toLowerCase().trim();
+        const checks = $('#managePermissionsModal .permissions-container .form-check');
+        if (!query) {
+            checks.show();
+            return;
+        }
+        checks.each(function() {
+            const labelText = $(this).find('label').text().toLowerCase();
+            $(this).toggle(labelText.indexOf(query) !== -1);
+        });
+    });
+    
+    // Filter Navigation Access inside Manage Permissions modal
+    $(document).on('input', '#navigation-search', function() {
+        const query = $(this).val().toLowerCase().trim();
+        const items = $('#managePermissionsModal .navigation-container .navigation-item');
+        if (!query) {
+            items.show();
+            return;
+        }
+        items.each(function() {
+            const navName = $(this).data('nav-name') || $(this).find('label').text().toLowerCase();
+            $(this).toggle(navName.indexOf(query) !== -1);
+        });
+    });
+    
+    // Filter Additional Permissions inside Manage Permissions modal
+    $(document).on('input', '#additional-permissions-search', function() {
+        const query = $(this).val().toLowerCase().trim();
+        const items = $('#managePermissionsModal .additional-permissions-container .additional-permission-item');
+        if (!query) {
+            items.show();
+            return;
+        }
+        items.each(function() {
+            const permName = $(this).data('perm-name') || $(this).find('label').text().toLowerCase();
+            $(this).toggle(permName.indexOf(query) !== -1);
+        });
+    });
+    
+    // Clear all searches when opening the modal
+    $('#managePermissionsModal').on('shown.bs.modal', function() {
+        $('#permissions-search').val('').trigger('input');
+        $('#navigation-search').val('').trigger('input');
+        $('#additional-permissions-search').val('').trigger('input');
+        $('#permissions-search').trigger('focus');
+    });
+    
+    // Handle delete action
+    $(document).on('click', '.delete-role-action', function(e) {
+        e.preventDefault();
+        const url = $(this).data('url');
+        const itemId = $(this).data('item-id');
+        const itemName = $(this).data('item-name');
+        
+        if (confirm('Are you sure you want to delete this ' + itemName + '? This action cannot be undone.')) {
+            $.ajax({
+                url: url,
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+                },
+                success: function(response) {
+                    if (response.success) {
+                        loadRoles(); // Reload the table
+                    } else {
+                        alert('Error: ' + response.message);
+                    }
+                },
+                error: function() {
+                    alert('An error occurred while deleting the role.');
+                }
+            });
+        }
+    });
+});
+
+
+// View Role function - Updated to use modal
+function viewRole(roleId) {
+    console.log('viewRole called with roleId:', roleId);
+    // Fetch role data and populate the view modal
+    $.ajax({
+        url: '{% url "accounts_api:api_role_detail" %}',
+        method: 'GET',
+        data: { role_id: roleId },
+        success: function(response) {
+            console.log('viewRole AJAX success:', response);
+            if (response.success) {
+                const role = response.role;
+                
+                // Populate role information
+                $('#view-role-name').text(role.name);
+                $('#view-role-description').text(role.description || 'No description provided');
+                $('#view-role-created').text(role.created_at);
+                $('#view-role-permissions-count').text(role.permissions_count + ' permission' + (role.permissions_count !== 1 ? 's' : ''));
+                $('#view-role-users-count').text(role.users_count + ' user' + (role.users_count !== 1 ? 's' : ''));
+                
+                // Populate permissions list
+                if (role.permissions && role.permissions.length > 0) {
+                    let permissionsHtml = '<ul class="list-unstyled mb-0">';
+                    role.permissions.forEach(function(permission) {
+                        permissionsHtml += '<li><i class="fas fa-check text-success me-2"></i>' + permission.name + '</li>';
+                    });
+                    permissionsHtml += '</ul>';
+                    $('#view-role-permissions-list').html(permissionsHtml);
+                } else {
+                    $('#view-role-permissions-list').html('<p class="text-muted">No permissions assigned</p>');
+                }
+                
+                // Populate users list
+                if (role.users && role.users.length > 0) {
+                    let usersHtml = '<ul class="list-unstyled mb-0">';
+                    role.users.forEach(function(user) {
+                        usersHtml += '<li><i class="fas fa-user me-2"></i>' + user.username + ' (' + user.email + ')</li>';
+                    });
+                    usersHtml += '</ul>';
+                    $('#view-role-users-list').html(usersHtml);
+                } else {
+                    $('#view-role-users-list').html('<p class="text-muted">No users assigned to this role</p>');
+                }
+                
+                // Store role ID for edit function
+                $('#viewRoleModal').data('role-id', roleId);
+                
+                $('#viewRoleModal').modal('show');
+            } else {
+                alert('Error: ' + response.message);
+            }
+        },
+        error: function() {
+            console.log('viewRole AJAX error');
+            alert('An error occurred while fetching role data.');
+        }
+    });
+}
+
+
+// Edit Role function - Updated to use existing modal
+function editRole(roleId) {
+    console.log('editRole called with roleId:', roleId);
+    // Fetch role data and populate the edit modal
+    $.ajax({
+        url: '{% url "accounts_api:api_role_detail" %}',
+        method: 'GET',
+        data: { role_id: roleId },
+        success: function(response) {
+            console.log('editRole AJAX success:', response);
+            if (response.success) {
+                const role = response.role;
+                $('#edit_role_id').val(role.id);
+                $('#edit_name').val(role.name);
+                $('#edit_description').val(role.description);
+                
+                $('#editRoleModal').modal('show');
+            } else {
+                alert('Error: ' + response.message);
+            }
+        },
+        error: function() {
+            console.log('editRole AJAX error');
+            alert('An error occurred while fetching role data.');
+        }
+    });
+}
+
+// Edit Role from View Modal
+function editRoleFromView() {
+    const roleId = $('#viewRoleModal').data('role-id');
+    $('#viewRoleModal').modal('hide');
+    editRole(roleId);
+}
+
+// Manage Permissions function
+function managePermissions(roleId) {
+    console.log('managePermissions called with roleId:', roleId);
+    // Fetch role permissions and populate the manage permissions modal
+    $.ajax({
+        url: '{% url "accounts_api:api_role_permissions_detail" %}',
+        method: 'GET',
+        data: { role_id: roleId },
+        success: function(response) {
+            console.log('managePermissions AJAX success:', response);
+            if (response.success) {
+                const role = response.role;
+                $('#permissions_role_id').val(role.id);
+                
+                // Update modal title
+                $('#managePermissionsModalLabel').html('<i class="fas fa-shield-alt me-2"></i>Manage Permissions - ' + role.name);
+                
+                // Clear all checkboxes
+                $('.permission-checkbox').prop('checked', false);
+                $('.navigation-checkbox').prop('checked', false);
+                $('input[name="additional_permissions"]').prop('checked', false);
+                
+                // Check permissions that are assigned to this role
+                if (role.permissions) {
+                    role.permissions.forEach(function(permissionId) {
+                        $('#perm_' + permissionId).prop('checked', true);
+                    });
+                }
+                
+                // Check navigation permissions that are assigned to this role
+                if (role.navigation_permissions) {
+                    role.navigation_permissions.forEach(function(navId) {
+                        $('#nav_' + navId).prop('checked', true);
+                    });
+                }
+                
+                // Check additional permissions that are assigned to this role
+                if (role.additional_permissions) {
+                    role.additional_permissions.forEach(function(addPerm) {
+                        $('input[name="additional_permissions"][value="' + addPerm + '"]').prop('checked', true);
+                    });
+                }
+                
+                $('#managePermissionsModal').modal('show');
+            } else {
+                alert('Error: ' + response.message);
+            }
+        },
+        error: function() {
+            console.log('managePermissions AJAX error');
+            alert('An error occurred while fetching role permissions.');
+        }
+    });
+}
+
+// Delete Role function - Updated to use modal
+function deleteRole(roleId) {
+    console.log('deleteRole called with roleId:', roleId);
+    // Fetch role data and populate the delete modal
+    $.ajax({
+        url: '{% url "accounts_api:api_role_detail" %}',
+        method: 'GET',
+        data: { role_id: roleId },
+        success: function(response) {
+            console.log('deleteRole AJAX success:', response);
+            if (response.success) {
+                const role = response.role;
+                
+                // Populate delete modal
+                $('#delete-role-name').text(role.name);
+                $('#delete-role-name-detail').text(role.name);
+                $('#delete-role-description').text(role.description || 'No description provided');
+                $('#delete-role-permissions-count').text(role.permissions_count + ' permission' + (role.permissions_count !== 1 ? 's' : ''));
+                $('#delete-role-users-count').text(role.users_count + ' user' + (role.users_count !== 1 ? 's' : ''));
+                
+                // Store role ID and URL for deletion
+                $('#deleteRoleModal').data('role-id', roleId);
+                $('#deleteRoleModal').data('delete-url', '/roles/' + roleId + '/delete/');
+                
+                // Reset confirmation checkbox
+                $('#confirm-delete').prop('checked', false);
+                $('#confirm-delete-btn').prop('disabled', true);
+                
+                $('#deleteRoleModal').modal('show');
+            } else {
+                alert('Error: ' + response.message);
+            }
+        },
+        error: function() {
+            console.log('deleteRole AJAX error');
+            alert('An error occurred while fetching role data.');
+        }
+    });
+}
+
+// Handle delete confirmation checkbox
+$(document).on('change', '#confirm-delete', function() {
+    $('#confirm-delete-btn').prop('disabled', !$(this).is(':checked'));
+});
+
+// Handle delete confirmation button
+$(document).on('click', '#confirm-delete-btn', function() {
+    const roleId = $('#deleteRoleModal').data('role-id');
+    const deleteUrl = $('#deleteRoleModal').data('delete-url');
+    
+    if (confirm('Are you absolutely sure you want to delete this role? This action cannot be undone.')) {
+        $.ajax({
+            url: deleteUrl,
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    $('#deleteRoleModal').modal('hide');
+                    loadRoles(); // Reload the table
+                    
+                    // Show success message
+                    const alertDiv = $('<div class="alert alert-success alert-dismissible fade show" role="alert">' +
+                        '<i class="fas fa-check-circle me-2"></i>' + response.message +
+                        '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' +
+                        '</div>');
+                    $('.card').first().before(alertDiv);
+                    
+                    setTimeout(() => alertDiv.fadeOut(), 5000);
+                } else {
+                    alert('Error: ' + response.message);
+                }
+            },
+            error: function() {
+                alert('An error occurred while deleting the role.');
+            }
+        });
+    }
+});
+
+// Make functions globally accessible
+window.viewRole = viewRole;
+window.editRole = editRole;
+window.managePermissions = managePermissions;
+window.deleteRole = deleteRole;
+</script>
+{% endblock %}

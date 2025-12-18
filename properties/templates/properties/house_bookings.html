@@ -1,0 +1,1220 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}House Rentals Management{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Breadcrumb Navigation -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'properties:house_dashboard' %}"><i class="fas fa-tachometer-alt me-1"></i>Dashboard</a></li>
+            <li class="breadcrumb-item active" aria-current="page"><i class="fas fa-calendar-check me-1"></i>Bookings</li>
+            <li class="breadcrumb-item"><a href="{% url 'properties:house_tenants' %}"><i class="fas fa-users me-1"></i>Tenants</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'properties:house_payments' %}"><i class="fas fa-credit-card me-1"></i>Payments</a></li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <div class="col-12">
+            <!-- Page Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="mb-1">
+                        <i class="fas fa-home text-primary me-2"></i>House Rentals Management
+                    </h2>
+                    <p class="text-muted mb-0">Manage residential property rentals and lease agreements</p>
+                </div>
+            </div>
+            
+            <!-- House Rentals Table -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="row flex-between-center">
+                        <div class="col">
+                            <h6 class="mb-2">House Rentals</h6>
+                            <h5 class="mb-0">Manage and monitor all house rental bookings</h5>
+                        </div>
+                        <div class="col-auto">
+                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newRentalModal">
+                                <span class="fas fa-plus me-2"></span>New Rental
+                            </button>
+                            <button type="button" class="btn btn-secondary ms-2" onclick="clearAllFilters()">
+                                <span class="fas fa-times me-2"></span>Clear All
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Search and Filters -->
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label for="search-input" class="form-label">Search</label>
+                            <input type="text" class="form-control" id="search-input" placeholder="Search bookings..." value="{{ search_query }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="status-filter" class="form-label">Booking Status</label>
+                            <select class="form-select" id="status-filter">
+                                <option value="">All Statuses</option>
+                                <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
+                                <option value="confirmed" {% if status_filter == 'confirmed' %}selected{% endif %}>Confirmed</option>
+                                <option value="checked_in" {% if status_filter == 'checked_in' %}selected{% endif %}>Checked In</option>
+                                <option value="checked_out" {% if status_filter == 'checked_out' %}selected{% endif %}>Checked Out</option>
+                                <option value="cancelled" {% if status_filter == 'cancelled' %}selected{% endif %}>Cancelled</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="payment-filter" class="form-label">Payment Status</label>
+                            <select class="form-select" id="payment-filter">
+                                <option value="">All Payment Statuses</option>
+                                <option value="pending" {% if payment_filter == 'pending' %}selected{% endif %}>Pending</option>
+                                <option value="paid" {% if payment_filter == 'paid' %}selected{% endif %}>Paid</option>
+                                <option value="partial" {% if payment_filter == 'partial' %}selected{% endif %}>Partial</option>
+                                <option value="overdue" {% if payment_filter == 'overdue' %}selected{% endif %}>Overdue</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="page-size-select" class="form-label">Items per page</label>
+                            <select class="form-select" id="page-size-select" onchange="changePageSize()">
+                                <option value="5" {% if request.GET.page_size == '5' or not request.GET.page_size %}selected{% endif %}>5</option>
+                                <option value="10" {% if request.GET.page_size == '10' %}selected{% endif %}>10</option>
+                                <option value="25" {% if request.GET.page_size == '25' %}selected{% endif %}>25</option>
+                                <option value="50" {% if request.GET.page_size == '50' %}selected{% endif %}>50</option>
+                            </select>
+                    </div>
+                </div>
+            </div>
+            
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Booking</th>
+                                    <th>Property</th>
+                                    <th>Customer</th>
+                                    <th>Period</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                    <th>Payment</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for booking in bookings %}
+                                <tr data-booking-id="{{ booking.id }}">
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3 fw-bold">
+                                                {{ booking.id|stringformat:"s"|slice:":2" }}
+                                            </div>
+                                        <div>
+                                                <strong>
+                                                    <a href="#" class="text-decoration-none">
+                                                        Booking #{{ booking.id }}
+                                                    </a>
+                                                </strong>
+                                                <div class="text-muted small">{{ booking.created_at|date:"M d, Y" }}</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <i class="fas fa-home text-muted me-2"></i>
+                                        <div>
+                                                <div class="fw-bold">{{ booking.property_obj.title }}</div>
+                                                <div class="text-muted small">{{ booking.property_obj.address|truncatechars:30 }}</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <i class="fas fa-user text-muted me-2"></i>
+                                        <div>
+                                                <div class="fw-bold">{{ booking.customer.full_name }}</div>
+                                                <div class="text-muted small">{{ booking.customer.phone }}</div>
+                                        </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div>
+                                            <div class="fw-bold">{{ booking.check_in_date|date:"M d, Y" }} - {{ booking.check_out_date|date:"M d, Y" }}</div>
+                                            <div class="text-muted small">{{ booking.duration_days }} days</div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="fw-bold">Tsh{{ booking.total_amount|floatformat:0 }}</div>
+                                        <div class="text-muted small">{{ booking.payment_status|title }}</div>
+                                    </td>
+                                    <td>
+                                        {% if booking.booking_status == 'confirmed' %}
+                                            <span class="badge bg-success">Confirmed</span>
+                                        {% elif booking.booking_status == 'checked_in' %}
+                                            <span class="badge bg-primary">Checked In</span>
+                                        {% elif booking.booking_status == 'checked_out' %}
+                                            <span class="badge bg-info">Checked Out</span>
+                                        {% elif booking.booking_status == 'pending' %}
+                                            <span class="badge bg-warning">Pending</span>
+                                        {% elif booking.booking_status == 'cancelled' %}
+                                            <span class="badge bg-danger">Cancelled</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ booking.booking_status|title }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if booking.payment_status == 'paid' %}
+                                            <span class="badge bg-success">Paid</span>
+                                        {% elif booking.payment_status == 'partial' %}
+                                            <span class="badge bg-warning">Partial</span>
+                                        {% elif booking.payment_status == 'overdue' %}
+                                            <span class="badge bg-danger">Overdue</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Pending</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="dropdown">
+                                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                                <i class="fas fa-ellipsis-v"></i>
+                                            </button>
+                                            <ul class="dropdown-menu">
+                                                <li><a class="dropdown-item" href="#" onclick="openViewDetailsModal({{ booking.id }})">
+                                                    <i class="fas fa-eye me-2"></i>View Details
+                                                </a></li>
+                                                <li><a class="dropdown-item" href="#" onclick="openEditBookingModal({{ booking.id }})">
+                                                    <i class="fas fa-edit me-2"></i>Edit Booking
+                                                </a></li>
+                                                {% if booking.booking_status == 'pending' %}
+                                                <li><a class="dropdown-item" href="#" onclick="openConfirmBookingModal({{ booking.id }})">
+                                                    <i class="fas fa-check me-2"></i>Confirm Booking
+                                                </a></li>
+                                                {% elif booking.booking_status == 'confirmed' %}
+                                                <li><a class="dropdown-item" href="#" onclick="openCheckInModal({{ booking.id }})">
+                                                    <i class="fas fa-key me-2"></i>Check In
+                                                </a></li>
+                                                {% elif booking.booking_status == 'checked_in' %}
+                                                <li><a class="dropdown-item" href="#" onclick="openCheckOutModal({{ booking.id }})">
+                                                    <i class="fas fa-sign-out-alt me-2"></i>Check Out
+                                                </a></li>
+                                                {% endif %}
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li><a class="dropdown-item" href="#" onclick="openPaymentHistoryModal({{ booking.id }})">
+                                                    <i class="fas fa-credit-card me-2"></i>Payment History
+                                                </a></li>
+                                                <li><a class="dropdown-item" href="#" onclick="openGenerateInvoiceModal({{ booking.id }})">
+                                                    <i class="fas fa-file-contract me-2"></i>Generate Invoice
+                                                </a></li>
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li><a class="dropdown-item text-danger" href="#" onclick="openCancelBookingModal({{ booking.id }})">
+                                                    <i class="fas fa-times me-2"></i>Cancel Booking
+                                                </a></li>
+                                            </ul>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="8" class="text-center py-4">
+                                        <div class="text-muted">
+                                            <i class="fas fa-calendar-check fa-2x mb-3"></i>
+                                            <p>No house bookings found.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Pagination -->
+                    {% if bookings.has_other_pages %}
+                    <div class="card-footer bg-white border-0 py-3">
+                        <div class="row align-items-center">
+                            <div class="col-md-6">
+                                <div class="text-muted">
+                                    Showing {{ bookings.start_index }} to {{ bookings.end_index }} of {{ bookings.paginator.count }} entries
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <nav aria-label="Page navigation" class="d-flex justify-content-end">
+                                    <ul class="pagination pagination-sm mb-0">
+                                        {% if bookings.has_previous %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if payment_filter %}&payment_status={{ payment_filter }}{% endif %}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}" title="First Page">
+                                                <i class="fas fa-angle-double-left"></i>
+                                            </a>
+                                        </li>
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ bookings.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if payment_filter %}&payment_status={{ payment_filter }}{% endif %}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}" title="Previous Page">
+                                                <i class="fas fa-angle-left"></i>
+                                            </a>
+                                        </li>
+                                        {% endif %}
+                                        
+                                        <!-- Page numbers -->
+                                        {% for num in bookings.paginator.page_range %}
+                                            {% if bookings.number == num %}
+                                        <li class="page-item active">
+                                            <span class="page-link">{{ num }}</span>
+                                        </li>
+                                            {% elif num > bookings.number|add:'-3' and num < bookings.number|add:'3' %}
+                                            <li class="page-item">
+                                                <a class="page-link" href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if payment_filter %}&payment_status={{ payment_filter }}{% endif %}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}">{{ num }}</a>
+                                            </li>
+                                            {% endif %}
+                                        {% endfor %}
+                                        
+                                        {% if bookings.has_next %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ bookings.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if payment_filter %}&payment_status={{ payment_filter }}{% endif %}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}" title="Next Page">
+                                                <i class="fas fa-angle-right"></i>
+                                            </a>
+                                        </li>
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ bookings.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if payment_filter %}&payment_status={{ payment_filter }}{% endif %}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}" title="Last Page">
+                                                <i class="fas fa-angle-double-right"></i>
+                                            </a>
+                                        </li>
+                                        {% endif %}
+                                    </ul>
+                                </nav>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New Rental Modal -->
+<div class="modal fade" id="newRentalModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-home me-2"></i>Create New House Rental
+                    </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                    <form id="newRentalForm" method="post" action="{% url 'properties:create_house_booking' %}">
+                        {% csrf_token %}
+                        
+                        <!-- Property Selection -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary mb-3">
+                                    <i class="fas fa-building me-2"></i>Property Selection
+                                </h6>
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label">Select House Property *</label>
+                                <select class="form-control" name="property_id" required>
+                                <option value="">Select Property</option>
+                                    {% for property in house_properties %}
+                                    <option value="{{ property.id }}">{{ property.title }} - {{ property.address }} (Tsh {{ property.rent_amount|floatformat:0 }}/month)</option>
+                                    {% endfor %}
+                            </select>
+                        </div>
+                        </div>
+                        
+                        <!-- Tenant Information -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary mb-3">
+                                    <i class="fas fa-user me-2"></i>Tenant Information
+                                </h6>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">First Name *</label>
+                                <input type="text" class="form-control" name="first_name" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Last Name *</label>
+                                <input type="text" class="form-control" name="last_name" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Email *</label>
+                                <input type="email" class="form-control" name="email" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Phone Number *</label>
+                                <input type="tel" class="form-control" name="phone" required>
+                        </div>
+                        </div>
+
+                        <!-- Rental Details -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary mb-3">
+                                    <i class="fas fa-calendar me-2"></i>Rental Details
+                                </h6>
+                        </div>
+                        <div class="col-md-6">
+                                <label class="form-label">Move-in Date *</label>
+                                <input type="date" class="form-control" name="check_in_date" required>
+                        </div>
+                        <div class="col-md-6">
+                                <label class="form-label">Move-out Date *</label>
+                                <input type="date" class="form-control" name="check_out_date" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Number of Occupants *</label>
+                                <input type="number" class="form-control" name="number_of_guests" min="1" required>
+                                <div class="form-text">Maximum occupants based on property bedrooms</div>
+                        </div>
+                        <div class="col-md-6">
+                                <label class="form-label">Rental Type</label>
+                                <select class="form-control" name="rental_type">
+                                    <option value="">Select Rental Type</option>
+                                    <option value="Monthly">Monthly Rental</option>
+                                    <option value="Long-term">Long-term Lease</option>
+                                    <option value="Short-term">Short-term Rental</option>
+                                    <option value="Vacation">Vacation Rental</option>
+                            </select>
+                        </div>
+                        </div>
+
+                        <!-- Financial Details -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary mb-3">
+                                    <i class="fas fa-dollar-sign me-2"></i>Financial Details
+                                </h6>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Security Deposit</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">Tsh</span>
+                                    <input type="number" class="form-control" name="security_deposit" step="0.01" min="0">
+                                </div>
+                                <div class="form-text">Automatically calculated as 1.5 months rent</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Rent Calculation</label>
+                                <div id="calculated-rent-display" class="form-control-plaintext">
+                                    <div class="text-muted">Select property and dates to see rent calculation</div>
+                                </div>
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label">Special Terms</label>
+                                <textarea class="form-control" name="special_terms" rows="3" placeholder="Any special rental terms, pet policies, utilities included, etc."></textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-2"></i>Cancel
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="submitRentalForm()">
+                        <i class="fas fa-save me-2"></i>Create Rental
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- View Details Modal -->
+<div class="modal fade" id="viewDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-eye me-2"></i>Booking Details
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="viewDetailsContent">
+                <!-- Content will be loaded via AJAX -->
+                <div class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Booking Modal -->
+<div class="modal fade" id="editBookingModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-edit me-2"></i>Edit Booking
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="editBookingContent">
+                <!-- Content will be loaded via AJAX -->
+                <div class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveBookingChanges()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirm Booking Modal -->
+<div class="modal fade" id="confirmBookingModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-check me-2"></i>Confirm Booking
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="confirmBookingContent">
+                <!-- Content will be loaded via AJAX -->
+                <div class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="confirmBooking()">Confirm Booking</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Check In Modal -->
+<div class="modal fade" id="checkInModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-key me-2"></i>Check In Guest
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="checkInContent">
+                <!-- Content will be loaded via AJAX -->
+                <div class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="processCheckIn()">Check In</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Check Out Modal -->
+<div class="modal fade" id="checkOutModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-sign-out-alt me-2"></i>Check Out Guest
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="checkOutContent">
+                <!-- Content will be loaded via AJAX -->
+                <div class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="processCheckOut()">Check Out</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Payment History Modal -->
+<div class="modal fade" id="paymentHistoryModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-credit-card me-2"></i>Payment History
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="paymentHistoryContent">
+                <!-- Content will be loaded via AJAX -->
+                <div class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="addNewPayment()">Add Payment</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Generate Invoice Modal -->
+<div class="modal fade" id="generateInvoiceModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-file-contract me-2"></i>Generate Invoice
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="generateInvoiceContent">
+                <!-- Content will be loaded via AJAX -->
+                <div class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-success" onclick="downloadInvoice()">Download PDF</button>
+                <button type="button" class="btn btn-primary" onclick="emailInvoice()">Email Invoice</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Cancel Booking Modal -->
+<div class="modal fade" id="cancelBookingModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-times me-2"></i>Cancel Booking
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="cancelBookingContent">
+                <!-- Content will be loaded via AJAX -->
+                <div class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Keep Booking</button>
+                <button type="button" class="btn btn-danger" onclick="cancelBooking()">Cancel Booking</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Global variables
+let currentBookingId = null;
+
+// Function to submit the rental form
+function submitRentalForm() {
+    const form = document.getElementById('newRentalForm');
+    
+    // Validate form
+    if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+    }
+    
+    // Show loading state
+    const submitBtn = document.querySelector('button[onclick="submitRentalForm()"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Creating...';
+    submitBtn.disabled = true;
+    
+    // Submit form
+    form.submit();
+}
+
+// Function to initialize rental form
+function initializeRentalForm() {
+    // Set minimum date to today
+    const today = new Date().toISOString().split('T')[0];
+    const moveInInput = document.querySelector('input[name="check_in_date"]');
+    const moveOutInput = document.querySelector('input[name="check_out_date"]');
+    
+    if (moveInInput) {
+        moveInInput.min = today;
+    }
+    if (moveOutInput) {
+        moveOutInput.min = today;
+    }
+    
+    // Update move-out date minimum when move-in date changes
+    if (moveInInput && moveOutInput) {
+        moveInInput.addEventListener('change', function() {
+            moveOutInput.min = this.value;
+            if (moveOutInput.value && moveOutInput.value <= this.value) {
+                moveOutInput.value = '';
+            }
+        });
+    }
+    
+    // Auto-calculate total rent based on months
+    const rentDisplay = document.querySelector('#calculated-rent-display');
+    const depositInput = document.querySelector('input[name="security_deposit"]');
+    
+    function calculateRent() {
+        if (moveInInput.value && moveOutInput.value) {
+            const checkIn = new Date(moveInInput.value);
+            const checkOut = new Date(moveOutInput.value);
+            
+            if (checkOut > checkIn) {
+                // Calculate months difference
+                const yearDiff = checkOut.getFullYear() - checkIn.getFullYear();
+                const monthDiff = checkOut.getMonth() - checkIn.getMonth();
+                const dayDiff = checkOut.getDate() - checkIn.getDate();
+                
+                let months = yearDiff * 12 + monthDiff;
+                if (dayDiff > 0) {
+                    months += 1; // Count partial month as full month
+                }
+                months = Math.max(1, months); // Minimum 1 month
+                
+                // Get monthly rent from selected property
+                const propertySelect = document.querySelector('select[name="property_id"]');
+                if (propertySelect && propertySelect.value) {
+                    const selectedOption = propertySelect.options[propertySelect.selectedIndex];
+                    const rentMatch = selectedOption.text.match(/Tsh ([\d,]+)\/month/);
+                    if (rentMatch) {
+                        const monthlyRent = parseFloat(rentMatch[1].replace(/,/g, ''));
+                        const totalRent = monthlyRent * months;
+                        
+                        if (rentDisplay) {
+                            rentDisplay.innerHTML = `
+                                <div class="alert alert-info">
+                                    <strong>Rent Calculation:</strong><br>
+                                    Monthly Rent: Tsh ${monthlyRent.toLocaleString()}<br>
+                                    Duration: ${months} month${months > 1 ? 's' : ''}<br>
+                                    <strong>Total Rent: Tsh ${totalRent.toLocaleString()}</strong>
+                                </div>
+                            `;
+                        }
+                        
+                        // Auto-calculate security deposit (1.5 months rent)
+                        if (depositInput) {
+                            depositInput.value = (monthlyRent * 1.5).toFixed(0);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Add event listeners
+    if (moveInInput) {
+        moveInInput.addEventListener('change', calculateRent);
+    }
+    if (moveOutInput) {
+        moveOutInput.addEventListener('change', calculateRent);
+    }
+    
+    // Auto-populate rent calculation when property is selected
+    const propertySelect = document.querySelector('select[name="property_id"]');
+    if (propertySelect) {
+        propertySelect.addEventListener('change', calculateRent);
+    }
+}
+
+// Modal Functions - Define globally
+try {
+    window.openViewDetailsModal = function(bookingId) {
+        console.log('Opening View Details Modal for booking:', bookingId);
+        currentBookingId = bookingId;
+        $('#viewDetailsModal').modal('show');
+        loadViewDetailsContent(bookingId);
+    }
+    console.log('openViewDetailsModal function defined successfully');
+} catch (error) {
+    console.error('Error defining openViewDetailsModal:', error);
+}
+
+window.openEditBookingModal = function(bookingId) {
+    console.log('Opening Edit Booking Modal for booking:', bookingId);
+    currentBookingId = bookingId;
+    $('#editBookingModal').modal('show');
+    loadEditBookingContent(bookingId);
+}
+
+window.openConfirmBookingModal = function(bookingId) {
+    console.log('Opening Confirm Booking Modal for booking:', bookingId);
+    currentBookingId = bookingId;
+    $('#confirmBookingModal').modal('show');
+    loadConfirmBookingContent(bookingId);
+}
+
+window.openCheckInModal = function(bookingId) {
+    console.log('Opening Check In Modal for booking:', bookingId);
+    currentBookingId = bookingId;
+    $('#checkInModal').modal('show');
+    loadCheckInContent(bookingId);
+}
+
+window.openCheckOutModal = function(bookingId) {
+    console.log('Opening Check Out Modal for booking:', bookingId);
+    currentBookingId = bookingId;
+    $('#checkOutModal').modal('show');
+    loadCheckOutContent(bookingId);
+}
+
+window.openPaymentHistoryModal = function(bookingId) {
+    console.log('Opening Payment History Modal for booking:', bookingId);
+    currentBookingId = bookingId;
+    $('#paymentHistoryModal').modal('show');
+    loadPaymentHistoryContent(bookingId);
+}
+
+window.openGenerateInvoiceModal = function(bookingId) {
+    console.log('Opening Generate Invoice Modal for booking:', bookingId);
+    currentBookingId = bookingId;
+    $('#generateInvoiceModal').modal('show');
+    loadGenerateInvoiceContent(bookingId);
+}
+
+window.openCancelBookingModal = function(bookingId) {
+    console.log('Opening Cancel Booking Modal for booking:', bookingId);
+    currentBookingId = bookingId;
+    $('#cancelBookingModal').modal('show');
+    loadCancelBookingContent(bookingId);
+}
+
+// AJAX Content Loading Functions
+function loadViewDetailsContent(bookingId) {
+    console.log('Loading view details for booking:', bookingId);
+    $.ajax({
+        url: `/properties/api/booking/${bookingId}/details/`,
+        method: 'GET',
+        success: function(data) {
+            console.log('View details loaded successfully');
+            $('#viewDetailsContent').html(data);
+        },
+        error: function(xhr, status, error) {
+            console.error('Error loading view details:', error, xhr);
+            $('#viewDetailsContent').html(`
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Error loading booking details: ${error}<br>
+                    Status: ${xhr.status}<br>
+                    Response: ${xhr.responseText}
+                </div>
+            `);
+        }
+    });
+}
+
+function loadEditBookingContent(bookingId) {
+    $.ajax({
+        url: `/properties/api/booking/${bookingId}/edit/`,
+        method: 'GET',
+        success: function(data) {
+            $('#editBookingContent').html(data);
+        },
+        error: function(xhr, status, error) {
+            $('#editBookingContent').html(`
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Error loading edit form: ${error}
+                </div>
+            `);
+        }
+    });
+}
+
+function loadConfirmBookingContent(bookingId) {
+    $.ajax({
+        url: `/properties/api/booking/${bookingId}/confirm/`,
+        method: 'GET',
+        success: function(data) {
+            $('#confirmBookingContent').html(data);
+        },
+        error: function(xhr, status, error) {
+            $('#confirmBookingContent').html(`
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Error loading confirmation details: ${error}
+                </div>
+            `);
+        }
+    });
+}
+
+function loadCheckInContent(bookingId) {
+    $.ajax({
+        url: `/properties/api/booking/${bookingId}/checkin/`,
+        method: 'GET',
+        success: function(data) {
+            $('#checkInContent').html(data);
+        },
+        error: function(xhr, status, error) {
+            $('#checkInContent').html(`
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Error loading check-in form: ${error}
+                </div>
+            `);
+        }
+    });
+}
+
+function loadCheckOutContent(bookingId) {
+    $.ajax({
+        url: `/properties/api/booking/${bookingId}/checkout/`,
+        method: 'GET',
+        success: function(data) {
+            $('#checkOutContent').html(data);
+        },
+        error: function(xhr, status, error) {
+            $('#checkOutContent').html(`
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Error loading check-out form: ${error}
+                </div>
+            `);
+        }
+    });
+}
+
+function loadPaymentHistoryContent(bookingId) {
+    $.ajax({
+        url: `/properties/api/booking/${bookingId}/payments/`,
+        method: 'GET',
+        success: function(data) {
+            $('#paymentHistoryContent').html(data);
+        },
+        error: function(xhr, status, error) {
+            $('#paymentHistoryContent').html(`
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Error loading payment history: ${error}
+                </div>
+            `);
+        }
+    });
+}
+
+function loadGenerateInvoiceContent(bookingId) {
+    $.ajax({
+        url: `/properties/api/booking/${bookingId}/invoice/`,
+        method: 'GET',
+        success: function(data) {
+            $('#generateInvoiceContent').html(data);
+        },
+        error: function(xhr, status, error) {
+            $('#generateInvoiceContent').html(`
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Error loading invoice: ${error}
+                </div>
+            `);
+        }
+    });
+}
+
+function loadCancelBookingContent(bookingId) {
+    $.ajax({
+        url: `/properties/api/booking/${bookingId}/cancel/`,
+        method: 'GET',
+        success: function(data) {
+            $('#cancelBookingContent').html(data);
+        },
+        error: function(xhr, status, error) {
+            $('#cancelBookingContent').html(`
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Error loading cancellation form: ${error}
+                </div>
+            `);
+        }
+    });
+}
+
+// Action Functions
+function saveBookingChanges() {
+    const form = $('#editBookingContent form');
+    if (form.length === 0) {
+        alert('No form found to save');
+        return;
+    }
+    
+    $.ajax({
+        url: form.attr('action'),
+        method: 'POST',
+        data: form.serialize(),
+        success: function(response) {
+            if (response.success) {
+                $('#editBookingModal').modal('hide');
+                location.reload(); // Refresh the page to show updated data
+            } else {
+                alert('Error saving changes: ' + response.message);
+            }
+        },
+        error: function(xhr, status, error) {
+            alert('Error saving changes: ' + error);
+        }
+    });
+}
+
+function confirmBooking() {
+    $.ajax({
+        url: `/properties/api/booking/${currentBookingId}/confirm/`,
+        method: 'POST',
+        data: {
+            'csrfmiddlewaretoken': $('[name=csrfmiddlewaretoken]').val()
+        },
+        success: function(response) {
+            if (response.success) {
+                $('#confirmBookingModal').modal('hide');
+                location.reload();
+            } else {
+                alert('Error confirming booking: ' + response.message);
+            }
+        },
+        error: function(xhr, status, error) {
+            alert('Error confirming booking: ' + error);
+        }
+    });
+}
+
+function processCheckIn() {
+    const form = $('#checkInContent form');
+    if (form.length === 0) {
+        alert('No check-in form found');
+        return;
+    }
+    
+    $.ajax({
+        url: form.attr('action'),
+        method: 'POST',
+        data: form.serialize(),
+        success: function(response) {
+            if (response.success) {
+                $('#checkInModal').modal('hide');
+                location.reload();
+            } else {
+                alert('Error processing check-in: ' + response.message);
+            }
+        },
+        error: function(xhr, status, error) {
+            alert('Error processing check-in: ' + error);
+        }
+    });
+}
+
+function processCheckOut() {
+    const form = $('#checkOutContent form');
+    if (form.length === 0) {
+        alert('No check-out form found');
+        return;
+    }
+    
+    $.ajax({
+        url: form.attr('action'),
+        method: 'POST',
+        data: form.serialize(),
+        success: function(response) {
+            if (response.success) {
+                $('#checkOutModal').modal('hide');
+                location.reload();
+            } else {
+                alert('Error processing check-out: ' + response.message);
+            }
+        },
+        error: function(xhr, status, error) {
+            alert('Error processing check-out: ' + error);
+        }
+    });
+}
+
+function addNewPayment() {
+    // Open a new payment modal or redirect to payment page
+    window.open(`/properties/bookings/${currentBookingId}/payment/`, '_blank');
+}
+
+function downloadInvoice() {
+    window.open(`/properties/api/booking/${currentBookingId}/invoice/download/`, '_blank');
+}
+
+function emailInvoice() {
+    $.ajax({
+        url: `/properties/api/booking/${currentBookingId}/invoice/email/`,
+        method: 'POST',
+        data: {
+            'csrfmiddlewaretoken': $('[name=csrfmiddlewaretoken]').val()
+        },
+        success: function(response) {
+            if (response.success) {
+                alert('Invoice sent successfully!');
+            } else {
+                alert('Error sending invoice: ' + response.message);
+            }
+        },
+        error: function(xhr, status, error) {
+            alert('Error sending invoice: ' + error);
+        }
+    });
+}
+
+function cancelBooking() {
+    const form = $('#cancelBookingContent form');
+    if (form.length === 0) {
+        alert('No cancellation form found');
+        return;
+    }
+    
+    $.ajax({
+        url: form.attr('action'),
+        method: 'POST',
+        data: form.serialize(),
+        success: function(response) {
+            if (response.success) {
+                $('#cancelBookingModal').modal('hide');
+                location.reload();
+            } else {
+                alert('Error cancelling booking: ' + response.message);
+            }
+        },
+        error: function(xhr, status, error) {
+            alert('Error cancelling booking: ' + error);
+        }
+    });
+}
+
+function updateBookingTotal(bookingId) {
+    if (!confirm('Are you sure you want to update the total amount for this booking?')) {
+        return;
+    }
+    
+    $.ajax({
+        url: `/properties/api/booking/${bookingId}/update-total/`,
+        method: 'POST',
+        data: {
+            'csrfmiddlewaretoken': $('[name=csrfmiddlewaretoken]').val()
+        },
+        success: function(response) {
+            if (response.success) {
+                alert('Booking total updated successfully!');
+                // Reload the modal content to show updated values
+                loadViewDetailsContent(bookingId);
+            } else {
+                alert('Error updating booking total: ' + response.message);
+            }
+        },
+        error: function(xhr, status, error) {
+            alert('Error updating booking total: ' + error);
+        }
+    });
+}
+
+$(document).ready(function() {
+    console.log('House Bookings page initialized');
+    console.log('jQuery version:', $.fn.jquery);
+    console.log('Bootstrap modal available:', typeof $.fn.modal);
+    
+    // Initialize rental form
+    initializeRentalForm();
+    
+    // Search input handler
+    var searchTimeout;
+    $('#search-input').on('input', function() {
+        var searchValue = $(this).val();
+        console.log('Search input changed:', searchValue);
+        
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(function() {
+            console.log('Search timeout triggered');
+            applyFilters();
+        }, 500);
+    });
+    
+    // Status filter change handler
+    $('#status-filter').on('change', function() {
+        var statusValue = $(this).val();
+        console.log('Status filter changed:', statusValue);
+        applyFilters();
+    });
+    
+    // Payment filter change handler
+    $('#payment-filter').on('change', function() {
+        var paymentValue = $(this).val();
+        console.log('Payment filter changed:', paymentValue);
+        applyFilters();
+    });
+    
+    // Clear all filters function
+    window.clearAllFilters = function() {
+        console.log('Clearing all filters');
+        $('#search-input').val('');
+        $('#status-filter').val('');
+        $('#payment-filter').val('');
+        applyFilters();
+    };
+    
+    // Apply filters function
+    function applyFilters() {
+        var search = $('#search-input').val() || '';
+        var status = $('#status-filter').val() || '';
+        var payment = $('#payment-filter').val() || '';
+        var pageSize = $('#page-size-select').val() || '5';
+        
+        console.log('Applying filters:', {search: search, status: status, payment: payment, pageSize: pageSize});
+        
+        // Build URL with parameters
+        var url = new URL(window.location);
+        url.searchParams.set('page', '1'); // Reset to first page
+        if (search) {
+            url.searchParams.set('search', search);
+        } else {
+            url.searchParams.delete('search');
+        }
+        if (status) {
+            url.searchParams.set('status', status);
+        } else {
+            url.searchParams.delete('status');
+        }
+        if (payment) {
+            url.searchParams.set('payment_status', payment);
+        } else {
+            url.searchParams.delete('payment_status');
+        }
+        if (pageSize) {
+            url.searchParams.set('page_size', pageSize);
+        }
+        
+        // Redirect to new URL
+        window.location.href = url.toString();
+    }
+    
+    // Page size change function
+    window.changePageSize = function() {
+        console.log('Page size changed');
+        applyFilters();
+    };
+});
+</script>
+{% endblock %}

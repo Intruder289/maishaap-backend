@@ -1,0 +1,91 @@
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-check-circle me-2"></i>Booking Confirmation Details
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-sm-3"><strong>Reference:</strong></div>
+                    <div class="col-sm-9">{{ booking.booking_reference }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-sm-3"><strong>Customer:</strong></div>
+                    <div class="col-sm-9">{{ booking.customer.full_name }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-sm-3"><strong>Property:</strong></div>
+                    <div class="col-sm-9">{{ booking.property_obj.title }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-sm-3"><strong>Check-in:</strong></div>
+                    <div class="col-sm-9">{{ booking.check_in_date|date:"M d, Y" }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-sm-3"><strong>Check-out:</strong></div>
+                    <div class="col-sm-9">{{ booking.check_out_date|date:"M d, Y" }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-sm-3"><strong>Duration:</strong></div>
+                    <div class="col-sm-9">{{ booking.duration_days }} days</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-sm-3"><strong>Total Amount:</strong></div>
+                    <div class="col-sm-9">Tsh {{ booking.total_amount|floatformat:0 }}</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-sm-3"><strong>Guests:</strong></div>
+                    <div class="col-sm-9">{{ booking.number_of_guests }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-info-circle me-2"></i>Confirmation Info
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle me-2"></i>
+                    <strong>Ready to Confirm</strong>
+                    <p class="mb-0 mt-2">This booking is ready for confirmation. Once confirmed, the guest will be notified and the booking status will be updated.</p>
+                </div>
+                
+                <div class="alert alert-info">
+                    <i class="fas fa-calendar me-2"></i>
+                    <strong>Next Steps</strong>
+                    <ul class="mb-0 mt-2">
+                        <li>Guest will be notified</li>
+                        <li>Booking status changes to "Confirmed"</li>
+                        <li>Check-in process can begin</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-3">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-sticky-note me-2"></i>Special Requests
+                </h6>
+            </div>
+            <div class="card-body">
+                {% if booking.special_requests %}
+                    <p>{{ booking.special_requests|linebreaks }}</p>
+                {% else %}
+                    <p class="text-muted">No special requests</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>

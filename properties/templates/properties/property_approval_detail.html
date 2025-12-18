@@ -1,0 +1,270 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Property Approval - {{ property.title }} - Maisha{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'properties:property_approval_list' %}">Property Approvals</a></li>
+<li class="breadcrumb-item active">{{ property.title }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <!-- Property Header -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <h1 class="mb-2">{{ property.title }}</h1>
+          <div class="d-flex align-items-center mb-2">
+            <span class="badge bg-info me-2">{{ property.property_type.name|title }}</span>
+            {% if property.is_approved %}
+              <span class="badge bg-success me-2">Approved</span>
+            {% elif property.rejection_reason %}
+              <span class="badge bg-danger me-2">Rejected</span>
+            {% else %}
+              <span class="badge bg-warning me-2">Pending Approval</span>
+            {% endif %}
+          </div>
+        </div>
+        <div>
+          <a href="{% url 'properties:property_approval_list' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Back to List
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <!-- Left Column: Property Details -->
+    <div class="col-lg-8">
+      <!-- Property Images -->
+      <div class="card mb-4">
+        <div class="card-header">
+          <h5 class="mb-0">Property Images</h5>
+        </div>
+        <div class="card-body">
+          {% if images %}
+          <div class="row g-3">
+            {% for image in images %}
+            <div class="col-md-4">
+              <img src="{{ image.image.url }}" alt="{{ property.title }}" 
+                   class="img-fluid rounded" style="max-height: 200px; width: 100%; object-fit: cover;">
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="text-muted">No images uploaded</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Property Description -->
+      <div class="card mb-4">
+        <div class="card-header">
+          <h5 class="mb-0">Description</h5>
+        </div>
+        <div class="card-body">
+          <p>{{ property.description|linebreaks }}</p>
+        </div>
+      </div>
+
+      <!-- Property Details -->
+      <div class="card mb-4">
+        <div class="card-header">
+          <h5 class="mb-0">Property Details</h5>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <strong>Location:</strong><br>
+              <i class="fas fa-map-marker-alt text-muted me-2"></i>
+              {{ property.address }}<br>
+              <small class="text-muted">{{ property.region.name }}{% if property.district %}, {{ property.district.name }}{% endif %}</small>
+            </div>
+            <div class="col-md-6 mb-3">
+              <strong>Pricing:</strong><br>
+              <i class="fas fa-money-bill-wave text-muted me-2"></i>
+              Tsh{{ property.rent_amount|intcomma }}{% if property.property_type.name|lower == 'venue' %}{% elif property.property_type.name|lower == 'house' %}/month{% elif property.property_type.name|lower == 'hotel' or property.property_type.name|lower == 'lodge' %}/day{% else %}/month{% endif %}
+              {% if property.deposit_amount %}
+              <br><small class="text-muted">Deposit: Tsh{{ property.deposit_amount|intcomma }}</small>
+              {% endif %}
+            </div>
+            {% if property.bedrooms %}
+            <div class="col-md-6 mb-3">
+              <strong>Bedrooms:</strong> {{ property.bedrooms }}
+            </div>
+            {% endif %}
+            {% if property.bathrooms %}
+            <div class="col-md-6 mb-3">
+              <strong>Bathrooms:</strong> {{ property.bathrooms }}
+            </div>
+            {% endif %}
+            {% if property.size_sqft %}
+            <div class="col-md-6 mb-3">
+              <strong>Size:</strong> {{ property.size_sqft }} sq ft
+            </div>
+            {% endif %}
+            {% if property.capacity %}
+            <div class="col-md-6 mb-3">
+              <strong>Capacity:</strong> {{ property.capacity }} people
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Amenities -->
+      {% if amenities %}
+      <div class="card mb-4">
+        <div class="card-header">
+          <h5 class="mb-0">Amenities</h5>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            {% for amenity in amenities %}
+            <div class="col-md-4 mb-2">
+              <i class="fas fa-check text-success me-2"></i>{{ amenity.name }}
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Right Column: Owner Info & Actions -->
+    <div class="col-lg-4">
+      <!-- Owner Information -->
+      <div class="card mb-4">
+        <div class="card-header">
+          <h5 class="mb-0">Owner Information</h5>
+        </div>
+        <div class="card-body">
+          <div class="d-flex align-items-center mb-3">
+            <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3 fw-bold">
+              {{ property.owner.first_name|first|default:property.owner.username|first|upper }}
+            </div>
+            <div>
+              <strong>{{ property.owner.get_full_name|default:property.owner.username }}</strong><br>
+              <small class="text-muted">{{ property.owner.email }}</small>
+            </div>
+          </div>
+          <div class="mb-2">
+            <strong>Username:</strong> @{{ property.owner.username }}
+          </div>
+          <div class="mb-2">
+            <strong>Property Created:</strong><br>
+            <small class="text-muted">{{ property.created_at|date:"M d, Y g:i A" }}</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- Admin Comments -->
+      <div class="card mb-4">
+        <div class="card-header">
+          <h5 class="mb-0">Admin Comments</h5>
+        </div>
+        <div class="card-body">
+          {% if property.admin_comments %}
+          <p>{{ property.admin_comments|linebreaks }}</p>
+          {% else %}
+          <p class="text-muted">No comments yet</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Rejection Reason (if rejected) -->
+      {% if property.rejection_reason %}
+      <div class="card mb-4 border-danger">
+        <div class="card-header bg-danger text-white">
+          <h5 class="mb-0">Rejection Reason</h5>
+        </div>
+        <div class="card-body">
+          <p class="text-danger">{{ property.rejection_reason|linebreaks }}</p>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Approval Actions -->
+      {% if not property.is_approved %}
+      <div class="card mb-4">
+        <div class="card-header">
+          <h5 class="mb-0">Actions</h5>
+        </div>
+        <div class="card-body">
+          <!-- Approve Form -->
+          <form method="post" action="{% url 'properties:approve_property' property.id %}" class="mb-3">
+            {% csrf_token %}
+            <div class="mb-3">
+              <label for="approve_comments" class="form-label">Admin Comments (Optional)</label>
+              <textarea class="form-control" id="approve_comments" name="admin_comments" rows="3" 
+                        placeholder="Add any comments about this property..."></textarea>
+            </div>
+            <button type="submit" class="btn btn-success w-100">
+              <i class="fas fa-check me-2"></i>Approve Property
+            </button>
+          </form>
+
+          <hr>
+
+          <!-- Reject Form -->
+          <form method="post" action="{% url 'properties:reject_property' property.id %}">
+            {% csrf_token %}
+            <div class="mb-3">
+              <label for="reject_reason" class="form-label">Rejection Reason <span class="text-danger">*</span></label>
+              <textarea class="form-control" id="reject_reason" name="rejection_reason" rows="3" 
+                        placeholder="Explain why this property is being rejected..." required></textarea>
+            </div>
+            <div class="mb-3">
+              <label for="reject_comments" class="form-label">Admin Comments (Optional)</label>
+              <textarea class="form-control" id="reject_comments" name="admin_comments" rows="3" 
+                        placeholder="Add any additional comments..."></textarea>
+            </div>
+            <button type="submit" class="btn btn-warning w-100">
+              <i class="fas fa-times me-2"></i>Reject Property
+            </button>
+          </form>
+
+          <hr>
+
+          <!-- Delete Form -->
+          <form method="post" action="{% url 'properties:delete_approval_request' property.id %}" 
+                onsubmit="return confirm('Are you sure you want to delete this property approval request? This action cannot be undone.');">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger w-100">
+              <i class="fas fa-trash me-2"></i>Delete Request
+            </button>
+          </form>
+        </div>
+      </div>
+      {% else %}
+      <!-- Already Approved -->
+      <div class="card mb-4 border-success">
+        <div class="card-header bg-success text-white">
+          <h5 class="mb-0">Approved</h5>
+        </div>
+        <div class="card-body">
+          <p><strong>Approved by:</strong> {{ property.approved_by.get_full_name|default:property.approved_by.username }}</p>
+          <p><strong>Approved on:</strong> {{ property.approved_at|date:"M d, Y g:i A" }}</p>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.avatar-sm {
+  width: 48px;
+  height: 48px;
+  font-size: 14px;
+  font-weight: 600;
+}
+</style>
+{% endblock %}
+

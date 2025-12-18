@@ -1,0 +1,278 @@
+{% extends "accounts/base.html" %}
+{% load static %}
+{% load humanize %}
+{% load currency_filters %}
+
+{% block title %}Payment Methods - Maisha{% endblock %}
+
+{% block page_title %}Payment Methods{% endblock %}
+
+{% block page_actions %}
+<button class="btn btn-primary" type="button">
+  <span class="fas fa-plus me-2"></span>
+  Add Payment Method
+</button>
+{% endblock %}
+
+{% block content %}
+<!-- Payment Methods Stats Cards -->
+<div class="row g-3 mb-6">
+  <div class="col-6 col-lg-3">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between">
+          <div>
+            <h6 class="mb-2 text-500">Total Providers</h6>
+            <h4 class="mb-0">{{ total_providers }}</h4>
+            <p class="fs--1 mb-0 text-info">
+              <span class="me-1 fas fa-credit-card"></span>
+              Payment providers
+            </p>
+          </div>
+          <div class="d-flex align-items-center">
+            <div class="avatar avatar-lg">
+              <div class="avatar-name rounded-circle bg-primary-subtle text-primary">
+                <span data-feather="credit-card"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-6 col-lg-3">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between">
+          <div>
+            <h6 class="mb-2 text-500">Active Providers</h6>
+            <h4 class="mb-0">{{ active_providers }}</h4>
+            <p class="fs--1 mb-0 text-success">
+              <span class="me-1 fas fa-check-circle"></span>
+              Currently active
+            </p>
+          </div>
+          <div class="d-flex align-items-center">
+            <div class="avatar avatar-lg">
+              <div class="avatar-name rounded-circle bg-success-subtle text-success">
+                <span data-feather="check-circle"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-6 col-lg-3">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between">
+          <div>
+            <h6 class="mb-2 text-500">Inactive Providers</h6>
+            <h4 class="mb-0">{{ inactive_providers }}</h4>
+            <p class="fs--1 mb-0 text-warning">
+              <span class="me-1 fas fa-pause-circle"></span>
+              Temporarily disabled
+            </p>
+          </div>
+          <div class="d-flex align-items-center">
+            <div class="avatar avatar-lg">
+              <div class="avatar-name rounded-circle bg-warning-subtle text-warning">
+                <span data-feather="pause-circle"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-6 col-lg-3">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between">
+          <div>
+            <h6 class="mb-2 text-500">Success Rate</h6>
+            <h4 class="mb-0">98.5%</h4>
+            <p class="fs--1 mb-0 text-success">
+              <span class="me-1 fas fa-trending-up"></span>
+              Excellent
+            </p>
+          </div>
+          <div class="d-flex align-items-center">
+            <div class="avatar avatar-lg">
+              <div class="avatar-name rounded-circle bg-info-subtle text-info">
+                <span data-feather="trending-up"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Payment Providers Table -->
+<div class="card">
+  <div class="card-header">
+    <div class="row flex-between-center">
+      <div class="col-auto">
+        <h5 class="mb-0">Payment Providers</h5>
+      </div>
+      <div class="col-auto">
+        <div class="d-flex gap-2">
+          <button class="btn btn-secondary btn btn-primary-sm" type="button">
+            <span class="fas fa-download me-1"></span>
+            Export
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm table-hover mb-0">
+        <thead class="bg-200">
+          <tr>
+            <th class="border-0">Provider</th>
+            <th class="border-0">Type</th>
+            <th class="border-0">Status</th>
+            <th class="border-0">Transaction Fee</th>
+            <th class="border-0">Last Used</th>
+            <th class="border-0">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for provider in providers %}
+          <tr>
+            <td>
+              <div class="d-flex align-items-center">
+                <div class="bg-200 rounded me-3 d-flex align-items-center justify-content-center">
+                  <span class="fas fa-credit-card text-600"></span>
+                </div>
+                <div>
+                  <h6 class="mb-0">{{ provider.name }}</h6>
+                  <small class="text-600">{{ provider.description|default:"Payment provider" }}</small>
+                </div>
+              </div>
+            </td>
+            <td>
+              <span class="badge bg-info-subtle text-info">{{ provider.provider_type|title }}</span>
+            </td>
+            <td>
+              {% if provider.is_active %}
+              <span class="badge bg-success-subtle text-success">
+                <span class="fas fa-check-circle me-1"></span>
+                Active
+              </span>
+              {% else %}
+              <span class="badge bg-danger-subtle text-danger">
+                <span class="fas fa-times-circle me-1"></span>
+                Inactive
+              </span>
+              {% endif %}
+            </td>
+            <td>
+              <span class="fw-bold">{{ provider.transaction_fee }}%</span>
+            </td>
+            <td>
+              <span class="text-600">{{ provider.created_at|date:"M j, Y" }}</span>
+            </td>
+            <td>
+              <div class="dropdown">
+                <button class="btn btn-link btn btn-primary-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                  <span class="fas fa-ellipsis-h"></span>
+                </button>
+                <ul class="dropdown-menu">
+                  <li><a class="dropdown-item" href="#">View Details</a></li>
+                  <li><a class="dropdown-item" href="#">Edit Settings</a></li>
+                  <li><hr class="dropdown-divider"></li>
+                  {% if provider.is_active %}
+                  <li><a class="dropdown-item text-warning" href="#">Disable</a></li>
+                  {% else %}
+                  <li><a class="dropdown-item text-success" href="#">Enable</a></li>
+                  {% endif %}
+                </ul>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="text-center py-4">
+              <div class="text-600">
+                <span class="fas fa-credit-card fs-3 mb-3 d-block"></span>
+                <p class="mb-0">No payment providers found</p>
+                <small>Add your first payment provider to get started</small>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Recent Transactions -->
+<div class="row g-3 mt-4">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h5 class="mb-0">Recent Transactions</h5>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>Transaction ID</th>
+                <th>Provider</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for transaction in recent_transactions %}
+              <tr>
+                <td>
+                  <span class="fw-bold">#{{ transaction.id }}</span>
+                </td>
+                <td>
+                  <span class="text-600">{{ transaction.provider.name }}</span>
+                </td>
+                <td>
+                  <span class="fw-bold">{{ transaction.payment.amount|currency_tzs }}</span>
+                </td>
+                <td>
+                  {% if transaction.status == 'completed' %}
+                  <span class="badge bg-success-subtle text-success">Completed</span>
+                  {% elif transaction.status == 'pending' %}
+                  <span class="badge bg-warning-subtle text-warning">Pending</span>
+                  {% else %}
+                  <span class="badge bg-danger-subtle text-danger">Failed</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <span class="text-600">{{ transaction.created_at|date:"M j, Y g:i A" }}</span>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="5" class="text-center py-3">
+                  <span class="text-500">No recent transactions</span>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

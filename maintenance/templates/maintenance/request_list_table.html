@@ -1,0 +1,179 @@
+<!-- AJAX Table Content -->
+<div class="table-responsive">
+  <table class="table table-hover mb-0">
+    <thead class="table-light">
+      <tr>
+        <th>Request</th>
+        <th>Property</th>
+        {% if user.is_staff %}
+        <th>Tenant</th>
+        {% endif %}
+        <th>Priority</th>
+        <th>Status</th>
+        <th>Created</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="maintenance-table-body">
+      {% for request in page_obj.object_list %}
+      <tr data-request-id="{{ request.id }}">
+        <td>
+          <div class="d-flex align-items-center">
+            <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3 fw-bold">
+              {{ request.title|first|upper }}
+            </div>
+            <div>
+              <strong>
+                <a href="{% url 'maintenance:request_detail' request.id %}" class="text-decoration-none">
+                  {{ request.title }}
+                </a>
+              </strong>
+              <div class="text-muted small">{{ request.description|truncatechars:50 }}</div>
+            </div>
+          </div>
+        </td>
+        <td>
+          <div class="d-flex align-items-center">
+            <i class="fas fa-home text-muted me-2"></i>
+            <div>
+              <div class="fw-bold">{{ request.property.title }}</div>
+              <div class="text-muted small">{{ request.property.address|truncatechars:30 }}</div>
+            </div>
+          </div>
+        </td>
+        {% if user.is_staff %}
+        <td>
+          <div class="d-flex align-items-center">
+            <i class="fas fa-user text-muted me-2"></i>
+            <div>
+              <div class="fw-bold">{{ request.tenant.get_full_name|default:request.tenant.username }}</div>
+              <div class="text-muted small">{{ request.tenant.email }}</div>
+            </div>
+          </div>
+        </td>
+        {% endif %}
+        <td>
+          {% if request.priority == 'urgent' %}
+          <span class="badge bg-danger">{{ request.get_priority_display }}</span>
+          {% elif request.priority == 'high' %}
+          <span class="badge bg-warning">{{ request.get_priority_display }}</span>
+          {% elif request.priority == 'medium' %}
+          <span class="badge bg-info">{{ request.get_priority_display }}</span>
+          {% else %}
+          <span class="badge bg-success">{{ request.get_priority_display }}</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if request.status == 'completed' %}
+          <span class="badge bg-success">{{ request.get_status_display }}</span>
+          {% elif request.status == 'in_progress' %}
+          <span class="badge bg-primary">{{ request.get_status_display }}</span>
+          {% elif request.status == 'pending' %}
+          <span class="badge bg-warning">{{ request.get_status_display }}</span>
+          {% else %}
+          <span class="badge bg-secondary">{{ request.get_status_display }}</span>
+          {% endif %}
+        </td>
+        <td>
+          <div class="text-muted small">
+            {{ request.created_at|date:"M d, Y" }}<br>
+            {{ request.created_at|time:"g:i A" }}
+          </div>
+        </td>
+        <td>
+          <div class="dropdown">
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+              <i class="fas fa-ellipsis-v"></i>
+            </button>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="#" onclick="openViewModal({{ request.id }})">
+                <i class="fas fa-eye me-2"></i>View Details
+              </a></li>
+              {% if user.is_staff %}
+              <li><a class="dropdown-item" href="#" onclick="openStartWorkModal({{ request.id }})">
+                <i class="fas fa-play me-2"></i>Start Work
+              </a></li>
+              <li><a class="dropdown-item" href="#" onclick="openMarkCompleteModal({{ request.id }})">
+                <i class="fas fa-check me-2"></i>Mark Complete
+              </a></li>
+              {% if request.status == 'completed' %}
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item text-danger" href="#" onclick="openDeleteModal({{ request.id }})">
+                <i class="fas fa-trash me-2"></i>Delete
+              </a></li>
+              {% endif %}
+              {% endif %}
+            </ul>
+          </div>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="7" class="text-center py-4">
+          <div class="text-muted">
+            <i class="fas fa-inbox fa-2x mb-3"></i>
+            <p>No maintenance requests found matching your criteria.</p>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Pagination -->
+{% if page_obj.has_other_pages %}
+<div class="card-footer bg-white border-0 py-3">
+  <div class="row align-items-center">
+    <div class="col-md-6">
+      <div class="text-muted">
+        Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} entries
+      </div>
+    </div>
+    <div class="col-md-6">
+      <nav aria-label="Page navigation" class="d-flex justify-content-end">
+        <ul class="pagination pagination-sm mb-0">
+          {% if page_obj.has_previous %}
+          <li class="page-item">
+            <a class="page-link" href="#" onclick="loadPage(1); return false;" title="First Page">
+              <i class="fas fa-angle-double-left"></i>
+            </a>
+          </li>
+          <li class="page-item">
+            <a class="page-link" href="#" onclick="loadPage({{ page_obj.previous_page_number }}); return false;" title="Previous Page">
+              <i class="fas fa-angle-left"></i>
+            </a>
+          </li>
+          {% endif %}
+
+          <!-- Page numbers -->
+          {% for num in page_obj.paginator.page_range %}
+            {% if page_obj.number == num %}
+            <li class="page-item active">
+              <span class="page-link">{{ num }}</span>
+            </li>
+            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+            <li class="page-item">
+              <a class="page-link" href="#" onclick="loadPage({{ num }}); return false;">{{ num }}</a>
+            </li>
+            {% endif %}
+          {% endfor %}
+
+          {% if page_obj.has_next %}
+          <li class="page-item">
+            <a class="page-link" href="#" onclick="loadPage({{ page_obj.next_page_number }}); return false;" title="Next Page">
+              <i class="fas fa-angle-right"></i>
+            </a>
+          </li>
+          <li class="page-item">
+            <a class="page-link" href="#" onclick="loadPage({{ page_obj.paginator.num_pages }}); return false;" title="Last Page">
+              <i class="fas fa-angle-double-right"></i>
+            </a>
+          </li>
+          {% endif %}
+        </ul>
+      </nav>
+    </div>
+  </div>
+</div>
+{% endif %}

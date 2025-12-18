@@ -1,0 +1,106 @@
+{% extends "accounts/base.html" %}
+{% load static %}
+
+{% block title %}Profile Settings{% endblock %}
+
+{% block page_title %}Profile Settings{% endblock %}
+
+{% block extra_css %}
+
+{% endblock extra_css %}
+
+{% block content %}
+<div class="profile-container">
+  <a href="{% url 'accounts:dashboard' %}" class="back-btn btn-primary">
+    <svg viewBox="0 0 24 24" fill="currentColor">
+      <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+    </svg>
+    Back to Dashboard
+  </a>
+  
+  <div class="profile-header">
+    <h1>Profile Settings</h1>
+    <p>Manage your account information and preferences</p>
+  </div>
+  
+  {% if messages %}
+    <div class="messages">
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+  
+  <div class="profile-card">
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      
+      <div class="photo-section">
+        <div class="photo-preview {% if not profile.image %}empty{% endif %}">
+          {% if profile.image %}
+            <img src="{{ profile.image.url }}" alt="Profile photo">
+          {% else %}
+            {{ request.user.first_name.0|default:request.user.username.0|upper }}{{ request.user.last_name.0|upper }}
+          {% endif %}
+        </div>
+        <label class="photo-label">Profile Photo</label>
+        {{ form.image }}
+      </div>
+      
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">First Name</label>
+          {{ form.first_name }}
+        </div>
+        <div class="form-group">
+          <label class="form-label">Last Name</label>
+          {{ form.last_name }}
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          {{ form.email }}
+        </div>
+        <div class="form-group">
+          <label class="form-label">Phone Number</label>
+          {{ form.phone }}
+        </div>
+        <div class="form-group full-width">
+          <label class="form-label">Username</label>
+          <input type="text" class="form-input" value="{{ request.user.username }}" disabled>
+        </div>
+      </div>
+      
+      <div class="btn btn-primary-group">
+        <a href="{% url 'accounts:dashboard' %}" class="btn btn-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+          </svg>
+          Save Changes
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+// Profile-specific JavaScript functionality
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('Profile page loaded');
+  
+  // Set active profile navigation (if it exists in sidebar)
+  const profileNav = document.querySelector('[data-page="profile"]');
+  if(profileNav) {
+    profileNav.classList.add('active');
+  }
+  
+  // Update page title
+  const pageTitle = document.getElementById('pageTitle');
+  if(pageTitle) {
+    pageTitle.textContent = 'Profile Settings';
+  }
+});
+</script>
+{% endblock extra_js %}

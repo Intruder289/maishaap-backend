@@ -1,0 +1,203 @@
+{% extends 'accounts/base.html' %}
+
+{% block title %}Manage User Roles - {{ user_obj.username }}{% endblock %}
+
+{% block content %}
+<!-- Manage User Roles Modal -->
+<div class="modal fade" id="manageUserRolesModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-user-tag me-2"></i>Manage Roles for {{ user_obj.get_full_name|default:user_obj.username }}
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="manageUserRolesForm">
+        {% csrf_token %}
+        <input type="hidden" id="user_id" name="user_id" value="{{ user_obj.id }}">
+        <div class="modal-body">
+          <div class="row">
+            <div class="col-md-6">
+              <h6 class="mb-3">Available Roles</h6>
+              <div class="roles-container" id="available-roles">
+                <div class="text-center text-muted py-3">
+                  <i class="fas fa-spinner fa-spin me-2"></i>Loading roles...
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <h6 class="mb-3">Current Roles</h6>
+              <div class="current-roles-container" id="current-roles">
+                <div class="text-center text-muted py-3">
+                  <i class="fas fa-spinner fa-spin me-2"></i>Loading current roles...
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-save me-2"></i>Save Role Assignments
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    const userId = $('#user_id').val();
+
+    // Auto-open modal
+    const modalEl = document.getElementById('manageUserRolesModal');
+    const bsModal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
+    bsModal.show();
+
+    // Close redirect
+    $('#manageUserRolesModal').on('hidden.bs.modal', function () {
+        const back = document.referrer;
+        if (back) {
+            window.history.back();
+        } else {
+            window.location.href = '{% url "accounts:user_list" %}';
+        }
+    });
+
+    // Load roles
+    function loadUserRoles() {
+        $.ajax({
+            url: '{% url "accounts:get_user_roles" user_obj.id %}',
+            method: 'GET',
+            success: function(response) {
+                if (response.success) {
+                    renderAvailableRoles(response.available_roles, response.user_roles);
+                    renderCurrentRoles(response.available_roles, response.user_roles);
+                } else {
+                    $('#available-roles').html('<div class="text-danger">Failed to load roles.</div>');
+                }
+            },
+            error: function() {
+                $('#available-roles').html('<div class="text-danger">Error loading roles.</div>');
+            }
+        });
+    }
+
+    function renderAvailableRoles(roles, selected) {
+        const container = $('#available-roles');
+        if (!roles || roles.length === 0) {
+            container.html('<div class="text-muted">No roles available.</div>');
+            return;
+        }
+        const html = roles.map(function(role) {
+            const checked = selected.includes(role.id) ? 'checked' : '';
+            return `
+                <div class="form-check mb-2">
+                    <input class="form-check-input role-checkbox" type="checkbox" value="${role.id}" id="role_${role.id}" ${checked}>
+                    <label class="form-check-label" for="role_${role.id}">
+                        <strong>${role.name}</strong><br>
+                        <small class="text-muted">${role.description || ''}</small>
+                    </label>
+                </div>
+            `;
+        }).join('');
+        container.html(html);
+    }
+
+    function renderCurrentRoles(roles, selected) {
+        const container = $('#current-roles');
+        if (!selected || selected.length === 0) {
+            container.html('<div class="text-muted">No roles assigned.</div>');
+            return;
+        }
+        const selectedSet = new Set(selected);
+        const current = roles.filter(r => selectedSet.has(r.id));
+        const html = current.map(function(role) {
+            return `
+                <div class="d-flex align-items-center justify-content-between border rounded p-2 mb-2">
+                    <div>
+                        <div class="fw-semibold">${role.name}</div>
+                        <div class="small text-muted">${role.description || ''}</div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-role" data-role-id="${role.id}">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+        }).join('');
+        container.html(html);
+    }
+
+    // Sync current list on toggle
+    $(document).on('change', '.role-checkbox', function() {
+        const selected = $('.role-checkbox:checked').map(function(){ return parseInt($(this).val()); }).get();
+        $.ajax({
+            url: '{% url "accounts:get_user_roles" user_obj.id %}',
+            method: 'GET',
+            success: function(response) {
+                if (response.success) {
+                    renderCurrentRoles(response.available_roles, selected);
+                }
+            }
+        });
+    });
+
+    // Remove role from current list
+    $(document).on('click', '.remove-role', function() {
+        const id = $(this).data('role-id');
+        $(`#role_${id}`).prop('checked', false).trigger('change');
+    });
+
+    // Submit
+    $('#manageUserRolesForm').on('submit', function(e) {
+        e.preventDefault();
+        const roles = $('.role-checkbox:checked').map(function(){ return $(this).val(); }).get();
+        const submitBtn = $(this).find('button[type="submit"]');
+        const original = submitBtn.html();
+        submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Saving...');
+        
+        // Prepare data - send as array
+        const data = {
+            roles: roles,
+            csrfmiddlewaretoken: $('[name=csrfmiddlewaretoken]').val()
+        };
+        
+        $.ajax({
+            url: '{% url "accounts:update_user_roles_ajax" user_obj.id %}',
+            method: 'POST',
+            data: data,
+            traditional: true, // This ensures arrays are sent correctly
+            headers: { 'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val() },
+            success: function(response) {
+                if (response.success) {
+                    // Close modal then refresh caller
+                    const alertDiv = $('<div class="alert alert-success alert-dismissible fade show m-3" role="alert">' +
+                        '<i class="fas fa-check-circle me-2"></i>' + (response.message || 'Roles updated successfully.') +
+                        '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' +
+                        '</div>');
+                    $('.modal-content').prepend(alertDiv);
+                    setTimeout(function(){ $('#manageUserRolesModal').modal('hide'); }, 600);
+                } else {
+                    alert(response.message || 'Failed to update roles.');
+                }
+            },
+            error: function() {
+                alert('Error updating roles.');
+            },
+            complete: function() {
+                submitBtn.prop('disabled', false).html(original);
+            }
+        });
+    });
+
+    // Initial load
+    loadUserRoles();
+});
+</script>
+{% endblock %}
+
+

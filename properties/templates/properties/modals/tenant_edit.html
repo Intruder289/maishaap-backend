@@ -1,0 +1,28 @@
+<form method="post" action="{% url 'properties:api_tenant_edit' tenant.id %}">
+    {% csrf_token %}
+    
+    <div class="row g-3">
+        <div class="col-md-6">
+            <label for="first_name" class="form-label">First Name *</label>
+            <input type="text" class="form-control" id="first_name" name="first_name" value="{{ tenant.first_name }}" required>
+        </div>
+        <div class="col-md-6">
+            <label for="last_name" class="form-label">Last Name *</label>
+            <input type="text" class="form-control" id="last_name" name="last_name" value="{{ tenant.last_name }}" required>
+        </div>
+        <div class="col-md-6">
+            <label for="email" class="form-label">Email Address *</label>
+            <input type="email" class="form-control" id="email" name="email" value="{{ tenant.email }}" required>
+        </div>
+        <div class="col-md-6">
+            <label for="phone" class="form-label">Phone Number *</label>
+            <input type="tel" class="form-control" id="phone" name="phone" value="{{ tenant.phone }}" required>
+        </div>
+        <div class="col-12">
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Note:</strong> Changes to tenant information will be saved immediately. This will not affect any existing bookings or payments.
+            </div>
+        </div>
+    </div>
+</form>

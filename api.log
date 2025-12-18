@@ -1,0 +1,4 @@
+New tenant registered: testuser_20251027203126 (test_20251027203126@example.com) - Pending approval
+Tenant logged in: api_test_user (api_test@example.com)
+New tenant registered: testuser_20251027204850 (test_20251027204850@example.com) - Pending approval
+INFO 2025-11-15 10:21:41,136 api_views 4356 21632 Password reset request from mobile app: testuser@example.com

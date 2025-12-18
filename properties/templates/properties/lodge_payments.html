@@ -1,0 +1,769 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}Lodge Payments{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <div class="row flex-between-center">
+      <div class="col">
+        <h6 class="mb-2">Lodge Payment Records</h6>
+        <h5 class="mb-0">Manage lodge payments, transactions, and financial records</h5>
+      </div>
+      <div class="col-auto">
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#recordPaymentModal">
+          <span class="fas fa-plus me-2"></span>Record Payment
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Search and Filters -->
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-3">
+        <label for="paymentSearch" class="form-label">Search</label>
+        <input type="text" class="form-control" id="paymentSearch" placeholder="Search payments...">
+      </div>
+      <div class="col-md-2">
+        <label for="methodFilter" class="form-label">Payment Method</label>
+        <select class="form-select" id="methodFilter">
+          <option value="">All Methods</option>
+          <option value="cash">Cash</option>
+          <option value="card">Card</option>
+          <option value="mobile_money">Mobile Money</option>
+          <option value="bank_transfer">Bank Transfer</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label for="typeFilter" class="form-label">Payment Type</label>
+        <select class="form-select" id="typeFilter">
+          <option value="">All Types</option>
+          <option value="deposit">Deposit</option>
+          <option value="partial">Partial</option>
+          <option value="full">Full Payment</option>
+          <option value="refund">Refund</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label for="dateFilter" class="form-label">Date Range</label>
+        <select class="form-select" id="dateFilter">
+          <option value="">All Time</option>
+          <option value="today">Today</option>
+          <option value="week">This Week</option>
+          <option value="month">This Month</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label for="format" class="form-label">&nbsp;</label>
+        <div class="d-flex gap-2">
+          <button class="btn btn-outline-secondary" onclick="clearFilters()">
+            <i class="fas fa-times me-1"></i>Clear
+          </button>
+          <button class="btn btn-outline-primary" onclick="exportPayments()">
+            <i class="fas fa-download me-1"></i>Export
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Payment</th>
+            <th>Booking</th>
+            <th>Customer</th>
+            <th>Amount</th>
+            <th>Method</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Date</th>
+            <th>Recorded By</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for payment in payments %}
+          <tr data-payment-id="{{ payment.id }}">
+            <td>
+              <div class="d-flex align-items-center">
+                <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3 fw-bold">
+                  {{ payment.id }}
+                </div>
+                <div>
+                  <strong>
+                    <a href="#" class="text-decoration-none" onclick="openViewModal({{ payment.id }})">
+                      Payment #{{ payment.id }}
+                    </a>
+                  </strong>
+                  <div class="text-muted small">{{ payment.transaction_reference|default:"No reference" }}</div>
+                </div>
+              </div>
+            </td>
+            <td>
+              <div class="d-flex align-items-center">
+                <i class="fas fa-calendar text-muted me-2"></i>
+                <div>
+                  <div class="fw-bold">{{ payment.booking.booking_reference }}</div>
+                  <div class="text-muted small">{{ payment.booking.room_number|default:"Lodge" }}</div>
+                </div>
+              </div>
+            </td>
+            <td>
+              <div class="d-flex align-items-center">
+                <i class="fas fa-user text-muted me-2"></i>
+                <div>
+                  <div class="fw-bold">{{ payment.booking.customer.full_name }}</div>
+                  <div class="text-muted small">{{ payment.booking.customer.email|default:payment.booking.customer.phone }}</div>
+                </div>
+              </div>
+            </td>
+            <td>
+              <strong>Tsh{{ payment.amount|floatformat:2 }}</strong>
+            </td>
+            <td>
+              {% if payment.payment_method == 'cash' %}
+              <span class="badge bg-success">{{ payment.get_payment_method_display }}</span>
+              {% elif payment.payment_method == 'card' %}
+              <span class="badge bg-info">{{ payment.get_payment_method_display }}</span>
+              {% elif payment.payment_method == 'mobile_money' %}
+              <span class="badge bg-warning">{{ payment.get_payment_method_display }}</span>
+              {% elif payment.payment_method == 'bank_transfer' %}
+              <span class="badge bg-primary">{{ payment.get_payment_method_display }}</span>
+              {% else %}
+              <span class="badge bg-secondary">{{ payment.get_payment_method_display }}</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if payment.payment_type == 'full' %}
+              <span class="badge bg-success">{{ payment.get_payment_type_display }}</span>
+              {% elif payment.payment_type == 'partial' %}
+              <span class="badge bg-warning">{{ payment.get_payment_type_display }}</span>
+              {% elif payment.payment_type == 'deposit' %}
+              <span class="badge bg-info">{{ payment.get_payment_type_display }}</span>
+              {% elif payment.payment_type == 'refund' %}
+              <span class="badge bg-danger">{{ payment.get_payment_type_display }}</span>
+              {% else %}
+              <span class="badge bg-secondary">{{ payment.get_payment_type_display }}</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if payment.status == 'active' %}
+              <span class="badge bg-success">Active</span>
+              {% elif payment.status == 'refunded' %}
+              <span class="badge bg-danger">Refunded</span>
+              {% elif payment.status == 'cancelled' %}
+              <span class="badge bg-secondary">Cancelled</span>
+              {% else %}
+              <span class="badge bg-secondary">{{ payment.get_status_display }}</span>
+              {% endif %}
+            </td>
+            <td>
+              <div class="text-muted small">
+                {{ payment.payment_date|date:"M d, Y" }}<br>
+                {{ payment.payment_date|time:"g:i A" }}
+              </div>
+            </td>
+            <td>
+              <div class="text-muted small">
+                {{ payment.recorded_by.get_full_name|default:payment.recorded_by.username }}
+              </div>
+            </td>
+            <td>
+              <div class="dropdown">
+                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                  <i class="fas fa-ellipsis-v"></i>
+                </button>
+                <ul class="dropdown-menu">
+                  <li><a class="dropdown-item" href="#" onclick="openViewModal({{ payment.id }})">
+                    <i class="fas fa-eye me-2"></i>View Details
+                  </a></li>
+                  <li><a class="dropdown-item" href="#" onclick="openPrintModal({{ payment.id }})">
+                    <i class="fas fa-receipt me-2"></i>Print Receipt
+                  </a></li>
+                  <li><hr class="dropdown-divider"></li>
+                  <li><a class="dropdown-item text-danger" href="#" onclick="openRefundModal({{ payment.id }})">
+                    <i class="fas fa-undo me-2"></i>Refund
+                  </a></li>
+                </ul>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="10" class="text-center py-4">
+              <div class="text-muted">
+                <i class="fas fa-inbox fa-2x mb-3"></i>
+                <p>No payment records found matching your criteria.</p>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    
+    <!-- Pagination -->
+    {% if payments.has_other_pages %}
+    <div class="card-footer bg-white border-0 py-3">
+      <div class="row align-items-center">
+        <div class="col-md-6">
+          <div class="text-muted">
+            Showing {{ payments.start_index }} to {{ payments.end_index }} of {{ payments.paginator.count }} entries
+          </div>
+        </div>
+        <div class="col-md-6">
+          <nav aria-label="Page navigation" class="d-flex justify-content-end">
+            <ul class="pagination pagination-sm mb-0">
+              {% if payments.has_previous %}
+              <li class="page-item">
+                <a class="page-link" href="?page=1{% if request.GET.methodFilter %}&method={{ request.GET.methodFilter }}{% endif %}{% if request.GET.typeFilter %}&type={{ request.GET.typeFilter }}{% endif %}" title="First Page">
+                  <i class="fas fa-angle-double-left"></i>
+                </a>
+              </li>
+              <li class="page-item">
+                <a class="page-link" href="?page={{ payments.previous_page_number }}{% if request.GET.methodFilter %}&method={{ request.GET.methodFilter }}{% endif %}{% if request.GET.typeFilter %}&type={{ request.GET.typeFilter }}{% endif %}" title="Previous Page">
+                  <i class="fas fa-angle-left"></i>
+                </a>
+              </li>
+              {% endif %}
+              
+              <!-- Page numbers -->
+              {% for num in payments.paginator.page_range %}
+                {% if payments.number == num %}
+              <li class="page-item active">
+                <span class="page-link">{{ num }}</span>
+              </li>
+                {% elif num > payments.number|add:'-3' and num < payments.number|add:'3' %}
+                <li class="page-item">
+                  <a class="page-link" href="?page={{ num }}{% if request.GET.methodFilter %}&method={{ request.GET.methodFilter }}{% endif %}{% if request.GET.typeFilter %}&type={{ request.GET.typeFilter }}{% endif %}">{{ num }}</a>
+                </li>
+                {% endif %}
+              {% endfor %}
+              
+              {% if payments.has_next %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ payments.next_page_number }}{% if request.GET.methodFilter %}&method={{ request.GET.methodFilter }}{% endif %}{% if request.GET.typeFilter %}&type={{ request.GET.typeFilter }}{% endif %}" title="Next Page">
+                  <i class="fas fa-angle-right"></i>
+                </a>
+              </li>
+              <li class="page-item">
+                <a class="page-link" href="?page={{ payments.paginator.num_pages }}{% if request.GET.methodFilter %}&method={{ request.GET.methodFilter }}{% endif %}{% if request.GET.typeFilter %}&type={{ request.GET.typeFilter }}{% endif %}" title="Last Page">
+                  <i class="fas fa-angle-double-right"></i>
+                </a>
+              </li>
+              {% endif %}
+            </ul>
+          </nav>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Record Payment Modal -->
+<div class="modal fade" id="recordPaymentModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Record Lodge Payment</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="recordPaymentForm">
+          {% csrf_token %}
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Booking Reference *</label>
+              <select class="form-control" id="bookingReference" required>
+                <option value="">Select Booking</option>
+                {% for booking in bookings %}
+                <option value="{{ booking.id }}" data-reference="{{ booking.booking_reference }}" data-customer="{{ booking.customer.full_name }}" data-room="{{ booking.room_number|default:'N/A' }}" data-total-amount="{{ booking.total_amount }}" data-paid-amount="{{ booking.paid_amount }}">
+                  {{ booking.booking_reference }} - {{ booking.customer.full_name }} ({{ booking.room_number|default:"Lodge" }}) - Tsh{{ booking.total_amount }}
+                </option>
+                {% empty %}
+                <option value="" disabled>No bookings available</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Amount *</label>
+              <input type="number" class="form-control" id="paymentAmount" step="0.01" min="0" required readonly>
+              <small class="text-muted">Auto-calculated remaining amount (non-editable)</small>
+              <div id="balanceInfo" class="mt-2" style="display: none;">
+                <div class="alert alert-info py-2">
+                  <small>
+                    <strong>Total:</strong> <span id="totalAmountDisplay"></span><br>
+                    <strong>Paid:</strong> <span id="paidAmountDisplay"></span><br>
+                    <strong>Remaining:</strong> <span id="remainingAmountDisplay"></span>
+                  </small>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Payment Method *</label>
+              <select class="form-control" id="paymentMethod" required>
+                <option value="">Select Method</option>
+                <option value="cash">Cash</option>
+                <option value="card">Card</option>
+                <option value="mobile_money">Mobile Money</option>
+                <option value="bank_transfer">Bank Transfer</option>
+                <option value="check">Check</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Payment Type *</label>
+              <select class="form-control" id="paymentType" required>
+                <option value="full" selected>Full Payment</option>
+                <option value="partial">Partial Payment</option>
+                <option value="deposit">Deposit</option>
+                <option value="refund">Refund</option>
+              </select>
+            </div>
+            <div class="col-md-6" id="partialAmountDiv" style="display: none;">
+              <label class="form-label">Partial Amount *</label>
+              <input type="number" class="form-control" id="partialAmount" step="0.01" min="0" placeholder="Enter partial amount">
+              <small class="text-muted">Enter the amount customer wants to pay now</small>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Transaction Reference</label>
+              <input type="text" class="form-control" id="transactionReference" placeholder="Transaction ID or reference" readonly>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Payment Date *</label>
+              <input type="datetime-local" class="form-control" id="paymentDate" required>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Notes</label>
+              <textarea class="form-control" id="paymentNotes" rows="3" placeholder="Additional notes about this payment..."></textarea>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="submitRecordPayment()">Record Payment</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- View Payment Details Modal -->
+<div class="modal fade" id="viewPaymentModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Payment Details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="viewPaymentModalBody">
+        <!-- Content will be loaded dynamically -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Print Receipt Modal -->
+<div class="modal fade" id="printReceiptModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Print Receipt</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="printReceiptModalBody">
+        <!-- Receipt content will be loaded dynamically -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" onclick="downloadReceiptPDF()">
+          <i class="fas fa-download me-2"></i>Download PDF
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Refund Payment Modal -->
+<div class="modal fade" id="refundPaymentModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Process Refund</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-warning">
+          <i class="fas fa-exclamation-triangle me-2"></i>
+          <strong>Warning:</strong> This action will process a refund for the selected payment. This action cannot be undone.
+        </div>
+        <form id="refundPaymentForm">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Refund Amount *</label>
+              <input type="number" class="form-control" id="refundAmount" step="0.01" min="0" required>
+              <small class="text-muted">Auto-filled for extra payments, manual entry for normal refunds</small>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Refund Method *</label>
+              <select class="form-control" id="refundMethod" required>
+                <option value="">Select Method</option>
+                <option value="cash">Cash</option>
+                <option value="card">Card Refund</option>
+                <option value="bank_transfer">Bank Transfer</option>
+                <option value="mobile_money">Mobile Money</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Refund Reference</label>
+              <input type="text" class="form-control" id="refundReference" readonly placeholder="Auto-generated">
+              <small class="text-muted">Automatically generated</small>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Refund Date *</label>
+              <input type="datetime-local" class="form-control" id="refundDate" required>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Reason for Refund *</label>
+              <textarea class="form-control" id="refundReason" rows="3" placeholder="Please provide a reason for this refund..." required></textarea>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" onclick="submitRefund()">Process Refund</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentPaymentId = null;
+
+$(document).ready(function() {
+    console.log('Lodge Payments page initialized');
+    
+    // Set current date/time for modals
+    const now = new Date();
+    const dateTimeString = now.toISOString().slice(0, 16);
+    $('#refundDate, #paymentDate').val(dateTimeString);
+    
+    // Reset payment form when modal is opened
+    $('#recordPaymentModal').on('show.bs.modal', function() {
+        // Clear form and reset state
+        $('#recordPaymentForm')[0].reset();
+        $('.fully-paid-warning').remove();
+        $('.form-control').removeClass('is-invalid').prop('disabled', false);
+        $('button[onclick="submitRecordPayment()"]').prop('disabled', false).text('Record Payment');
+        $('#balanceInfo').hide();
+        
+        // Set current date/time
+        $('#paymentDate').val(dateTimeString);
+    });
+    
+    // Auto-fill Transaction Reference and Amount when booking is selected
+    $('#bookingReference').on('change', function() {
+        const selectedOption = $(this).find('option:selected');
+        const bookingReference = selectedOption.data('reference');
+        const totalAmount = parseFloat(selectedOption.data('total-amount')) || 0;
+        const paidAmount = parseFloat(selectedOption.data('paid-amount')) || 0;
+        
+        // Remove any existing fully paid warnings
+        $('.fully-paid-warning').remove();
+        $('.form-control').removeClass('is-invalid');
+        
+        if (bookingReference) {
+            $('#transactionReference').val(bookingReference);
+            
+            // Calculate remaining amount
+            const remainingAmount = totalAmount - paidAmount;
+            
+            // Check if booking is fully paid
+            if (remainingAmount <= 0) {
+                // Show fully paid warning
+                const warningHtml = `
+                    <div class="alert alert-warning fully-paid-warning mt-2" role="alert">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Booking ${bookingReference} is already fully paid!</strong><br>
+                        Total: Tsh ${totalAmount.toFixed(2)} | Paid: Tsh ${paidAmount.toFixed(2)} | Remaining: Tsh 0.00<br>
+                        <small>Please start a new booking for additional payments.</small>
+                    </div>
+                `;
+                $('#bookingReference').after(warningHtml);
+                
+                // Disable form fields
+                $('#paymentAmount, #paymentMethod, #paymentType, #partialAmount').prop('disabled', true).addClass('is-invalid');
+                $('button[onclick="submitRecordPayment()"]').prop('disabled', true).text('Booking Fully Paid');
+                
+                // Set values to show the fully paid status
+                $('#paymentAmount').val(totalAmount);
+                $('#partialAmount').val(0);
+                
+                // Show balance information
+                $('#totalAmountDisplay').text(`Tsh${totalAmount.toFixed(2)}`);
+                $('#paidAmountDisplay').text(`Tsh${paidAmount.toFixed(2)}`);
+                $('#remainingAmountDisplay').text(`Tsh0.00`);
+                $('#balanceInfo').show();
+                
+                return; // Exit early for fully paid bookings
+            }
+            
+            // For bookings with remaining balance
+            $('#paymentAmount').val(remainingAmount);
+            $('#partialAmount').attr('max', remainingAmount);
+            $('#partialAmount').attr('placeholder', `Max: Tsh${remainingAmount.toFixed(2)}`);
+            
+            // Show balance information
+            $('#totalAmountDisplay').text(`Tsh${totalAmount.toFixed(2)}`);
+            $('#paidAmountDisplay').text(`Tsh${paidAmount.toFixed(2)}`);
+            $('#remainingAmountDisplay').text(`Tsh${remainingAmount.toFixed(2)}`);
+            $('#balanceInfo').show();
+            
+            // Enable form fields
+            $('#paymentAmount, #paymentMethod, #paymentType, #partialAmount').prop('disabled', false).removeClass('is-invalid');
+            $('button[onclick="submitRecordPayment()"]').prop('disabled', false).text('Record Payment');
+            
+        } else {
+            $('#transactionReference').val('');
+            $('#paymentAmount').val('');
+            $('#partialAmount').val('');
+            $('#balanceInfo').hide();
+            
+            // Enable form fields
+            $('#paymentAmount, #paymentMethod, #paymentType, #partialAmount').prop('disabled', false).removeClass('is-invalid');
+            $('button[onclick="submitRecordPayment()"]').prop('disabled', false).text('Record Payment');
+        }
+    });
+    
+    // Show/hide partial amount input based on payment type
+    $('#paymentType').on('change', function() {
+        const paymentType = $(this).val();
+        if (paymentType === 'partial') {
+            $('#partialAmountDiv').show();
+            $('#partialAmount').prop('required', true);
+            
+            // Set max amount to remaining balance
+            const selectedOption = $('#bookingReference').find('option:selected');
+            const totalAmount = parseFloat(selectedOption.data('total-amount')) || 0;
+            const paidAmount = parseFloat(selectedOption.data('paid-amount')) || 0;
+            const remainingAmount = totalAmount - paidAmount;
+            
+            $('#partialAmount').attr('max', remainingAmount);
+            $('#partialAmount').attr('placeholder', `Max: Tsh${remainingAmount.toFixed(2)}`);
+        } else {
+            $('#partialAmountDiv').hide();
+            $('#partialAmount').prop('required', false);
+            $('#partialAmount').val('');
+        }
+    });
+    
+    // Filter functionality
+    $('#paymentSearch, #methodFilter, #typeFilter, #dateFilter').on('change keyup', function() {
+        filterPayments();
+    });
+    
+    function filterPayments() {
+        const searchTerm = $('#paymentSearch').val().toLowerCase();
+        const methodFilter = $('#methodFilter').val();
+        const typeFilter = $('#typeFilter').val();
+        
+        $('#paymentsTable tbody tr').each(function() {
+            let showRow = true;
+            const row = $(this);
+            
+            // Search filter
+            if (searchTerm && !row.text().toLowerCase().includes(searchTerm)) {
+                showRow = false;
+            }
+            
+            // Method filter
+            if (methodFilter && !row.find('td:nth-child(5)').text().toLowerCase().includes(methodFilter)) {
+                showRow = false;
+            }
+            
+            // Type filter
+            if (typeFilter && !row.find('td:nth-child(6)').text().toLowerCase().includes(typeFilter)) {
+                showRow = false;
+            }
+            
+            row.toggle(showRow);
+        });
+    }
+    
+    // Clear filters
+    window.clearFilters = function() {
+        $('#paymentSearch, #methodFilter, #typeFilter, #dateFilter').val('');
+        $('#paymentsTable tbody tr').show();
+    };
+    
+    // Export payments
+    window.exportPayments = function() {
+        alert('Export functionality will be implemented');
+    };
+});
+
+// Modal functions
+function openViewModal(paymentId) {
+    currentPaymentId = paymentId;
+    console.log('Opening view modal for payment:', paymentId);
+    
+    // Show loading spinner
+    $('#viewPaymentModalBody').html('<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>');
+    $('#viewPaymentModal').modal('show');
+    
+    // Load payment details via AJAX
+    $.ajax({
+        url: `/properties/api/payment-details/${paymentId}/`,
+        method: 'GET',
+        success: function(data) {
+            console.log('Successfully loaded payment details');
+            $('#viewPaymentModalBody').html(data);
+        },
+        error: function(xhr, status, error) {
+            console.error('Failed to load payment details:', error);
+            console.error('Response:', xhr.responseText);
+            $('#viewPaymentModalBody').html('<div class="alert alert-danger">Failed to load payment details: ' + error + '</div>');
+        }
+    });
+}
+
+function openPrintModal(paymentId) {
+    currentPaymentId = paymentId;
+    console.log('Opening print modal for payment:', paymentId);
+    
+    // Show loading spinner
+    $('#printReceiptModalBody').html('<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>');
+    $('#printReceiptModal').modal('show');
+    
+    // Load receipt data via AJAX
+    $.ajax({
+        url: `/properties/api/payment/${paymentId}/generate-receipt/`,
+        method: 'GET',
+        success: function(data) {
+            console.log('Successfully loaded receipt data');
+            $('#printReceiptModalBody').html(data);
+        },
+        error: function(xhr, status, error) {
+            console.error('Failed to load receipt:', error);
+            console.error('Response:', xhr.responseText);
+            $('#printReceiptModalBody').html('<div class="alert alert-danger">Failed to load receipt: ' + error + '</div>');
+        }
+    });
+}
+
+function openRefundModal(paymentId) {
+    currentPaymentId = paymentId;
+    $('#refundPaymentModal').modal('show');
+    // Implement refund logic
+}
+
+function submitRecordPayment() {
+    // Prevent double submission
+    const submitBtn = $('button[onclick="submitRecordPayment()"]');
+    if (submitBtn.prop('disabled')) {
+        return;
+    }
+    submitBtn.prop('disabled', true).text('Processing...');
+    
+    const paymentType = $('#paymentType').val();
+    let amount = $('#paymentAmount').val();
+    
+    // If partial payment, use the partial amount instead
+    if (paymentType === 'partial') {
+        const partialAmount = $('#partialAmount').val();
+        if (!partialAmount || parseFloat(partialAmount) <= 0) {
+            alert('Please enter a valid partial amount');
+            submitBtn.prop('disabled', false).text('Record Payment');
+            return;
+        }
+        amount = partialAmount;
+    }
+    
+    const formData = {
+        booking_id: $('#bookingReference').val(),
+        amount: amount,
+        payment_method: $('#paymentMethod').val(),
+        payment_type: paymentType,
+        transaction_reference: $('#transactionReference').val(),
+        payment_date: $('#paymentDate').val(),
+        notes: $('#paymentNotes').val()
+    };
+    
+    console.log('Form Data:', formData);
+    
+    // Check each required field individually
+    const missingFields = [];
+    if (!formData.booking_id) missingFields.push('Booking Reference');
+    if (!formData.amount || parseFloat(formData.amount) <= 0) missingFields.push('Amount');
+    if (!formData.payment_method) missingFields.push('Payment Method');
+    if (!formData.payment_type) missingFields.push('Payment Type');
+    if (!formData.payment_date) missingFields.push('Payment Date');
+    
+    if (missingFields.length > 0) {
+        alert('Please fill in the following required fields:\n' + missingFields.join('\n'));
+        submitBtn.prop('disabled', false).text('Record Payment');
+        return;
+    }
+    
+    // Get CSRF token
+    const csrfToken = $('[name=csrfmiddlewaretoken]').val();
+    formData.csrfmiddlewaretoken = csrfToken;
+    
+    // Proceed with payment submission
+    $.ajax({
+        url: '/properties/api/collect-payment/',
+        method: 'POST',
+        data: formData,
+        success: function(response) {
+            if (response.success) {
+                alert(response.message || 'Payment recorded successfully!');
+                $('#recordPaymentModal').modal('hide');
+                location.reload(); // Refresh the page to show the new payment
+            } else {
+                alert(response.error || 'Failed to record payment');
+                submitBtn.prop('disabled', false).text('Record Payment');
+            }
+        },
+        error: function(xhr) {
+            let errorMsg = 'Failed to record payment. Please try again.';
+            if (xhr.responseJSON && xhr.responseJSON.error) {
+                errorMsg = xhr.responseJSON.error;
+            }
+            alert(errorMsg);
+            submitBtn.prop('disabled', false).text('Record Payment');
+        }
+    });
+}
+
+function submitRefund() {
+    alert('Refund functionality will be implemented');
+}
+
+function printReceipt() {
+    $('#viewPaymentModal').modal('hide');
+    setTimeout(function() {
+        $('#printReceiptModal').modal('show');
+    }, 300);
+}
+
+function downloadReceiptPDF() {
+    if (currentPaymentId) {
+        // Open the download endpoint in a new window to trigger PDF download
+        window.location.href = `/properties/api/payment/${currentPaymentId}/download-receipt/`;
+    } else {
+        alert('No payment selected');
+    }
+}
+</script>
+{% endblock %}

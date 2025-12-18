@@ -1,0 +1,232 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}My Houses{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+  <div>
+    <div>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <path d="M12 3l10 9h-3v9h-6v-6H11v6H5v-9H2z" fill="white"/>
+      </svg>
+    </div>
+    <div>
+      <h1>My Houses</h1>
+      <p>Manage your property portfolio</p>
+    </div>
+  </div>
+  <div>
+    <a href="{% url 'accounts:house_create' %}" class="btn btn-primary-primary">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 5v14M5 12h14"/>
+      </svg>
+      Add New House
+    </a>
+  </div>
+</div>
+
+<!-- Statistics Overview -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+        <path d="M12 3l10 9h-3v9h-6v-6H11v6H5v-9H2z"/>
+      </svg>
+    </div>
+    <div class="stat-content">
+      <div class="stat-value">{{ stats.total }}</div>
+      <div class="text-500">Total Properties</div>
+    </div>
+  </div>
+  
+  <div class="stat-card">
+    <div class="stat-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+    </div>
+    <div class="stat-content">
+      <div class="stat-value">{{ stats.available }}</div>
+      <div class="text-500">Available</div>
+    </div>
+  </div>
+  
+  <div class="stat-card">
+    <div class="stat-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+        <path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z"/>
+      </svg>
+    </div>
+    <div class="stat-content">
+      <div class="stat-value">{{ stats.rented }}</div>
+      <div class="text-500">Rented</div>
+    </div>
+  </div>
+  
+  <div class="stat-card">
+    <div class="stat-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+        <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+        <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+      </svg>
+    </div>
+    <div class="stat-content">
+      <div class="stat-value">{{ stats.under_maintenance }}</div>
+      <div class="text-500">Under Maintenance</div>
+    </div>
+  </div>
+  
+  <div class="stat-card">
+    <div class="stat-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+        <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+        <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+      </svg>
+    </div>
+    <div class="stat-content">
+      <div class="stat-value">{{ stats.total_views }}</div>
+      <div class="text-500">Total Views</div>
+    </div>
+  </div>
+  
+  <div class="stat-card">
+    <div class="stat-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+      </svg>
+    </div>
+    <div class="stat-content">
+      <div class="stat-value">{{ stats.total_favorites }}</div>
+      <div class="text-500">Total Favorites</div>
+    </div>
+  </div>
+</div>
+
+<!-- Properties List -->
+{% if properties %}
+<div>
+  {% for property in properties %}
+  <div class="dashboard-card" style="padding: 0; overflow: hidden;">
+    <!-- Property Image -->
+    <div style="height: 200px; background: #f1f5f9; position: relative; overflow: hidden;">
+      {% if property.images.first %}
+        <img src="{{ property.images.first.image.url }}" alt="{{ property.title }}" 
+            >
+      {% else %}
+        <div>
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 3l10 9h-3v9h-6v-6H11v6H5v-9H2z"/>
+          </svg>
+        </div>
+      {% endif %}
+      
+      <!-- Status Badge -->
+      <div>
+        <span class="badge badge-{{ property.status }}">
+          {{ property.get_status_display }}
+        </span>
+      </div>
+      
+      <!-- Featured Badge -->
+      {% if property.is_featured %}
+      <div>
+        <span class="badge">
+          Featured
+        </span>
+      </div>
+      {% endif %}
+      
+      <!-- Performance Stats -->
+      <div>
+        {% if property.views_count > 0 %}
+        <span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="white">
+            <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+            <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+          </svg>
+          {{ property.views_count }}
+        </span>
+        {% endif %}
+        {% if property.favorites_count > 0 %}
+        <span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="white">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+          </svg>
+          {{ property.favorites_count }}
+        </span>
+        {% endif %}
+      </div>
+    </div>
+    
+    <!-- Property Info -->
+    <div>
+      <h3>
+        <a href="{% url 'accounts:house_detail' property.pk %}">
+          {{ property.title }}
+        </a>
+      </h3>
+      
+      <p>
+        {{ property.property_type.name }} • {{ property.region.name }}
+      </p>
+      
+      <div>
+        <div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M7 14c1.66 0 3-1.34 3-3S8.66 8 7 8s-3 1.34-3 3 1.34 3 3 3zm0-4c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm12-3h-8v8H3V5H1v15h2v-3h18v3h2V9c0-1.1-.9-2-2-2z"/>
+          </svg>
+          {{ property.bedrooms }} bed{{ property.bedrooms|pluralize }}
+        </div>
+        <div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M9 2v2H7C5.9 4 5 4.9 5 6v14c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-2V2h-2v2h-4V2H9zm0 4v2H7v12h10V8h-2V6H9z"/>
+          </svg>
+          {{ property.bathrooms }} bath{{ property.bathrooms|pluralize }}
+        </div>
+        <div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+          </svg>
+          {{ property.size_sqft }} sqft
+        </div>
+      </div>
+      
+      <div>
+        <div>
+          <div>
+            Tsh {{ property.rent_amount|floatformat:0|intcomma }}/month
+          </div>
+          <div>
+            Created: {{ property.created_at|date:"M j, Y" }}
+          </div>
+        </div>
+        <div>
+          <a href="{% url 'accounts:house_detail' property.pk %}" 
+             class="btn btn-primary-secondary">
+            View
+          </a>
+          <a href="{% url 'accounts:house_edit' property.pk %}" 
+             class="btn btn-primary-primary">
+            Edit
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div>
+  <svg width="64" height="64" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 3l10 9h-3v9h-6v-6H11v6H5v-9H2z"/>
+  </svg>
+  <h3>No houses yet</h3>
+  <p>Start building your property portfolio by adding your first house.</p>
+  <a href="{% url 'accounts:house_create' %}" class="btn btn-primary-primary">Add First House</a>
+</div>
+{% endif %}
+
+{% endblock %}

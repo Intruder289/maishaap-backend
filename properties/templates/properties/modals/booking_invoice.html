@@ -1,0 +1,141 @@
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-file-contract me-2"></i>Invoice Preview
+                </h6>
+            </div>
+            <div class="card-body">
+                <!-- Invoice Header -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <h4 class="text-primary">INVOICE</h4>
+                        <p class="mb-0"><strong>Invoice #:</strong> {{ booking.booking_reference }}</p>
+                        <p class="mb-0"><strong>Date:</strong> {{ booking.created_at|date:"M d, Y" }}</p>
+                    </div>
+                    <div class="col-md-6 text-end">
+                        <h5 class="mb-0">{{ booking.property_obj.title }}</h5>
+                        <p class="mb-0">{{ booking.property_obj.address }}</p>
+                    </div>
+                </div>
+                
+                <!-- Customer Information -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <h6 class="text-primary">Bill To:</h6>
+                        <p class="mb-0"><strong>{{ booking.customer.full_name }}</strong></p>
+                        <p class="mb-0">{{ booking.customer.email }}</p>
+                        <p class="mb-0">{{ booking.customer.phone }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="text-primary">Property Details:</h6>
+                        <p class="mb-0"><strong>{{ booking.property_obj.title }}</strong></p>
+                        <p class="mb-0">{{ booking.property_obj.address }}</p>
+                        <p class="mb-0">Type: {{ booking.property_obj.property_type.name }}</p>
+                    </div>
+                </div>
+                
+                <!-- Invoice Items -->
+                <div class="table-responsive mb-4">
+                    <table class="table table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Description</th>
+                                <th>Period</th>
+                                <th>Rate</th>
+                                <th>Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Rental for {{ booking.number_of_guests }} guest{{ booking.number_of_guests|pluralize }}</td>
+                                <td>{{ booking.check_in_date|date:"M d, Y" }} - {{ booking.check_out_date|date:"M d, Y" }}</td>
+                                <td>Tsh {{ booking.property_obj.rent_amount|floatformat:0 }}/month</td>
+                                <td>Tsh {{ booking.total_amount|floatformat:0 }}</td>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr class="table-light">
+                                <th colspan="3" class="text-end">Total Amount:</th>
+                                <th>Tsh {{ booking.total_amount|floatformat:0 }}</th>
+                            </tr>
+                            <tr class="table-light">
+                                <th colspan="3" class="text-end">Paid Amount:</th>
+                                <th>Tsh {{ booking.paid_amount|floatformat:0 }}</th>
+                            </tr>
+                            <tr class="table-light">
+                                <th colspan="3" class="text-end">Balance Due:</th>
+                                <th>Tsh {{ booking.remaining_amount|floatformat:0 }}</th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                
+                <!-- Payment Status -->
+                <div class="row">
+                    <div class="col-12">
+                        <div class="alert {% if booking.payment_status == 'paid' %}alert-success{% elif booking.payment_status == 'partial' %}alert-warning{% else %}alert-danger{% endif %}">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Payment Status:</strong>
+                            {% if booking.payment_status == 'paid' %}
+                                Fully Paid
+                            {% elif booking.payment_status == 'partial' %}
+                                Partially Paid - Balance: Tsh {{ booking.remaining_amount|floatformat:0 }}
+                            {% else %}
+                                Pending Payment - Amount Due: Tsh {{ booking.total_amount|floatformat:0 }}
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-download me-2"></i>Invoice Actions
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-success" onclick="downloadInvoice()">
+                        <i class="fas fa-download me-2"></i>Download PDF
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="emailInvoice()">
+                        <i class="fas fa-envelope me-2"></i>Email Invoice
+                    </button>
+                </div>
+                
+                <hr>
+                
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Invoice Details</strong>
+                    <ul class="mb-0 mt-2">
+                        <li>Generated on: {{ "now"|date:"M d, Y H:i" }}</li>
+                        <li>Booking Reference: {{ booking.booking_reference }}</li>
+                        <li>Duration: {{ booking.duration_days }} days</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-sticky-note me-2"></i>Special Requests
+                </h6>
+            </div>
+            <div class="card-body">
+                {% if booking.special_requests %}
+                    <p>{{ booking.special_requests|linebreaks }}</p>
+                {% else %}
+                    <p class="text-muted">No special requests</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>

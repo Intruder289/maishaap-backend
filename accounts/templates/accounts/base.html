@@ -1,0 +1,1493 @@
+{% load static %}
+{% now "YmdHis" as timestamp %}
+{% load navigation_tags %}
+{% load currency_filters %}
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <title>{% block title %}MAISHA - Property Management System{% endblock %}</title>
+    
+    <!-- Favicon -->
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'img/favicons/apple-touch-icon.png' %}" />
+    <link rel="icon" type="image/png" sizes="32x32" href="{% static 'img/favicons/favicon-32x32.png' %}" />
+    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'img/favicons/favicon-16x16.png' %}" />
+    <link rel="shortcut icon" type="image/x-icon" href="{% static 'img/favicons/favicon.ico' %}" />
+    <link rel="manifest" href="{% static 'img/favicons/manifest.json' %}" />
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+    <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@300;400;600;700;800;900&display=swap" rel="stylesheet" />
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    
+    <!-- Stylesheets -->
+    <link href="{% static 'simplebar/simplebar.min.css' %}" rel="stylesheet" />
+    <link href="{% static 'flatpickr/flatpickr.min.css' %}" rel="stylesheet" />
+    <link href="{% static 'choices/choices.min.css' %}" rel="stylesheet" />
+    <!-- Select2 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="{% static 'css/theme.min.css' %}" id="style-default" />
+    <link rel="stylesheet" href="{% static 'css/user.min.css' %}" id="user-style-default" />
+    
+    <!-- Custom Footer Styles -->
+        <style>
+            html, body {
+                height: 100%;
+                overflow-x: hidden; /* Prevent horizontal scroll */
+            }
+            .main-wrapper {
+                display: flex;
+                flex-direction: column;
+                min-height: 100vh;
+            }
+            .content {
+                flex: 1;
+                padding-bottom: 100px; /* Add more space for fixed footer */
+            }
+            .footer {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                z-index: 1000;
+                background-color: #f8f9fa !important;
+                border-top: 1px solid #dee2e6 !important;
+                box-shadow: 0 -2px 4px rgba(0,0,0,0.1);
+                opacity: 1 !important;
+                min-height: 60px;
+                width: 100vw !important;
+                margin-left: 0 !important;
+                overflow: visible !important;
+            }
+            .footer .container-fluid {
+                overflow: visible !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                padding-left: 2rem !important;
+                padding-right: 2rem !important;
+            }
+            .footer .row {
+                overflow: visible !important;
+                margin-left: 0 !important;
+                margin-right: 0 !important;
+            }
+            .footer .col-md-6 {
+                overflow: visible !important;
+            }
+            /* Clean dropdown styling - let Bootstrap handle naturally */
+            .dropdown-menu {
+                position: absolute !important;
+                z-index: 1080 !important; /* above cards & tables */
+            }
+            
+            /* Keep Phoenix defaults; minimal safe tweaks for table dropdowns */
+            .table-responsive { overflow-x: auto; overflow-y: visible; }
+            /* Allow table action dropdowns to expand without inner scrollbars */
+            .table-responsive .dropdown-menu,
+            table .dropdown-menu {
+                max-height: none !important;
+                overflow: visible !important;
+            }
+            /* Fix clipping inside responsive wrappers and cards */
+            .table-responsive, .card, .card-body, .container-fluid, .content {
+                overflow: visible !important;
+            }
+            /* Card-like action menus for all tables */
+            table .dropdown-menu {
+                padding: 8px 0 !important;
+                border: 1px solid #e9ecef !important;
+                border-radius: 0.5rem !important;
+                box-shadow: 0 10px 24px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04) !important;
+                min-width: 240px;
+            }
+            /* Right-align menus in last column by default */
+            table td:last-child .dropdown-menu {
+                right: 0;
+                left: auto;
+            }
+            table .dropdown-menu .dropdown-item {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                padding: 10px 14px;
+                font-weight: 500;
+            }
+            table .dropdown-menu .dropdown-item i {
+                width: 18px;
+                text-align: center;
+                opacity: 0.9;
+            }
+            table .dropdown-menu .dropdown-item:hover {
+                background: #f8f9fa;
+            }
+            table .dropdown-menu .dropdown-item.text-danger:hover {
+                background: #fff1f0;
+            }
+            /* Sidebar Navigation Fixes */
+            .navbar-vertical .nav .collapse {
+                display: none !important;
+            }
+            
+            .navbar-vertical .nav .collapse.show {
+                display: block !important;
+            }
+            
+            .dropdown-indicator-icon span {
+                transition: transform 0.3s ease;
+                display: inline-block;
+            }
+            
+            .nav-link.dropdown-indicator[aria-expanded="true"] .dropdown-indicator-icon span {
+                transform: rotate(90deg);
+            }
+            
+            /* Enhanced Mobile Responsiveness */
+            @media (max-width: 767.98px) {
+                /* Ensure tables are properly responsive */
+                .table-responsive {
+                    border: none;
+                    border-radius: 0.5rem;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                }
+                
+                /* Mobile table improvements */
+                .table {
+                    font-size: 0.85rem;
+                }
+                
+                .table thead th {
+                    padding: 0.75rem 0.5rem;
+                    font-size: 0.8rem;
+                    white-space: nowrap;
+                }
+                
+                .table tbody td {
+                    padding: 0.75rem 0.5rem;
+                    vertical-align: middle;
+                }
+                
+                /* Mobile dropdown improvements */
+                .dropdown-menu {
+                    font-size: 0.85rem;
+                    min-width: 160px;
+                }
+                
+                .dropdown-item {
+                    padding: 0.5rem 1rem;
+                    font-size: 0.85rem;
+                }
+                
+                /* Mobile button improvements */
+                .btn {
+                    min-height: 44px; /* Touch-friendly */
+                }
+                
+                /* Mobile form improvements */
+                .form-control, .form-select {
+                    font-size: 16px; /* Prevents zoom on iOS */
+                    min-height: 44px;
+                }
+                
+                /* Mobile card improvements */
+                .card-body {
+                    padding: 1rem;
+                }
+                
+                .card-header {
+                    padding: 0.75rem 1rem;
+                }
+            }
+            
+            @media (max-width: 575.98px) {
+                /* Very small screens */
+                .table {
+                    font-size: 0.8rem;
+                }
+                
+                .table thead th {
+                    padding: 0.6rem 0.4rem;
+                    font-size: 0.75rem;
+                }
+                
+                .table tbody td {
+                    padding: 0.6rem 0.4rem;
+                }
+                
+                /* Hide less important columns on very small screens */
+                .table th:nth-child(n+5),
+                .table td:nth-child(n+5) {
+                    display: none;
+                }
+            }
+        </style>
+    
+    {% block extra_css %}{% endblock %}
+  </head>
+
+  <body>
+    <div class="main-wrapper">
+    <main class="main" id="top">
+        <!-- Vertical Navbar -->
+        <nav class="navbar navbar-vertical navbar-expand-lg" data-navbar-vertical>
+        <div class="collapse navbar-collapse" id="navbarVerticalCollapse">
+          <div class="navbar-vertical-content">
+            <ul class="navbar-nav flex-column" id="navbarVerticalNav">
+              
+              <!-- Dashboard -->
+              {% if user|has_nav_permission:"dashboard" or user.is_superuser or user_has_all_navigation %}
+              <li class="nav-item">
+                <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'accounts:dashboard' %}">
+                  <div class="d-flex align-items-center">
+                                    <span class="nav-link-icon">
+                                        <i class="fas fa-tachometer-alt"></i>
+                                    </span>
+                    <span class="nav-link-text">Dashboard</span>
+                  </div>
+                </a>
+              </li>
+              {% endif %}
+              
+              <!-- Properties -->
+              {% if user|has_nav_permission:"properties" or user|has_any_child_permission:"properties" or user.is_superuser or user_has_all_navigation %}
+              <li class="nav-item">
+                            <div class="nav-item-wrapper">
+                                <a class="nav-link dropdown-indicator label-1" href="#" role="button" data-bs-toggle="collapse" data-bs-target="#nv-properties" aria-expanded="false" aria-controls="nv-properties">
+                  <div class="d-flex align-items-center">
+                                        <div class="dropdown-indicator-icon"><span class="fas fa-caret-right"></span></div>
+                                        <span class="nav-link-icon">
+                                            <i class="fas fa-home"></i>
+                                        </span>
+                    <span class="nav-link-text">Properties</span>
+                  </div>
+                </a>
+                                <div class="parent-wrapper label-1">
+                                    <ul class="nav collapse parent" data-bs-parent="#navbarVerticalCollapse" id="nv-properties">
+                                        <li class="collapsed-nav-item-title d-none">Properties</li>
+                  {% if user|has_nav_permission:"property_list" or user.is_superuser or user_has_all_navigation %}
+                  <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'property_list' %}active{% endif %}" href="{% url 'properties:property_list' %}">
+                                                <div class="d-flex align-items-center"><span class="nav-link-text">All Properties</span></div>
+                    </a>
+                  </li>
+                  {% endif %}
+                  
+                  <!-- Configure Property Submenu -->
+                  {% if user|has_nav_permission:"configure_property" or user|has_any_child_permission:"configure_property" or user.is_superuser or user_has_all_navigation %}
+                  <li class="nav-item">
+                    <div class="nav-item-wrapper">
+                      <a class="nav-link dropdown-indicator label-2" href="#" role="button" data-bs-toggle="collapse" data-bs-target="#nv-configure-property" aria-expanded="false" aria-controls="nv-configure-property">
+                        <div class="d-flex align-items-center">
+                          <div class="dropdown-indicator-icon"><span class="fas fa-caret-right"></span></div>
+                          <span class="nav-link-text">Configure Property</span>
+                        </div>
+                      </a>
+                      <div class="parent-wrapper label-2">
+                        <ul class="nav collapse parent" data-bs-parent="#nv-properties" id="nv-configure-property">
+                          <li class="collapsed-nav-item-title d-none">Configure Property</li>
+                          {% if user|has_nav_permission:"manage_property_types" or user.is_superuser or user_has_all_navigation %}
+                          <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'manage_property_types' %}active{% endif %}" href="{% url 'properties:manage_property_types' %}">
+                              <div class="d-flex align-items-center"><span class="nav-link-text">Property Types</span></div>
+                            </a>
+                          </li>
+                          {% endif %}
+                          {% if user|has_nav_permission:"manage_regions" or user.is_superuser or user_has_all_navigation %}
+                          <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'manage_regions' %}active{% endif %}" href="{% url 'properties:manage_regions' %}">
+                              <div class="d-flex align-items-center"><span class="nav-link-text">Regions</span></div>
+                            </a>
+                          </li>
+                          {% endif %}
+                          {% if user|has_nav_permission:"manage_regions" or user.is_superuser or user_has_all_navigation %}
+                          <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'manage_districts' %}active{% endif %}" href="{% url 'properties:manage_districts' %}">
+                              <div class="d-flex align-items-center"><span class="nav-link-text">Districts</span></div>
+                            </a>
+                          </li>
+                          {% endif %}
+                          {% if user|has_nav_permission:"manage_amenities" or user.is_superuser or user_has_all_navigation %}
+                          <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'manage_amenities' %}active{% endif %}" href="{% url 'properties:manage_amenities' %}">
+                              <div class="d-flex align-items-center"><span class="nav-link-text">Amenities</span></div>
+                            </a>
+                          </li>
+                          {% endif %}
+                        </ul>
+                      </div>
+                    </div>
+                  </li>
+                  {% endif %}
+                  
+                  {% if user|has_nav_permission:"house_rent_reminder_settings" or user.is_superuser or user_has_all_navigation %}
+                  <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'house_rent_reminder_settings' %}active{% endif %}" href="{% url 'properties:house_rent_reminder_settings' %}">
+                      <div class="d-flex align-items-center">
+                        <span class="nav-link-icon">
+                          <i class="fas fa-bell"></i>
+                        </span>
+                        <span class="nav-link-text">Reminder Settings</span>
+                      </div>
+                    </a>
+                  </li>
+                  {% endif %}
+                </ul>
+                                </div>
+                            </div>
+              </li>
+              {% endif %}
+              
+              <!-- Manage Properties -->
+              {% if user|has_nav_permission:"manage_properties" or user|has_any_child_permission:"manage_properties" or user.is_superuser or user_has_all_navigation %}
+              <li class="nav-item">
+                            <div class="nav-item-wrapper">
+                                <a class="nav-link dropdown-indicator label-1" href="#" role="button" data-bs-toggle="collapse" data-bs-target="#nv-manage" aria-expanded="false" aria-controls="nv-manage">
+                  <div class="d-flex align-items-center">
+                                        <div class="dropdown-indicator-icon"><span class="fas fa-caret-right"></span></div>
+                                        <span class="nav-link-icon">
+                                            <i class="fas fa-cogs"></i>
+                                        </span>
+                    <span class="nav-link-text">Manage Properties</span>
+                  </div>
+                </a>
+                                <div class="parent-wrapper label-1">
+                                    <ul class="nav collapse parent" data-bs-parent="#navbarVerticalCollapse" id="nv-manage">
+                                        <li class="collapsed-nav-item-title d-none">Manage Properties</li>
+                                        
+                  <!-- Hotel Management -->
+                  {% if user|has_nav_permission:"hotel_management" or user|has_any_child_permission:"hotel_management" or user.is_superuser or user_has_all_navigation %}
+                  <li class="nav-item">
+                    <div class="nav-item-wrapper">
+                      <a class="nav-link dropdown-indicator label-2" href="#" role="button" data-bs-toggle="collapse" data-bs-target="#nv-hotel-manage" aria-expanded="false" aria-controls="nv-hotel-manage">
+                        <div class="d-flex align-items-center">
+                          <div class="dropdown-indicator-icon"><span class="fas fa-caret-right"></span></div>
+                          <span class="nav-link-text">Hotel Management</span>
+                        </div>
+                      </a>
+                      <div class="parent-wrapper label-2">
+                        <ul class="nav collapse parent" data-bs-parent="#nv-manage" id="nv-hotel-manage">
+                          <li class="collapsed-nav-item-title d-none">Hotel Management</li>
+                          {% if user|has_nav_permission:"hotel_dashboard" or user.is_superuser or user_has_all_navigation %}
+                          <li class="nav-item">
+                            <a class="nav-link" href="{% url 'properties:hotel_dashboard' %}">
+                              <div class="d-flex align-items-center"><span class="nav-link-text">Dashboard</span></div>
+                            </a>
+                          </li>
+                          {% endif %}
+                          {% if user|has_nav_permission:"hotel_bookings" or user.is_superuser or user_has_all_navigation %}
+                          <li class="nav-item">
+                            <a class="nav-link" href="{% url 'properties:hotel_bookings' %}">
+                              <div class="d-flex align-items-center"><span class="nav-link-text">Bookings</span></div>
+                            </a>
+                          </li>
+                          {% endif %}
+                          {% if user|has_nav_permission:"hotel_rooms" or user.is_superuser or user_has_all_navigation %}
+                          <li class="nav-item">
+                            <a class="nav-link" href="{% url 'properties:hotel_rooms' %}">
+                              <div class="d-flex align-items-center"><span class="nav-link-text">Room Status</span></div>
+                            </a>
+                          </li>
+                          {% endif %}
+                          {% if user|has_nav_permission:"hotel_customers" or user.is_superuser or user_has_all_navigation %}
+                          <li class="nav-item">
+                            <a class="nav-link" href="{% url 'properties:hotel_customers' %}">
+                              <div class="d-flex align-items-center"><span class="nav-link-text">Customers</span></div>
+                            </a>
+                          </li>
+                          {% endif %}
+                          {% if user|has_nav_permission:"hotel_payments" or user.is_superuser or user_has_all_navigation %}
+                          <li class="nav-item">
+                            <a class="nav-link" href="{% url 'properties:hotel_payments' %}">
+                              <div class="d-flex align-items-center"><span class="nav-link-text">Payments</span></div>
+                            </a>
+                          </li>
+                          {% endif %}
+                          {% if user|has_nav_permission:"hotel_reports" or user.is_superuser or user_has_all_navigation %}
+                          <li class="nav-item">
+                            <a class="nav-link" href="{% url 'properties:hotel_reports' %}">
+                              <div class="d-flex align-items-center"><span class="nav-link-text">Reports</span></div>
+                            </a>
+                          </li>
+                          {% endif %}
+                        </ul>
+                      </div>
+                    </div>
+                  </li>
+                  {% endif %}
+                  
+                  <!-- Lodge Management -->
+                  {% if user|has_nav_permission:"lodge_management" or user|has_any_child_permission:"lodge_management" or user.is_superuser or user_has_all_navigation %}
+                  <li class="nav-item">
+                    <div class="nav-item-wrapper">
+                      <a class="nav-link dropdown-indicator label-2" href="#" role="button" data-bs-toggle="collapse" data-bs-target="#nv-lodge-manage" aria-expanded="false" aria-controls="nv-lodge-manage">
+                        <div class="d-flex align-items-center">
+                          <div class="dropdown-indicator-icon"><span class="fas fa-caret-right"></span></div>
+                          <span class="nav-link-text">Lodge Management</span>
+                        </div>
+                      </a>
+                      <div class="parent-wrapper label-2">
+                        <ul class="nav collapse parent" data-bs-parent="#nv-manage" id="nv-lodge-manage">
+                          <li class="collapsed-nav-item-title d-none">Lodge Management</li>
+                          {% if user|has_nav_permission:"lodge_dashboard" or user.is_superuser or user_has_all_navigation %}
+                          <li class="nav-item">
+                            <a class="nav-link" href="{% url 'properties:lodge_dashboard' %}">
+                              <div class="d-flex align-items-center"><span class="nav-link-text">Dashboard</span></div>
+                            </a>
+                          </li>
+                          {% endif %}
+                          {% if user|has_nav_permission:"lodge_bookings" or user.is_superuser or user_has_all_navigation %}
+                          <li class="nav-item">
+                            <a class="nav-link" href="{% url 'properties:lodge_bookings' %}">
+                              <div class="d-flex align-items-center"><span class="nav-link-text">Bookings</span></div>
+                            </a>
+                          </li>
+                          {% endif %}
+                          {% if user|has_nav_permission:"lodge_rooms" or user.is_superuser or user_has_all_navigation %}
+                          <li class="nav-item">
+                            <a class="nav-link" href="{% url 'properties:lodge_rooms' %}">
+                              <div class="d-flex align-items-center"><span class="nav-link-text">Room Status</span></div>
+                            </a>
+                          </li>
+                          {% endif %}
+                          {% if user|has_nav_permission:"lodge_customers" or user.is_superuser or user_has_all_navigation %}
+                          <li class="nav-item">
+                            <a class="nav-link" href="{% url 'properties:lodge_customers' %}">
+                              <div class="d-flex align-items-center"><span class="nav-link-text">Customers</span></div>
+                            </a>
+                          </li>
+                          {% endif %}
+                          {% if user|has_nav_permission:"lodge_payments" or user.is_superuser or user_has_all_navigation %}
+                          <li class="nav-item">
+                            <a class="nav-link" href="{% url 'properties:lodge_payments' %}">
+                              <div class="d-flex align-items-center"><span class="nav-link-text">Payments</span></div>
+                            </a>
+                          </li>
+                          {% endif %}
+                          {% if user|has_nav_permission:"lodge_reports" or user.is_superuser or user_has_all_navigation %}
+                          <li class="nav-item">
+                            <a class="nav-link" href="{% url 'properties:lodge_reports' %}">
+                              <div class="d-flex align-items-center"><span class="nav-link-text">Reports</span></div>
+                            </a>
+                          </li>
+                          {% endif %}
+                        </ul>
+                      </div>
+                    </div>
+                  </li>
+                  {% endif %}
+                  
+                  <!-- Venue Management -->
+                  {% if user|has_nav_permission:"venue_management" or user|has_any_child_permission:"venue_management" or user.is_superuser or user_has_all_navigation %}
+                  <li class="nav-item">
+                    <div class="nav-item-wrapper">
+                      <a class="nav-link dropdown-indicator label-2" href="#" role="button" data-bs-toggle="collapse" data-bs-target="#nv-venue-manage" aria-expanded="false" aria-controls="nv-venue-manage">
+                        <div class="d-flex align-items-center">
+                          <div class="dropdown-indicator-icon"><span class="fas fa-caret-right"></span></div>
+                          <span class="nav-link-text">Venue Management</span>
+                        </div>
+                      </a>
+                      <div class="parent-wrapper label-2">
+                        <ul class="nav collapse parent" data-bs-parent="#nv-manage" id="nv-venue-manage">
+                          <li class="collapsed-nav-item-title d-none">Venue Management</li>
+                          {% if user|has_nav_permission:"venue_dashboard" or user.is_superuser or user_has_all_navigation %}
+                          <li class="nav-item">
+                            <a class="nav-link" href="{% url 'properties:venue_dashboard' %}">
+                              <div class="d-flex align-items-center"><span class="nav-link-text">Dashboard</span></div>
+                            </a>
+                          </li>
+                          {% endif %}
+                          {% if user|has_nav_permission:"venue_bookings" or user.is_superuser or user_has_all_navigation %}
+                          <li class="nav-item">
+                            <a class="nav-link" href="{% url 'properties:venue_bookings' %}">
+                              <div class="d-flex align-items-center"><span class="nav-link-text">Bookings</span></div>
+                            </a>
+                          </li>
+                          {% endif %}
+                          {% if user|has_nav_permission:"venue_availability" or user.is_superuser or user_has_all_navigation %}
+                          <li class="nav-item">
+                            <a class="nav-link" href="{% url 'properties:venue_availability' %}">
+                              <div class="d-flex align-items-center"><span class="nav-link-text">Availability</span></div>
+                            </a>
+                          </li>
+                          {% endif %}
+                          {% if user|has_nav_permission:"venue_customers" or user.is_superuser or user_has_all_navigation %}
+                          <li class="nav-item">
+                            <a class="nav-link" href="{% url 'properties:venue_customers' %}">
+                              <div class="d-flex align-items-center"><span class="nav-link-text">Customers</span></div>
+                            </a>
+                          </li>
+                          {% endif %}
+                          {% if user|has_nav_permission:"venue_payments" or user.is_superuser or user_has_all_navigation %}
+                          <li class="nav-item">
+                            <a class="nav-link" href="{% url 'properties:venue_payments' %}">
+                              <div class="d-flex align-items-center"><span class="nav-link-text">Payments</span></div>
+                            </a>
+                          </li>
+                          {% endif %}
+                          {% if user|has_nav_permission:"venue_reports" or user.is_superuser or user_has_all_navigation %}
+                          <li class="nav-item">
+                            <a class="nav-link" href="{% url 'properties:venue_reports' %}">
+                              <div class="d-flex align-items-center"><span class="nav-link-text">Reports</span></div>
+                            </a>
+                          </li>
+                          {% endif %}
+                        </ul>
+                      </div>
+                    </div>
+                  </li>
+                  {% endif %}
+                  
+                  <!-- House Management -->
+                  {% if user|has_nav_permission:"house_management" or user|has_any_child_permission:"house_management" or user.is_superuser or user_has_all_navigation %}
+                  <li class="nav-item">
+                    <div class="nav-item-wrapper">
+                      <a class="nav-link dropdown-indicator label-2" href="#" role="button" data-bs-toggle="collapse" data-bs-target="#nv-house-manage" aria-expanded="false" aria-controls="nv-house-manage">
+                        <div class="d-flex align-items-center">
+                          <div class="dropdown-indicator-icon"><span class="fas fa-caret-right"></span></div>
+                          <span class="nav-link-text">House Management</span>
+                        </div>
+                      </a>
+                      <div class="parent-wrapper label-2">
+                        <ul class="nav collapse parent" data-bs-parent="#nv-manage" id="nv-house-manage">
+                          <li class="collapsed-nav-item-title d-none">House Management</li>
+                          {% if user|has_nav_permission:"house_dashboard" or user.is_superuser or user_has_all_navigation %}
+                          <li class="nav-item">
+                            <a class="nav-link" href="{% url 'properties:house_dashboard' %}">
+                              <div class="d-flex align-items-center"><span class="nav-link-text">Dashboard</span></div>
+                            </a>
+                          </li>
+                          {% endif %}
+                          {% if user|has_nav_permission:"house_bookings" or user.is_superuser or user_has_all_navigation %}
+                          <li class="nav-item">
+                            <a class="nav-link" href="{% url 'properties:house_bookings' %}">
+                              <div class="d-flex align-items-center"><span class="nav-link-text">Bookings</span></div>
+                            </a>
+                          </li>
+                          {% endif %}
+                          {% if user|has_nav_permission:"house_tenants" or user.is_superuser or user_has_all_navigation %}
+                          <li class="nav-item">
+                            <a class="nav-link" href="{% url 'properties:house_tenants' %}">
+                              <div class="d-flex align-items-center"><span class="nav-link-text">Tenants</span></div>
+                            </a>
+                          </li>
+                          {% endif %}
+                          {% if user|has_nav_permission:"house_payments" or user.is_superuser or user_has_all_navigation %}
+                          <li class="nav-item">
+                            <a class="nav-link" href="{% url 'properties:house_payments' %}">
+                              <div class="d-flex align-items-center"><span class="nav-link-text">Payments</span></div>
+                            </a>
+                          </li>
+                          {% endif %}
+                          {% if user|has_nav_permission:"house_reports" or user.is_superuser or user_has_all_navigation %}
+                          <li class="nav-item">
+                            <a class="nav-link" href="{% url 'properties:house_reports' %}">
+                              <div class="d-flex align-items-center"><span class="nav-link-text">Reports</span></div>
+                            </a>
+                          </li>
+                          {% endif %}
+                        </ul>
+                      </div>
+                    </div>
+                  </li>
+                  {% endif %}
+                </ul>
+                                </div>
+                            </div>
+              </li>
+              {% endif %}
+              
+              <!-- User Management -->
+              {% if user|has_nav_permission:"user_management" or user|has_any_child_permission:"user_management" or user.is_superuser or user_has_all_navigation %}
+              <li class="nav-item">
+                            <div class="nav-item-wrapper">
+                                <a class="nav-link dropdown-indicator label-1" href="#" role="button" data-bs-toggle="collapse" data-bs-target="#nv-users" aria-expanded="false" aria-controls="nv-users">
+                  <div class="d-flex align-items-center">
+                                        <div class="dropdown-indicator-icon"><span class="fas fa-caret-right"></span></div>
+                                        <span class="nav-link-icon">
+                                            <i class="fas fa-users"></i>
+                                        </span>
+                    <span class="nav-link-text">User Management</span>
+                  </div>
+                </a>
+                                <div class="parent-wrapper label-1">
+                                    <ul class="nav collapse parent" data-bs-parent="#navbarVerticalCollapse" id="nv-users">
+                                        <li class="collapsed-nav-item-title d-none">User Management</li>
+                  {% if user|has_nav_permission:"user_list" or user.is_superuser or user_has_all_navigation %}
+                  <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'user_list' %}active{% endif %}" href="{% url 'accounts:user_list' %}">
+                                                <div class="d-flex align-items-center"><span class="nav-link-text">All Users</span></div>
+                    </a>
+                  </li>
+                  {% endif %}
+                  {% if user|has_nav_permission:"owner_list" or user.is_superuser or user_has_all_navigation %}
+                  <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'owner_list' or request.resolver_match.url_name == 'register_owner' or request.resolver_match.url_name == 'activate_owner' or request.resolver_match.url_name == 'deactivate_owner' %}active{% endif %}" href="{% url 'accounts:owner_list' %}">
+                                                <div class="d-flex align-items-center"><span class="nav-link-text">Owner Management</span></div>
+                    </a>
+                  </li>
+                  {% endif %}
+                  {% if user|has_nav_permission:"role_list" or user.is_superuser or user_has_all_navigation %}
+                  <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'role_list' %}active{% endif %}" href="{% url 'accounts:role_list' %}">
+                                                <div class="d-flex align-items-center"><span class="nav-link-text">Roles & Permissions</span></div>
+                    </a>
+                  </li>
+                  {% endif %}
+                </ul>
+                                </div>
+                            </div>
+              </li>
+              {% endif %}
+              
+              
+              <!-- Maintenance -->
+              {% if user|has_nav_permission:"maintenance" or user|has_any_child_permission:"maintenance" or user.is_superuser or user_has_all_navigation %}
+              <li class="nav-item">
+                            <div class="nav-item-wrapper">
+                                <a class="nav-link dropdown-indicator label-1" href="#" role="button" data-bs-toggle="collapse" data-bs-target="#nv-maintenance" aria-expanded="false" aria-controls="nv-maintenance">
+                  <div class="d-flex align-items-center">
+                                        <div class="dropdown-indicator-icon"><span class="fas fa-caret-right"></span></div>
+                                        <span class="nav-link-icon">
+                                            <i class="fas fa-tools"></i>
+                                        </span>
+                    <span class="nav-link-text">Maintenance</span>
+                  </div>
+                </a>
+                                <div class="parent-wrapper label-1">
+                                    <ul class="nav collapse parent" data-bs-parent="#navbarVerticalCollapse" id="nv-maintenance">
+                                        <li class="collapsed-nav-item-title d-none">Maintenance</li>
+                  {% if user|has_nav_permission:"request_list" or user.is_superuser or user_has_all_navigation %}
+                  <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'request_list' %}active{% endif %}" href="{% url 'maintenance:request_list' %}">
+                                                <div class="d-flex align-items-center"><span class="nav-link-text">All Requests</span></div>
+                    </a>
+                  </li>
+                  {% endif %}
+                </ul>
+                                </div>
+                            </div>
+              </li>
+              {% endif %}
+              
+              <!-- Complaints -->
+              {% if user|has_nav_permission:"complaints" or user|has_any_child_permission:"complaints" or user.is_superuser or user_has_all_navigation %}
+              <li class="nav-item">
+                            <div class="nav-item-wrapper">
+                                <a class="nav-link dropdown-indicator label-1" href="#" role="button" data-bs-toggle="collapse" data-bs-target="#nv-complaints" aria-expanded="false" aria-controls="nv-complaints">
+                  <div class="d-flex align-items-center">
+                                        <div class="dropdown-indicator-icon"><span class="fas fa-caret-right"></span></div>
+                                        <span class="nav-link-icon">
+                                            <i class="fas fa-exclamation-triangle"></i>
+                                        </span>
+                    <span class="nav-link-text">Complaints</span>
+                  </div>
+                </a>
+                                <div class="parent-wrapper label-1">
+                                    <ul class="nav collapse parent" data-bs-parent="#navbarVerticalCollapse" id="nv-complaints">
+                                        <li class="collapsed-nav-item-title d-none">Complaints</li>
+                  {% if user|has_nav_permission:"complaint_list" or user.is_superuser or user_has_all_navigation %}
+                  <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'complaint_list' %}active{% endif %}" href="{% url 'complaints:complaint_list' %}">
+                                                <div class="d-flex align-items-center"><span class="nav-link-text">All Complaints</span></div>
+                    </a>
+                  </li>
+                  {% endif %}
+                </ul>
+                                </div>
+                            </div>
+              </li>
+              {% endif %}
+              
+              <!-- Notifications -->
+              {% if user.is_superuser or user.is_staff %}
+              <li class="nav-item">
+                <a class="nav-link {% if request.resolver_match.url_name == 'notifications_list' %}active{% endif %}" href="{% url 'accounts:notifications_list' %}">
+                  <div class="d-flex align-items-center">
+                    <span class="nav-link-icon">
+                      <i class="fas fa-bell"></i>
+                    </span>
+                    <span class="nav-link-text">
+                      Notifications
+                      <span class="badge rounded-pill bg-danger ms-2" id="notificationBadge" {% if notification_count > 0 %}style="display: inline-block;"{% else %}style="display: none;"{% endif %}>
+                        {{ notification_count|default:0 }}
+                      </span>
+                    </span>
+                  </div>
+                </a>
+              </li>
+              {% endif %}
+              
+              <!-- Property Approval Requests -->
+              {% if user.is_superuser or user.is_staff %}
+              <li class="nav-item">
+                <a class="nav-link {% if request.resolver_match.url_name == 'property_approval_list' %}active{% endif %}" href="{% url 'properties:property_approval_list' %}">
+                  <div class="d-flex align-items-center">
+                    <span class="nav-link-icon">
+                      <i class="fas fa-upload"></i>
+                    </span>
+                    <span class="nav-link-text">
+                      Upload Approval Request
+                    </span>
+                  </div>
+                </a>
+              </li>
+              {% endif %}
+              
+            </ul>
+          </div>
+            </div>
+            <div class="navbar-vertical-footer">
+                <button class="btn navbar-vertical-toggle border-0 fw-semi-bold w-100 white-space-nowrap d-flex align-items-center">
+                    <span class="uil uil-left-arrow-to-left fs-0"></span>
+                    <span class="uil uil-arrow-from-right fs-0"></span>
+                    <span class="navbar-vertical-footer-text ms-2">Collapsed View</span>
+                </button>
+            </div>
+        </nav>
+        
+        <!-- Top Navbar -->
+        <nav class="navbar navbar-top fixed-top navbar-expand" id="navbarDefault">
+            <div class="collapse navbar-collapse justify-content-between">
+                <div class="navbar-logo">
+                    <button class="btn navbar-toggler navbar-toggler-humburger-icon hover-bg-transparent" type="button" data-bs-toggle="collapse" data-bs-target="#navbarVerticalCollapse" aria-controls="navbarVerticalCollapse" aria-expanded="false" aria-label="Toggle Navigation" data-navbar-vertical-toggle>
+                        <span class="navbar-toggle-icon">
+                            <span class="toggle-line"></span>
+                        </span>
+                    </button>
+                    <a class="navbar-brand me-1 me-sm-3" href="{% url 'accounts:dashboard' %}">
+                        <div class="d-flex align-items-center">
+                            <div class="d-flex align-items-center">
+                                <img src="{% static 'accounts/img/logo.png' %}" alt="MAISHA Logo" class="me-2" style="width: 32px; height: 32px;">
+                                <div class="d-none d-sm-block">
+                                    <div class="fw-bold text-900" style="color: #bf5b37; font-size: 1.1rem; line-height: 1;">MAISHA</div>
+                                    <div class="fw-bold text-900" style="color: #6c757d; font-size: 0.8rem; line-height: 1;">PROPERTY MANAGEMENT</div>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                <div class="d-flex align-items-center">
+                    <div class="me-4 d-none d-lg-block">
+                        <h5 class="mb-0 text-dark">Welcome, 
+                            <span class="text-primary">
+                                {% if user.get_full_name %}
+                                    {{ user.get_full_name }}
+                                {% elif user.first_name and user.last_name %}
+                                    {{ user.first_name }} {{ user.last_name }}
+                                {% else %}
+                                    {{ user.username }}
+                                {% endif %}
+                            </span>
+                        </h5>
+                        <small class="text-muted" id="user-role-display">
+                            {% if user.profile %}
+                                {% with primary_role=user.profile.get_primary_role %}
+                                    {% if primary_role %}
+                                        {{ primary_role }}
+                                    {% elif user.profile.role == 'owner' %}
+                                        Property Owner
+                                    {% elif user.profile.role == 'tenant' %}
+                                        Tenant
+                                    {% else %}
+                                        No Role Assigned
+                                    {% endif %}
+                                {% endwith %}
+                            {% else %}
+                                No Role Assigned
+                            {% endif %}
+                        </small>
+                    </div>
+                </div>
+                <ul class="navbar-nav navbar-nav-icons flex-row align-items-center">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link lh-1 pe-0" id="navbarDropdownUser" href="#" role="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-haspopup="true" aria-expanded="false">
+                            <div class="avatar avatar-l">
+                                {% if user.profile and user.profile.image %}
+                                    <img class="rounded-circle" src="{{ user.profile.image.url }}" alt="Profile Picture" style="width: 100%; height: 100%; object-fit: cover;" />
+                                {% else %}
+                                    <div class="avatar-name rounded-circle bg-primary text-white d-flex align-items-center justify-content-center">
+                                        {% if user.first_name and user.last_name %}
+                                            {{ user.first_name|first }}{{ user.last_name|first }}
+                                        {% else %}
+                                            {{ user.username|first|upper }}
+                                        {% endif %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </a>
+                        <div class="dropdown-menu dropdown-menu-end navbar-dropdown-caret py-0 dropdown-profile shadow border" aria-labelledby="navbarDropdownUser">
+                            <div class="card position-relative border-0">
+                                <div class="card-body p-0">
+                                    <div class="text-center pt-4 pb-3">
+                                        <div class="avatar avatar-xl">
+                                            {% if user.profile and user.profile.image %}
+                                                <img class="rounded-circle" src="{{ user.profile.image.url }}" alt="Profile Picture" style="width: 100%; height: 100%; object-fit: cover;" />
+                                            {% else %}
+                                                <div class="avatar-name rounded-circle bg-primary text-white d-flex align-items-center justify-content-center">
+                                                    {% if user.first_name and user.last_name %}
+                                                        {{ user.first_name|first }}{{ user.last_name|first }}
+                                                    {% else %}
+                                                        {{ user.username|first|upper }}
+                                                    {% endif %}
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                        <h6 class="mt-2 text-900">
+                                            {% if user.get_full_name %}
+                                                {{ user.get_full_name }}
+                                            {% elif user.first_name and user.last_name %}
+                                                {{ user.first_name }} {{ user.last_name }}
+                                            {% else %}
+                                                {{ user.username }}
+                                            {% endif %}
+                                        </h6>
+                                    </div>
+                                </div>
+                                <div class="overflow-auto scrollbar" style="height: 10rem;">
+                                    <ul class="nav d-flex flex-column mb-2 pb-1">
+                                        <li class="nav-item">
+                                            <a class="nav-link px-3" href="#" onclick="openProfileModal()">
+                                                <span class="me-2 text-900" data-feather="user"></span><span>Profile</span>
+                                            </a>
+                                        </li>
+                                        <li class="nav-item">
+                                            <a class="nav-link px-3" href="#" onclick="openSettingsModal()">
+                                                <span class="me-2 text-900" data-feather="settings"></span>Settings & Privacy
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </div>
+                                <div class="border-top"></div>
+                                <div class="px-3 py-2">
+                                    <a class="btn btn-outline-danger w-100 d-flex align-items-center justify-content-center" href="{% url 'accounts:logout' %}">
+                                        <i class="fas fa-sign-out-alt me-2"></i>Sign out
+                                    </a>
+            </div>
+          </div>
+                        </div>
+                    </li>
+                </ul>
+        </div>
+      </nav>
+
+        <!-- Main Content -->
+      <div class="content">
+            <div class="px-3 px-xxl-4">
+          <!-- Breadcrumb -->
+          <nav aria-label="breadcrumb" class="mb-4">
+            <ol class="breadcrumb">
+              <li class="breadcrumb-item"><a href="{% url 'accounts:dashboard' %}">Home</a></li>
+              {% block breadcrumb %}{% endblock %}
+            </ol>
+          </nav>
+
+          {% block content %}{% endblock %}
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer bg-light border-top">
+        <div class="container-fluid">
+            <div class="row align-items-center py-3">
+                <div class="col-md-6 col-12">
+                </div>
+                <div class="col-md-6 col-12">
+                    <div class="d-flex justify-content-md-end justify-content-center align-items-center gap-3">
+                        <span class="text-muted small">
+                            © {% now "Y" %} MAISHA
+                        </span>
+                        <span class="text-muted small">
+                            <i class="fas fa-code me-1"></i>Powered by Django
+                        </span>
+                        <span class="text-muted small">
+                            <i class="fas fa-shield-alt me-1"></i>Secure & Reliable
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Profile Modal -->
+    <div class="modal fade" id="profileModal" tabindex="-1" aria-labelledby="profileModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+                    <h5 class="modal-title" id="profileModalLabel">
+                        <i class="fas fa-user me-2"></i>Profile
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="profileModalContent">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Loading profile...</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" onclick="saveProfile()">
+                        <i class="fas fa-save me-1"></i>Save Changes
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings & Privacy Modal -->
+    <div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="settingsModalLabel">
+                        <i class="fas fa-cog me-2"></i>Settings & Privacy
+                    </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+                <div class="modal-body" id="settingsModalContent">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Loading settings...</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" onclick="saveSettings()">
+                        <i class="fas fa-save me-1"></i>Save Settings
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    
+    <!-- Toast container (top-right) -->
+    <div id="toastContainer" class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 9999; margin-top: 20px; pointer-events: none;"></div>
+    
+    <!-- Scripts -->
+    <!-- Bootstrap 5 CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Fallback to local files if CDN fails -->
+    <script>
+        // Check if Bootstrap loaded from CDN
+        if (typeof bootstrap === 'undefined') {
+            document.write('<script src="{% static 'popper/popper.min.js' %}"><\/script>');
+            document.write('<script src="{% static 'bootstrap/bootstrap.min.js' %}"><\/script>');
+        }
+    </script>
+    <!-- Lodash (required by Phoenix.js) -->
+    <script src="{% static 'lodash/lodash.min.js' %}"></script>
+    
+    <!-- Phoenix Config (required by Phoenix.js) -->
+    <script>
+        window.config = {
+            config: {
+                phoenix: {
+                    isRTL: false,
+                    isDark: false,
+                    isNavbarVerticalCollapsed: false,
+                    isChatWidgetVisible: false,
+                    isChatWidgetCollapsed: false,
+                    isChatWidgetExpanded: false,
+                    isChatWidgetMinimized: false,
+                    isChatWidgetMaximized: false,
+                    isChatWidgetFullscreen: false,
+                    isChatWidgetHidden: false
+                },
+                phoenixSupportChat: false,
+                phoenixTheme: 'light'
+            }
+        };
+        
+        // Browser detection utility
+        window.is = {
+            opera: function() {
+                return /Opera|OPR\//.test(navigator.userAgent);
+            },
+            mobile: function() {
+                return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            },
+            firefox: function() {
+                return /Firefox/.test(navigator.userAgent);
+            },
+            safari: function() {
+                return /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
+            },
+            ios: function() {
+                return /iPad|iPhone|iPod/.test(navigator.userAgent);
+            },
+            iphone: function() {
+                return /iPhone/.test(navigator.userAgent);
+            },
+            ipad: function() {
+                return /iPad/.test(navigator.userAgent);
+            },
+            ie: function() {
+                return /MSIE|Trident/.test(navigator.userAgent);
+            },
+            edge: function() {
+                return /Edge/.test(navigator.userAgent);
+            },
+            chrome: function() {
+                return /Chrome/.test(navigator.userAgent) && !/Edge/.test(navigator.userAgent);
+            },
+            mac: function() {
+                return /Mac/.test(navigator.userAgent);
+            },
+            windows: function() {
+                return /Windows/.test(navigator.userAgent);
+            }
+        };
+    </script>
+    
+    <script src="{% static 'anchorjs/anchor.min.js' %}"></script>
+    <script src="{% static 'simplebar/simplebar.min.js' %}"></script>
+    <script src="{% static 'js/phoenix.js' %}"></script>
+    
+    <!-- Feather Icons -->
+    <script src="{% static 'feather-icons/feather.min.js' %}"></script>
+    
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    
+    <!-- Select2 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    
+    <!-- Dropdown Actions JavaScript -->
+    <script src="{% static 'js/dropdown-actions.js' %}"></script>
+    
+    <!-- Real-time notification polling -->
+    {% if user.is_authenticated and user.is_staff %}
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Update notification count every 30 seconds
+        function updateNotificationCount() {
+            // Use global function if available, otherwise update directly
+            if (window.updateSidebarBadge) {
+                window.updateSidebarBadge();
+            } else {
+                const badge = document.getElementById('notificationBadge');
+                if (!badge) return;
+                
+                fetch('/api/notifications/count/')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            const count = parseInt(data.count) || 0;
+                            
+                            // Update badge content and visibility
+                            // CRITICAL: Only hide when count is 0, stay visible when count > 0
+                            if (count > 0) {
+                                // Show badge with count - ensure it stays visible
+                                badge.innerHTML = count.toString();
+                                badge.style.display = 'inline-block';
+                                badge.style.visibility = 'visible';
+                                badge.style.opacity = '1';
+                                console.log('Notification badge updated: showing count', count);
+                            } else {
+                                // Hide badge ONLY when count is exactly 0
+                                badge.innerHTML = '0';
+                                badge.style.display = 'none';
+                                console.log('Notification badge hidden: count is 0');
+                            }
+                        } else {
+                            // On error, keep current state
+                            console.warn('Failed to update notification count:', data);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error updating notification count:', error);
+                        // On error, keep current state - don't modify badge
+                    });
+            }
+        }
+        
+        // Don't update immediately - wait to avoid flickering with initial server-rendered count
+        // Update every 30 seconds starting after 5 seconds
+        setTimeout(function() {
+            updateNotificationCount();
+            setInterval(updateNotificationCount, 30000);
+        }, 5000);
+    });
+    </script>
+    {% endif %}
+    
+        <!-- Phoenix handles navbar behavior automatically -->
+    
+    {% block extra_js %}{% endblock %}
+    
+    <!-- Initialize Feather Icons and Sidebar Navigation -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize Feather icons
+        if (typeof feather !== 'undefined') {
+            feather.replace();
+        }
+        
+        // Re-initialize Feather icons when new content is added
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.addedNodes.length > 0) {
+                    if (typeof feather !== 'undefined') {
+                        feather.replace();
+                    }
+                }
+            });
+        });
+        
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+        
+        // Simple fix for sidebar navigation - let Bootstrap handle it naturally
+        setTimeout(function() {
+            // Just ensure Bootstrap collapse is working properly
+            const collapseElements = document.querySelectorAll('.collapse');
+            collapseElements.forEach(function(element) {
+                // Initialize Bootstrap collapse if not already done
+                if (!element.hasAttribute('data-bs-collapse-initialized')) {
+                    element.setAttribute('data-bs-collapse-initialized', 'true');
+                }
+            });
+        }, 100);
+        
+        // Minimal CSS - let Bootstrap handle the rest
+        const style = document.createElement('style');
+        style.textContent = `
+            .dropdown-indicator-icon span {
+                transition: transform 0.2s ease;
+            }
+            /* Action dropdown styling */
+            .dropdown-menu {
+                min-width: 200px;
+                box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+                border: 1px solid rgba(0, 0, 0, 0.1);
+            }
+            .dropdown-item {
+                padding: 0.5rem 1rem;
+                display: flex;
+                align-items: center;
+            }
+            .dropdown-item:hover {
+                background-color: #f8f9fa;
+            }
+            .dropdown-item.text-danger:hover {
+                background-color: #fff5f5;
+                color: #dc3545 !important;
+            }
+        `;
+        document.head.appendChild(style);
+    });
+    </script>
+
+    <script>
+    // Convert Django messages to toast notifications
+    document.addEventListener('DOMContentLoaded', function() {
+        {% if messages %}
+            {% for message in messages %}
+                showToast('{{ message|escapejs }}', '{{ message.tags|default:"info" }}', '{% if message.tags == "success" %}Success{% elif message.tags == "error" or message.tags == "danger" %}Error{% elif message.tags == "warning" %}Warning{% else %}Notification{% endif %}');
+            {% endfor %}
+        {% endif %}
+    });
+    
+    // Settings & Privacy Modal Functions
+    function openSettingsModal() {
+        const modal = new bootstrap.Modal(document.getElementById('settingsModal'));
+        modal.show();
+        loadSettingsContent();
+    }
+
+    function loadSettingsContent() {
+        const contentDiv = document.getElementById('settingsModalContent');
+        contentDiv.innerHTML = `
+            <div class="row">
+                <div class="col-md-6">
+                    <h6><i class="fas fa-shield-alt me-2"></i>Privacy Settings</h6>
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="profileVisibility" checked>
+                        <label class="form-check-label" for="profileVisibility">
+                            Make profile visible to other users
+                        </label>
+                    </div>
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="emailNotifications" checked>
+                        <label class="form-check-label" for="emailNotifications">
+                            Receive email notifications
+                        </label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <h6><i class="fas fa-cog me-2"></i>Account Settings</h6>
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="twoFactorAuth">
+                        <label class="form-check-label" for="twoFactorAuth">
+                            Enable two-factor authentication
+                        </label>
+                    </div>
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="sessionTimeout" checked>
+                        <label class="form-check-label" for="sessionTimeout">
+                            Auto-logout after inactivity
+                        </label>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function saveSettings() {
+        showToast('Settings saved successfully!', 'success');
+        const modal = bootstrap.Modal.getInstance(document.getElementById('settingsModal'));
+        modal.hide();
+    }
+
+    function openProfileModal() {
+        const modal = new bootstrap.Modal(document.getElementById('profileModal'));
+        modal.show();
+        loadProfileContent();
+    }
+
+    function loadProfileContent() {
+        const contentDiv = document.getElementById('profileModalContent');
+        contentDiv.innerHTML = `
+              <div class="row">
+                <div class="col-md-4 text-center mb-4">
+                  <div class="position-relative d-inline-block">
+                    {% if user.profile and user.profile.image %}
+                            <img id="profilePreview" src="{{ user.profile.image.url }}" alt="Profile Picture" class="rounded-circle" style="width: 120px; height: 120px; object-fit: cover;">
+                    {% else %}
+                            <div id="profilePreview" class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width: 120px; height: 120px;">
+                        {% if user.first_name and user.last_name %}
+                          {{ user.first_name|first }}{{ user.last_name|first }}
+                        {% else %}
+                          {{ user.username|first|upper }}
+                        {% endif %}
+                      </div>
+                    {% endif %}
+                        <label for="id_photo" class="btn btn-sm btn-primary position-absolute" style="bottom: 0; right: 0; border-radius: 50%; width: 36px; height: 36px; padding: 0; display: flex; align-items: center; justify-content: center;">
+                      <i class="fas fa-camera"></i>
+                    </label>
+                    <input type="file" id="id_photo" name="photo" accept="image/*" class="d-none">
+                  </div>
+                  <small class="text-muted d-block mt-2">Click camera icon to change photo</small>
+                </div>
+                
+                <div class="col-md-8">
+                    <form id="profileForm" method="post" action="{% url 'accounts:profile_update' %}" enctype="multipart/form-data">
+                        {% csrf_token %}
+                  <div class="row">
+                    <div class="col-md-6 mb-3">
+                      <label for="id_first_name" class="form-label">First Name</label>
+                      <input type="text" class="form-control" id="id_first_name" name="first_name" value="{{ user.first_name }}">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                      <label for="id_last_name" class="form-label">Last Name</label>
+                      <input type="text" class="form-control" id="id_last_name" name="last_name" value="{{ user.last_name }}">
+                    </div>
+                  </div>
+                  <div class="mb-3">
+                    <label for="id_email" class="form-label">Email</label>
+                    <input type="email" class="form-control" id="id_email" name="email" value="{{ user.email }}">
+                  </div>
+                  <div class="mb-3">
+                    <label for="id_phone" class="form-label">Phone</label>
+                    <input type="text" class="form-control" id="id_phone" name="phone" value="{{ user.profile.phone|default:'' }}">
+                  </div>
+                  <div class="mb-3">
+                    <label for="id_password" class="form-label">New Password (optional)</label>
+                    <input type="password" class="form-control" id="id_password" name="password" placeholder="Leave blank to keep current password">
+            </div>
+          </form>
+        </div>
+      </div>
+        `;
+        
+        // Add photo preview functionality
+        const photoInput = document.getElementById('id_photo');
+        if (photoInput) {
+            photoInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const preview = document.getElementById('profilePreview');
+                        if (preview) {
+                            // Replace with img if it's currently a div
+                            if (preview.tagName === 'DIV') {
+                                const img = document.createElement('img');
+                                img.id = 'profilePreview';
+                                img.className = 'rounded-circle';
+                                img.style.width = '120px';
+                                img.style.height = '120px';
+                                img.style.objectFit = 'cover';
+                                preview.parentNode.replaceChild(img, preview);
+                                img.src = e.target.result;
+                            } else {
+                                preview.src = e.target.result;
+                            }
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+        
+        // Handle form submission with AJAX
+        const form = document.getElementById('profileForm');
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const formData = new FormData(this);
+                
+                // Manually append photo file if it exists (since it's outside the form)
+                const photoInput = document.getElementById('id_photo');
+                if (photoInput && photoInput.files && photoInput.files[0]) {
+                    formData.append('photo', photoInput.files[0]);
+                    console.log('Photo appended:', photoInput.files[0].name);
+                }
+                
+                fetch(this.action, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showToast('Profile updated successfully!', 'success');
+                        // Close modal and reload to show updated profile
+                        setTimeout(function() {
+                            const modal = bootstrap.Modal.getInstance(document.getElementById('profileModal'));
+                            if (modal) {
+                                modal.hide();
+                            }
+                            location.reload();
+                        }, 1500);
+                    } else {
+                        showToast(data.message || 'Failed to update profile', 'danger');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showToast('An error occurred while updating profile', 'danger');
+                });
+            });
+        }
+    }
+
+    function saveProfile() {
+        const profileForm = document.getElementById('profileForm');
+        if (profileForm) {
+            profileForm.dispatchEvent(new Event('submit'));
+        } else {
+            showToast('Profile form not found', 'danger');
+        }
+    }
+
+    // Global toast management
+    function showToast(message, type = 'success', title = 'Notification') {
+        const container = document.getElementById('toastContainer');
+        if (!container) {
+            return;
+        }
+        
+        const bgClass = 'bg-primary';
+        const iconClass = type === 'success' ? 'fas fa-check-circle text-success' : type === 'danger' ? 'fas fa-times-circle text-danger' : type === 'warning' ? 'fas fa-exclamation-triangle text-warning' : 'fas fa-info-circle text-info';
+        
+        const toastEl = document.createElement('div');
+        toastEl.className = 'toast shadow-lg border-0';
+        toastEl.setAttribute('role', 'alert');
+        toastEl.setAttribute('aria-live', 'assertive');
+        toastEl.setAttribute('aria-atomic', 'true');
+        toastEl.style.minWidth = '320px';
+        toastEl.style.maxWidth = '400px';
+        toastEl.style.marginBottom = '10px';
+        toastEl.style.pointerEvents = 'auto';
+        toastEl.innerHTML = `
+            <div class="toast-header ${bgClass} text-white">
+                <i class="${iconClass} me-2"></i>
+                <strong class="me-auto">${title}</strong>
+                <button type="button" class="btn-close btn-close-white ms-2 mb-1" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body bg-white text-dark border-0">
+                <div class="fw-medium">${message}</div>
+    </div>
+        `;
+        
+        container.appendChild(toastEl);
+        const bsToast = new bootstrap.Toast(toastEl, { 
+            delay: 4000, 
+            autohide: true,
+            animation: true
+        });
+        
+        bsToast.show();
+        
+        toastEl.addEventListener('hidden.bs.toast', function () { 
+            toastEl.remove(); 
+        });
+    }
+    
+    // Select2 Initialization Helper
+    // This function safely initializes Select2 on dropdowns
+    function initSelect2(selector, options = {}) {
+        const defaultOptions = {
+            theme: 'bootstrap-5',
+            width: '100%',
+            allowClear: true,
+            minimumResultsForSearch: 3,
+            placeholder: 'Select...',
+            ...options
+        };
+        
+        try {
+            if (typeof jQuery !== 'undefined' && jQuery.fn.select2) {
+                jQuery(selector).select2(defaultOptions);
+            }
+        } catch (e) {
+            console.warn('Select2 initialization failed for', selector, e);
+        }
+    }
+    
+    // Initialize Select2 on common dropdowns when DOM is ready
+    document.addEventListener('DOMContentLoaded', function() {
+        // Wait a bit for dynamic content to load
+        setTimeout(function() {
+            // Initialize Select2 on region dropdowns
+            if (jQuery('#id_region').length && !jQuery('#id_region').hasClass('select2-hidden-accessible')) {
+                initSelect2('#id_region', { placeholder: 'Select Region' });
+            }
+            
+            // Initialize Select2 on district dropdowns
+            if (jQuery('#id_district').length && !jQuery('#id_district').hasClass('select2-hidden-accessible')) {
+                initSelect2('#id_district', { placeholder: 'Select District' });
+            }
+            
+            // Initialize Select2 on property type dropdowns
+            if (jQuery('#id_property_type').length && !jQuery('#id_property_type').hasClass('select2-hidden-accessible')) {
+                initSelect2('#id_property_type', { placeholder: 'Select Property Type' });
+            }
+            
+            // Initialize Select2 on district management region dropdowns
+            if (jQuery('#edit_district_region').length && !jQuery('#edit_district_region').hasClass('select2-hidden-accessible')) {
+                initSelect2('#edit_district_region', { placeholder: 'Select Region' });
+            }
+        }, 100);
+    });
+    </script>
+    </div> <!-- End main-wrapper -->
+  </body>
+</html>

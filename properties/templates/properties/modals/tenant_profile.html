@@ -1,0 +1,146 @@
+<div class="row">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <div class="avatar-lg bg-primary text-white rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3 fw-bold" style="width: 80px; height: 80px; font-size: 2rem;">
+                    {{ tenant.full_name|first|upper }}
+                </div>
+                <h5 class="card-title">{{ tenant.full_name }}</h5>
+                <p class="text-muted">Tenant ID: {{ tenant.id }}</p>
+                
+                {% if latest_booking %}
+                    {% if latest_booking.total_amount >= 1000000 %}
+                        <span class="badge bg-warning">VIP Tenant</span>
+                    {% elif latest_booking.total_amount >= 500000 %}
+                        <span class="badge bg-primary">Premium</span>
+                    {% else %}
+                        <span class="badge bg-secondary">Standard</span>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>Contact Information</h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-2">
+                    <strong>Email:</strong><br>
+                    <a href="mailto:{{ tenant.email }}" class="text-decoration-none">{{ tenant.email|default:"N/A" }}</a>
+                </div>
+                <div class="mb-2">
+                    <strong>Phone:</strong><br>
+                    <a href="tel:{{ tenant.phone }}" class="text-decoration-none">{{ tenant.phone|default:"N/A" }}</a>
+                </div>
+                <div class="mb-0">
+                    <strong>Member Since:</strong><br>
+                    <span class="text-muted">{{ tenant.created_at|date:"M d, Y" }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8">
+        {% if latest_booking %}
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-home me-2"></i>Current Property</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>{{ latest_booking.property_obj.title }}</h6>
+                        <p class="text-muted mb-2">{{ latest_booking.property_obj.address }}</p>
+                        <p class="text-muted mb-0">{{ latest_booking.property_obj.description|truncatechars:100 }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="row">
+                            <div class="col-6">
+                                <div class="text-center">
+                                    <div class="fw-bold text-primary">Tsh{{ latest_booking.total_amount|floatformat:0 }}</div>
+                                    <small class="text-muted">Monthly Rent</small>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-center">
+                                    <div class="fw-bold text-success">{{ latest_booking.duration_days }}</div>
+                                    <small class="text-muted">Days</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-calendar me-2"></i>Lease Information</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <strong>Move-in Date:</strong><br>
+                            <span class="text-primary">{{ latest_booking.check_in_date|date:"M d, Y" }}</span>
+                        </div>
+                        <div class="mb-3">
+                            <strong>Lease End:</strong><br>
+                            <span class="text-primary">{{ latest_booking.check_out_date|date:"M d, Y" }}</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <strong>Booking Status:</strong><br>
+                            {% if latest_booking.booking_status == 'confirmed' %}
+                                <span class="badge bg-success">Active</span>
+                            {% elif latest_booking.booking_status == 'checked_in' %}
+                                <span class="badge bg-primary">Checked In</span>
+                            {% elif latest_booking.booking_status == 'checked_out' %}
+                                <span class="badge bg-info">Checked Out</span>
+                            {% elif latest_booking.booking_status == 'cancelled' %}
+                                <span class="badge bg-danger">Cancelled</span>
+                            {% else %}
+                                <span class="badge bg-warning">Pending</span>
+                            {% endif %}
+                        </div>
+                        <div class="mb-3">
+                            <strong>Payment Status:</strong><br>
+                            {% if latest_booking.payment_status == 'paid' %}
+                                <span class="badge bg-success">Paid</span>
+                            {% elif latest_booking.payment_status == 'partial' %}
+                                <span class="badge bg-warning">Partial</span>
+                            {% elif latest_booking.payment_status == 'overdue' %}
+                                <span class="badge bg-danger">Overdue</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Pending</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        {% if latest_booking.special_requests %}
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-sticky-note me-2"></i>Special Requests</h6>
+            </div>
+            <div class="card-body">
+                <p class="mb-0">{{ latest_booking.special_requests }}</p>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% else %}
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="fas fa-home fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">No Current Property</h5>
+                <p class="text-muted">This tenant doesn't have any active house bookings.</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>

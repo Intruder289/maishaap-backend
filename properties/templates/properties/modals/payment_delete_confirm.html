@@ -1,0 +1,29 @@
+<div class="alert alert-warning">
+    <i class="fas fa-exclamation-triangle me-2"></i>
+    <strong>Warning:</strong> Are you sure you want to delete this payment? This action cannot be undone.
+</div>
+
+<div class="row mt-3">
+    <div class="col-12">
+        <h6 class="text-muted mb-3">Payment Information</h6>
+        <div class="card border">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p class="mb-2"><strong>Payment ID:</strong> #{{ payment.id }}</p>
+                        <p class="mb-2"><strong>Amount:</strong> Tsh{{ payment.amount|floatformat:2 }}</p>
+                        <p class="mb-2"><strong>Payment Method:</strong> {{ payment.get_payment_method_display }}</p>
+                        <p class="mb-2"><strong>Payment Type:</strong> {{ payment.get_payment_type_display }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p class="mb-2"><strong>Customer:</strong> {{ payment.booking.customer.full_name }}</p>
+                        <p class="mb-2"><strong>Booking:</strong> {{ payment.booking.booking_reference }}</p>
+                        <p class="mb-2"><strong>Property:</strong> {{ payment.booking.property_obj.title }}</p>
+                        <p class="mb-2"><strong>Date:</strong> {{ payment.payment_date|date:"M d, Y H:i" }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+

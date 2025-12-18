@@ -1,0 +1,164 @@
+{% extends "accounts/base.html" %}
+{% load static %}
+{% load currency_filters %}
+
+{% block title %}Record Payment{% endblock %}
+{% block page_title %}Record Payment{% endblock %}
+{% block page_description %}Record a new payment for rent or other charges{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'rent:payment_list' %}">Payments</a></li>
+<li class="breadcrumb-item active">Record Payment</li>
+{% endblock %}
+
+{% block page_actions %}
+<div class="d-flex gap-2">
+  <a href="{% url 'rent:payment_list' %}" class="btn btn-secondary">
+    <i class="fas fa-arrow-left me-2"></i>Back to Payments
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-8">
+    <div class="card">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-credit-card me-2"></i>Record New Payment</h5>
+      </div>
+      <div class="card-body">
+        <form method="post" id="paymentForm">
+          {% csrf_token %}
+          
+          <div class="row g-3">
+            <div class="col-12">
+              <label for="amount" class="form-label">Amount <span class="text-danger">*</span></label>
+              <div class="input-group">
+                <span class="input-group-text">Tsh</span>
+                <input type="number" class="form-control" id="amount" name="amount" required step="0.01" min="0" placeholder="0.00">
+              </div>
+            </div>
+            
+            <div class="col-md-6">
+              <label for="payment_method" class="form-label">Payment Method <span class="text-danger">*</span></label>
+              <select class="form-select" id="payment_method" name="payment_method" required>
+                <option value="">Select payment method</option>
+                <option value="cash">Cash</option>
+                <option value="bank_transfer">Bank Transfer</option>
+                <option value="mobile_money">Mobile Money</option>
+                <option value="check">Check</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            
+            <div class="col-md-6">
+              <label for="payment_date" class="form-label">Payment Date <span class="text-danger">*</span></label>
+              <input type="date" class="form-control" id="payment_date" name="payment_date" required>
+            </div>
+            
+            <div class="col-12">
+              <label for="reference_number" class="form-label">Reference Number</label>
+              <input type="text" class="form-control" id="reference_number" name="reference_number" placeholder="Transaction reference or receipt number">
+              <div class="form-text">Optional: Transaction reference, receipt number, or check number</div>
+            </div>
+            
+            <div class="col-12">
+              <label for="notes" class="form-label">Notes</label>
+              <textarea class="form-control" id="notes" name="notes" rows="3" placeholder="Additional notes about this payment..."></textarea>
+            </div>
+          </div>
+          
+          <div class="d-flex justify-content-end gap-2 mt-4">
+            <a href="{% url 'rent:payment_list' %}" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary" id="submitBtn">Record Payment</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Active Leases Info -->
+{% if active_leases %}
+<div class="row mt-4">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h6 class="mb-0"><i class="fas fa-home me-2"></i>Your Active Leases</h6>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>Property</th>
+                <th>Rent Amount</th>
+                <th>Start Date</th>
+                <th>End Date</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for lease in active_leases %}
+              <tr>
+                <td>
+                  <div class="d-flex align-items-center">
+                    <img src="{% if lease.property_ref.image %}{{ lease.property_ref.image.url }}{% else %}{% static 'img/generic/4.png' %}{% endif %}" 
+                         alt="{{ lease.property_ref.name }}" class="rounded me-3">
+                    <div>
+                      <h6 class="mb-0">{{ lease.property_ref.name }}</h6>
+                      <small class="text-600">{{ lease.property_ref.property_ref }}</small>
+                    </div>
+                  </div>
+                </td>
+                <td class="fw-bold">{{ lease.rent_amount|currency_tzs }}</td>
+                <td>{{ lease.start_date|date:"M j, Y" }}</td>
+                <td>{{ lease.end_date|date:"M j, Y" }}</td>
+                <td>
+                  <span class="badge bg-success-subtle text-success">{{ lease.get_status_display }}</span>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Set today's date as default
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('payment_date').value = today;
+    
+    // Form validation
+    document.querySelector('form').addEventListener('submit', function(e) {
+        const amount = document.getElementById('amount').value;
+        const paymentMethod = document.getElementById('payment_method').value;
+        const paymentDate = document.getElementById('payment_date').value;
+        
+        if (!amount || !paymentMethod || !paymentDate) {
+            e.preventDefault();
+            alert('Please fill in all required fields.');
+            return;
+        }
+        
+        if (parseFloat(amount) <= 0) {
+            e.preventDefault();
+            alert('Please enter a valid amount greater than 0.');
+            return;
+        }
+        
+        // Disable submit button to prevent double submission
+        const submitBtn = document.getElementById('submitBtn');
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Recording...';
+    });
+});
+</script>
+{% endblock %}

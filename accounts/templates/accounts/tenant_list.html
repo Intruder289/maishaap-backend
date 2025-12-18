@@ -1,0 +1,112 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}Tenant Management{% endblock %}
+{% block page_title %}Tenant Management{% endblock %}
+{% block header_title %}Tenant Management{% endblock %}
+
+{% block page_actions %}
+<button class="btn btn-primary" type="button">
+  <span class="fas fa-plus me-2"></span>
+  Add Tenant
+</button>
+{% endblock %}
+
+{% block content %}
+<!-- Tenant Table -->
+{% include 'components/table_components.html' with table_id='tenant-table' search_placeholder='Search tenants...' %}
+
+{% block table_header %}
+<thead class="bg-200">
+  <tr>
+    <th class="border-0">Name</th>
+    <th class="border-0">Email</th>
+    <th class="border-0">Role</th>
+    <th class="border-0">Phone</th>
+    <th class="border-0">Status</th>
+    <th class="border-0">Updated</th>
+    <th class="border-0">Actions</th>
+  </tr>
+</thead>
+{% endblock %}
+
+{% block table_rows %}
+<tbody>
+  {% for tenant in tenants %}
+    <tr>
+      <td>
+        <div class="d-flex align-items-center">
+          {% if tenant.profile_photo %}
+            <img src="{{ tenant.profile_photo.url }}" alt="{{ tenant.get_username }}" class="rounded-circle me-2" width="32" height="32">
+          {% else %}
+            <div class="bg-200 rounded-circle me-2 d-flex align-items-center justify-content-center">
+              <span class="fas fa-user text-600"></span>
+            </div>
+          {% endif %}
+          <div>
+            <h6 class="mb-0">{{ tenant.get_full_name|default:tenant.username }}</h6>
+            <small class="text-600">ID: {{ tenant.id|truncatechars:15 }}</small>
+          </div>
+        </div>
+      </td>
+      <td>
+        <span class="text-600">{{ tenant.email|default:"No email" }}</span>
+      </td>
+      <td>
+        <span class="badge bg-info-subtle text-info">
+          {{ tenant.role|default:"No role" }}
+        </span>
+      </td>
+      <td>
+        <span class="text-600">{{ tenant.phone_number|default:"No phone" }}</span>
+      </td>
+      <td>
+        {% if tenant.is_active %}
+          <span class="badge bg-success-subtle text-success">
+            <span class="fas fa-check-circle me-1"></span>
+            Active
+          </span>
+        {% else %}
+          <span class="badge bg-danger-subtle text-danger">
+            <span class="fas fa-times-circle me-1"></span>
+            Inactive
+          </span>
+        {% endif %}
+      </td>
+      <td>
+        <small class="text-600">
+          {% if tenant.date_joined %}
+            {{ tenant.date_joined|date:"M d, Y" }}
+          {% else %}
+            Unknown
+          {% endif %}
+        </small>
+      </td>
+      <td>
+        {% include 'components/dropdown_actions.html' with 
+           view_url="/users/"|add:tenant.id|add:"/profile/"
+           edit_url="/users/"|add:tenant.id|add:"/edit/"
+           toggle_status_url="/api/v1/users/"|add:tenant.id|add:"/toggle-status/"
+           delete_url="/api/v1/users/"|add:tenant.id|add:"/delete/"
+           item_id=tenant.id 
+           item_name="tenant"
+           is_active=tenant.is_active %}
+      </td>
+    </tr>
+  {% endfor %}
+</tbody>
+{% endblock %}
+
+{% block table_empty_message %}
+<tr>
+  <td colspan="7" class="text-center py-4">
+    <div class="text-600">
+      <span class="fas fa-users fs-3 mb-3 d-block"></span>
+      <p class="mb-0">No tenants found</p>
+      <small>There are no tenants in the system yet</small>
+    </div>
+  </td>
+</tr>
+{% endblock %}
+
+{% endblock %}

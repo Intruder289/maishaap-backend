@@ -1,0 +1,346 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}{{ maintenance_request.title }}{% endblock %}
+{% block page_title %}Maintenance Request Details{% endblock %}
+
+{% block content %}
+<div class="maintenance-detail">
+    <div class="detail-container">
+        <!-- Header -->
+        <div class="detail-header">
+            <div class="header-top">
+                <div class="header-content">
+                    <h1 class="text-decoration-none">
+                        {{ maintenance_request.title }}
+                        {% if maintenance_request.is_emergency %}
+                        <span class="emergency-badge">
+                            <i class="fas fa-fire"></i> Emergency
+                        </span>
+                        {% endif %}
+                    </h1>
+                    <p class="d-flex align-items-center">
+                        <i class="fas fa-building"></i> {{ maintenance_request.property.name }}
+                        {% if maintenance_request.location_details %}
+                        • {{ maintenance_request.location_details }}
+                        {% endif %}
+                    </p>
+                    <div class="status-priority">
+                        <span class="badge {{ maintenance_request.status }}">
+                            {{ maintenance_request.get_status_display }}
+                        </span>
+                        <span class="badge {{ maintenance_request.priority }}">
+                            {{ maintenance_request.get_priority_display }} Priority
+                        </span>
+                        <span class="badge bg-secondary-subtle text-secondary">
+                            {{ maintenance_request.get_category_display }}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="header-actions">
+                    <a href="{% url 'maintenance:request_list' %}" class="btn btn-primary" title="Back to list">
+                        <i class="fas fa-arrow-left"></i> Back to List
+                    </a>
+                </div>
+            </div>
+            
+            {% if maintenance_request.is_overdue %}
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i>
+                This request is {{ maintenance_request.days_overdue }} day{{ maintenance_request.days_overdue|pluralize }} overdue.
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Content Grid -->
+        <div class="detail-grid">
+            <!-- Main Content -->
+            <div class="main-content">
+                <!-- Description -->
+                <div class="detail-card">
+                    <h3 class="card-title">
+                        <i class="fas fa-file-alt"></i> Description
+                    </h3>
+                    <p class="description-text">{{ maintenance_request.description }}</p>
+                    
+                    {% if maintenance_request.tenant_notes %}
+                    <div>
+                        <h4>Additional Notes:</h4>
+                        <p class="description-text">{{ maintenance_request.tenant_notes }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Access Instructions -->
+                {% if maintenance_request.access_instructions or maintenance_request.tenant_availability %}
+                <div class="detail-card">
+                    <h3 class="card-title">
+                        <i class="fas fa-key"></i> Access Information
+                    </h3>
+                    {% if maintenance_request.access_instructions %}
+                    <div>
+                        <h4>Access Instructions:</h4>
+                        <p class="description-text">{{ maintenance_request.access_instructions }}</p>
+                    </div>
+                    {% endif %}
+                    
+                    {% if maintenance_request.tenant_availability %}
+                    <div>
+                        <h4>Tenant Availability:</h4>
+                        <p class="description-text">{{ maintenance_request.tenant_availability }}</p>
+                    </div>
+                    {% endif %}
+                    
+                    {% if maintenance_request.requires_tenant_presence %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> Tenant presence required during repairs
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <!-- Work Orders -->
+                {% if work_orders %}
+                <div class="detail-card">
+                    <h3 class="card-title">
+                        <i class="fas fa-clipboard-list"></i> Work Orders
+                    </h3>
+                    {% for work_order in work_orders %}
+                    <div class="work-order-item">
+                        <div class="work-order-header">
+                            <span class="work-order-number">{{ work_order.work_order_number }}</span>
+                            <span class="work-order-status badge {{ work_order.status }}">
+                                {{ work_order.get_status_display }}
+                            </span>
+                        </div>
+                        <div class="work-order-details">
+                            {{ work_order.work_description|truncatechars:100 }}
+                            {% if work_order.scheduled_date %}
+                            <br><strong>Scheduled:</strong> {{ work_order.scheduled_date|naturalday }} at {{ work_order.scheduled_date|time:"H:i" }}
+                            {% endif %}
+                            {% if work_order.total_cost %}
+                            <br><strong>Cost:</strong> Tsh {{ work_order.total_cost|floatformat:0|intcomma }}
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <!-- Expenses -->
+                {% if expenses %}
+                <div class="detail-card">
+                    <h3 class="card-title">
+                        <i class="fas fa-receipt"></i> Expenses
+                    </h3>
+                    {% for expense in expenses %}
+                    <div class="expense-item">
+                        <div>
+                            <div class="expense-description">{{ expense.description }}</div>
+                            <div class="expense-meta">
+                                {{ expense.get_expense_type_display }} • {{ expense.expense_date|naturalday }}
+                                {% if expense.vendor %}• {{ expense.vendor.name }}{% endif %}
+                            </div>
+                        </div>
+                        <div class="expense-amount">Tsh {{ expense.amount|floatformat:0|intcomma }}</div>
+                    </div>
+                    {% endfor %}
+                    
+                    <div>
+                        <strong>
+                            Total: Tsh {% with total_expenses=expenses|length %}{% if total_expenses > 0 %}{{ expenses.0.maintenance_request.expenses.all|length }}{% endif %}{% endwith %}
+                        </strong>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Images -->
+                {% if images %}
+                <div class="detail-card">
+                    <h3 class="card-title">
+                        <i class="fas fa-images"></i> Images
+                    </h3>
+                    <div class="images-grid">
+                        {% for image in images %}
+                        <div class="image-item">
+                            <img src="{{ image.image.url }}" alt="{{ image.caption|default:'Maintenance image' }}">
+                            {% if image.caption %}
+                            <div class="image-caption">{{ image.caption }}</div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Feedback -->
+                {% if maintenance_request.tenant_rating or maintenance_request.tenant_feedback %}
+                <div class="detail-card">
+                    <h3 class="card-title">
+                        <i class="fas fa-star"></i> Tenant Feedback
+                    </h3>
+                    {% if maintenance_request.tenant_rating %}
+                    <div class="rating-display">
+                        {% for i in "12345"|make_list %}
+                            {% if forloop.counter <= maintenance_request.tenant_rating %}
+                                <i class="fas fa-star"></i>
+                            {% else %}
+                                <i class="far fa-star"></i>
+                            {% endif %}
+                        {% endfor %}
+                        <span>
+                            {{ maintenance_request.tenant_rating }}/5 stars
+                        </span>
+                    </div>
+                    {% endif %}
+                    
+                    {% if maintenance_request.tenant_feedback %}
+                    <p class="feedback-text">{{ maintenance_request.tenant_feedback }}</p>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <!-- Feedback Form -->
+                {% if feedback_form %}
+                <div class="detail-card">
+                    <h3 class="card-title">
+                        <i class="fas fa-comment"></i> Submit Feedback
+                    </h3>
+                    <div class="feedback-form">
+                        <form method="post" action="{% url 'maintenance:submit_feedback' maintenance_request.id %}">
+                            {% csrf_token %}
+                            <div class="form-group">
+                                <label class="form-label">{{ feedback_form.tenant_rating.label }}</label>
+                                {{ feedback_form.tenant_rating }}
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">{{ feedback_form.tenant_feedback.label }}</label>
+                                {{ feedback_form.tenant_feedback }}
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-paper-plane"></i> Submit Feedback
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Sidebar -->
+            <div class="sidebar-content">
+                <!-- Request Details -->
+                <div class="detail-card">
+                    <h3 class="card-title">
+                        <i class="fas fa-info-circle"></i> Request Details
+                    </h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">Request ID</span>
+                            <span class="info-value">#{{ maintenance_request.id }}</span>
+                        </div>
+                        
+                        <div class="info-item">
+                            <span class="info-label">Requested Date</span>
+                            <span class="info-value">{{ maintenance_request.requested_date|naturalday }}</span>
+                        </div>
+                        
+                        {% if maintenance_request.due_date %}
+                        <div class="info-item">
+                            <span class="info-label">Due Date</span>
+                            <span class="info-value">{{ maintenance_request.due_date|naturalday }}</span>
+                        </div>
+                        {% endif %}
+                        
+                        {% if maintenance_request.assigned_to %}
+                        <div class="info-item">
+                            <span class="info-label">Assigned To</span>
+                            <span class="info-value">{{ maintenance_request.assigned_to.get_full_name|default:maintenance_request.assigned_to.username }}</span>
+                        </div>
+                        {% endif %}
+                        
+                        {% if maintenance_request.estimated_cost %}
+                        <div class="info-item">
+                            <span class="info-label">Estimated Cost</span>
+                            <span class="info-value cost-display">Tsh {{ maintenance_request.estimated_cost|floatformat:0|intcomma }}</span>
+                        </div>
+                        {% endif %}
+                        
+                        {% if maintenance_request.actual_cost %}
+                        <div class="info-item">
+                            <span class="info-label">Actual Cost</span>
+                            <span class="info-value cost-display">Tsh {{ maintenance_request.actual_cost|floatformat:0|intcomma }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Timeline -->
+                <div class="detail-card">
+                    <h3 class="card-title">
+                        <i class="fas fa-history"></i> Timeline
+                    </h3>
+                    <div class="timeline">
+                        <div class="timeline-item">
+                            <div class="timeline-icon requested">
+                                <i class="fas fa-plus"></i>
+                            </div>
+                            <div class="timeline-content">
+                                <div class="timeline-title">Request Submitted</div>
+                                <div class="timeline-date">{{ maintenance_request.requested_date|naturalday }} at {{ maintenance_request.requested_date|time:"H:i" }}</div>
+                            </div>
+                        </div>
+                        
+                        {% if maintenance_request.assigned_date %}
+                        <div class="timeline-item">
+                            <div class="timeline-icon assigned">
+                                <i class="fas fa-user"></i>
+                            </div>
+                            <div class="timeline-content">
+                                <div class="timeline-title">Assigned to {{ maintenance_request.assigned_to.get_full_name|default:maintenance_request.assigned_to.username }}</div>
+                                <div class="timeline-date">{{ maintenance_request.assigned_date|naturalday }} at {{ maintenance_request.assigned_date|time:"H:i" }}</div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if maintenance_request.started_date %}
+                        <div class="timeline-item">
+                            <div class="timeline-icon started">
+                                <i class="fas fa-play"></i>
+                            </div>
+                            <div class="timeline-content">
+                                <div class="timeline-title">Work Started</div>
+                                <div class="timeline-date">{{ maintenance_request.started_date|naturalday }} at {{ maintenance_request.started_date|time:"H:i" }}</div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if maintenance_request.completed_date %}
+                        <div class="timeline-item">
+                            <div class="timeline-icon completed">
+                                <i class="fas fa-check"></i>
+                            </div>
+                            <div class="timeline-content">
+                                <div class="timeline-title">Work Completed</div>
+                                <div class="timeline-date">{{ maintenance_request.completed_date|naturalday }} at {{ maintenance_request.completed_date|time:"H:i" }}</div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Admin Notes -->
+                {% if maintenance_request.admin_notes and user.is_staff %}
+                <div class="detail-card">
+                    <h3 class="card-title">
+                        <i class="fas fa-sticky-note"></i> Admin Notes
+                    </h3>
+                    <p class="description-text">{{ maintenance_request.admin_notes }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

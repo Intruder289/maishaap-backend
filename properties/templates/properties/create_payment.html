@@ -1,0 +1,183 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Create Payment{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="page-title-box">
+                <div class="page-title-right">
+                    <ol class="breadcrumb m-0">
+                        <li class="breadcrumb-item"><a href="{% url 'properties:dashboard' %}">Properties</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'properties:booking_detail' pk=booking.pk %}">Booking {{ booking.booking_reference }}</a></li>
+                        <li class="breadcrumb-item active">Create Payment</li>
+                    </ol>
+                </div>
+                <h4 class="page-title">Create Payment</h4>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-money-bill-wave me-2"></i>New Payment
+                    </h5>
+                    <p class="text-muted mb-0">Booking: <strong>{{ booking.booking_reference }}</strong> - {{ booking.customer.full_name }}</p>
+                </div>
+                <div class="card-body">
+                    <!-- Booking Summary -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="alert alert-info">
+                                <h6 class="alert-heading">Booking Summary</h6>
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <strong>Total Amount:</strong><br>
+                                        <span class="h5 text-primary">Tsh{{ booking.total_amount }}</span>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <strong>Paid Amount:</strong><br>
+                                        <span class="h5 text-success">Tsh{{ booking.paid_amount }}</span>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <strong>Remaining:</strong><br>
+                                        <span class="h5 text-warning">Tsh{{ booking.remaining_amount }}</span>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <strong>Status:</strong><br>
+                                        <span class="badge bg-{% if booking.payment_status == 'paid' %}success{% elif booking.payment_status == 'partial' %}warning{% else %}danger{% endif %}">
+                                            {{ booking.get_payment_status_display }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <!-- Payment Information -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary mb-3">
+                                    <i class="fas fa-credit-card me-2"></i>Payment Information
+                                </h6>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Payment Amount *</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">Tsh</span>
+                                    <input type="number" class="form-control" name="amount" step="0.01" min="0" max="{{ booking.remaining_amount }}" required>
+                                </div>
+                                <div class="form-text">Maximum: Tsh{{ booking.remaining_amount }}</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Payment Method *</label>
+                                <select class="form-control" name="payment_method" required>
+                                    <option value="">Select Payment Method</option>
+                                    <option value="cash">Cash</option>
+                                    <option value="card">Card</option>
+                                    <option value="bank_transfer">Bank Transfer</option>
+                                    <option value="mobile_money">Mobile Money</option>
+                                    <option value="check">Check</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Payment Type *</label>
+                                <select class="form-control" name="payment_type" required>
+                                    <option value="">Select Payment Type</option>
+                                    <option value="deposit">Deposit</option>
+                                    <option value="partial">Partial Payment</option>
+                                    <option value="full">Full Payment</option>
+                                    <option value="refund">Refund</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Payment Date *</label>
+                                <input type="datetime-local" class="form-control" name="payment_date" required>
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label">Transaction Reference</label>
+                                <input type="text" class="form-control" name="transaction_reference" placeholder="Transaction ID, receipt number, etc.">
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label">Notes</label>
+                                <textarea class="form-control" name="notes" rows="3" placeholder="Additional payment notes"></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Quick Amount Buttons -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary mb-3">Quick Amount</h6>
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-outline-primary" onclick="setAmount({{ booking.total_amount|floatformat:2 }})">
+                                        Full Amount (Tsh{{ booking.total_amount|floatformat:2 }})
+                                    </button>
+                                    <button type="button" class="btn btn-outline-warning" onclick="setAmount({{ booking.remaining_amount|floatformat:2 }})">
+                                        Remaining (Tsh{{ booking.remaining_amount|floatformat:2 }})
+                                    </button>
+                                    <button type="button" class="btn btn-outline-info" onclick="setAmount({{ booking.total_amount|floatformat:2|add:"-1"|div:2 }})">
+                                        Half Amount (Tsh{{ booking.total_amount|floatformat:2|add:"-1"|div:2 }})
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-2"></i>Record Payment
+                                    </button>
+                                    <a href="{% url 'properties:booking_detail' pk=booking.pk %}" class="btn btn-secondary">
+                                        <i class="fas fa-times me-2"></i>Cancel
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function setAmount(amount) {
+    document.querySelector('input[name="amount"]').value = amount.toFixed(2);
+}
+
+// Set default payment date to now
+document.addEventListener('DOMContentLoaded', function() {
+    const now = new Date();
+    const localDateTime = now.toISOString().slice(0, 16);
+    document.querySelector('input[name="payment_date"]').value = localDateTime;
+    
+    // Auto-suggest payment type based on amount
+    const amountInput = document.querySelector('input[name="amount"]');
+    const paymentTypeSelect = document.querySelector('select[name="payment_type"]');
+    
+    amountInput.addEventListener('input', function() {
+        const amount = parseFloat(this.value);
+        const remaining = {{ booking.remaining_amount }};
+        
+        if (amount >= remaining) {
+            paymentTypeSelect.value = 'full';
+        } else if (amount > 0) {
+            paymentTypeSelect.value = 'partial';
+        }
+    });
+});
+</script>
+{% endblock %}

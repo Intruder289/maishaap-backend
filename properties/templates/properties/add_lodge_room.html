@@ -1,0 +1,151 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}Add Lodge Accommodation{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="page-title-box">
+                <div class="page-title-right">
+                    <ol class="breadcrumb m-0">
+                        <li class="breadcrumb-item"><a href="{% url 'properties:dashboard' %}">Properties</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'properties:lodge_dashboard' %}">Lodge Management</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'properties:lodge_rooms' %}">Accommodation</a></li>
+                        <li class="breadcrumb-item active">Add Accommodation</li>
+                    </ol>
+                </div>
+                <h4 class="page-title">Add Lodge Accommodation</h4>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-mountain me-2"></i>Add New Accommodation
+                    </h5>
+                    <p class="text-muted mb-0">Lodge: <strong>{{ selected_property.title }}</strong></p>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="{% url 'properties:add_lodge_room' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="hotel_id" value="{{ selected_property.id }}">
+                        
+                        <!-- Accommodation Information -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary mb-3">
+                                    <i class="fas fa-mountain me-2"></i>Accommodation Information
+                                </h6>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Accommodation Number *</label>
+                                <input type="text" class="form-control" name="room_number" required placeholder="e.g., Cabin-1, Tent-5, Chalet-2">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Accommodation Type *</label>
+                                <select class="form-control" name="room_type" required>
+                                    <option value="">Select Type</option>
+                                    <option value="Cabin">Cabin</option>
+                                    <option value="Tent Site">Tent Site</option>
+                                    <option value="Chalet">Chalet</option>
+                                    <option value="Lodge Room">Lodge Room</option>
+                                    <option value="Camping Site">Camping Site</option>
+                                    <option value="Bungalow">Bungalow</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Area/Section</label>
+                                <input type="text" class="form-control" name="floor_number" placeholder="e.g., Mountain View, Riverside">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Capacity *</label>
+                                <input type="number" class="form-control" name="capacity" min="1" value="2" required placeholder="Number of guests">
+                            </div>
+                        </div>
+
+                        <!-- Accommodation Details -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary mb-3">
+                                    <i class="fas fa-info-circle me-2"></i>Accommodation Details
+                                </h6>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Bed Type</label>
+                                <select class="form-control" name="bed_type">
+                                    <option value="">Select Bed Type</option>
+                                    <option value="Single Bed">Single Bed</option>
+                                    <option value="Double Bed">Double Bed</option>
+                                    <option value="Queen Bed">Queen Bed</option>
+                                    <option value="King Bed">King Bed</option>
+                                    <option value="Bunk Beds">Bunk Beds</option>
+                                    <option value="Cots">Cots</option>
+                                    <option value="Sleeping Bags">Sleeping Bags</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Base Rate (per night) *</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">Tsh</span>
+                                    <input type="number" class="form-control" name="base_rate" step="0.01" min="0" required placeholder="0.00">
+                                </div>
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label">Amenities</label>
+                                <textarea class="form-control" name="amenities" rows="3" placeholder="e.g., Fire pit, Shared bathroom, Kitchen area, Wildlife viewing platform"></textarea>
+                                <div class="form-text">List accommodation amenities separated by commas</div>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-2"></i>Add Accommodation
+                                    </button>
+                                    <a href="{% url 'properties:lodge_rooms' %}" class="btn btn-secondary">
+                                        <i class="fas fa-times me-2"></i>Cancel
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-generate accommodation number suggestions based on type
+    const roomTypeSelect = document.querySelector('select[name="room_type"]');
+    const roomNumberInput = document.querySelector('input[name="room_number"]');
+    
+    roomTypeSelect.addEventListener('change', function() {
+        if (this.value === 'Cabin') {
+            roomNumberInput.placeholder = 'e.g., Cabin-1, Cabin-2';
+        } else if (this.value === 'Tent Site') {
+            roomNumberInput.placeholder = 'e.g., Tent-1, Tent-5';
+        } else if (this.value === 'Chalet') {
+            roomNumberInput.placeholder = 'e.g., Chalet-1, Chalet-2';
+        } else if (this.value === 'Bungalow') {
+            roomNumberInput.placeholder = 'e.g., Bungalow-A, Bungalow-B';
+        } else if (this.value === 'Camping Site') {
+            roomNumberInput.placeholder = 'e.g., Site-1, Site-10';
+        } else {
+            roomNumberInput.placeholder = 'e.g., Room-101, Room-205';
+        }
+    });
+});
+</script>
+{% endblock %}
+

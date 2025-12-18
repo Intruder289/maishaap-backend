@@ -1,0 +1,264 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Financial Reports - Maisha{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Enhanced Page Header -->
+    <div class="row mb-4">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <div class="header-icon-wrapper financial">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <div>
+                    <h1 class="h2 mb-2">
+                        <i class="fas fa-dollar-sign"></i>
+                        Financial Analytics
+                    </h1>
+                    <p class="text-body-emphasis">Comprehensive revenue analysis, expense tracking, and financial performance insights</p>
+                </div>
+            </div>
+            <div>
+                <a href="{% url 'reports:dashboard' %}" class="secondary-btn btn-primary">
+                    <i class="fas fa-arrow-left"></i>Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Enhanced Date Range Filter -->
+    <div class="filter-section">
+        <div class="card mb-6">
+            <div class="card-header-section">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="fas fa-calendar-alt"></i>
+                        <div>
+                            <h3>Report Period</h3>
+                            <p>Select date range for financial analysis</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="filter-form-container">
+                <form method="get" class="filter-form">
+                    <div class="form-control-group">
+                        <div class="form-control-wrapper">
+                            <label for="start_date" class="form-label">
+                                <i class="fas fa-play me-2"></i>Start Date
+                            </label>
+                            <input type="date" class="form-control" id="start_date" name="start_date" 
+                                   value="{{ start_date|date:'Y-m-d' }}">
+                        </div>
+                        <div class="form-control-wrapper">
+                            <label for="end_date" class="form-label">
+                                <i class="fas fa-stop me-2"></i>End Date
+                            </label>
+                            <input type="date" class="form-control" id="end_date" name="end_date" 
+                                   value="{{ end_date|date:'Y-m-d' }}">
+                        </div>
+                        <div class="filter-button-wrapper">
+                            <!-- Filter button removed -->
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Financial Statistics Cards -->
+    <div class="stats-grid">
+        <div class="stat-card financial-stat" 
+             data-trend="positive"
+             data-card-type="rent-collected"
+             tabindex="0"
+             role="button"
+             aria-label="View rent collection details">
+            <div class="stat-icon rent-collected">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.13 17.83V22c0 .55-.45 1-1 1s-1-.45-1-1v-2.17c-1.69-.24-3.08-1.45-3.56-3.16-.14-.49.23-.97.74-.97h.12c.35 0 .65.22.74.55.29 1.07 1.25 1.85 2.4 1.85 1.28 0 2.33-.99 2.33-2.21 0-1.03-.7-1.9-1.67-2.16L9.5 13.4c-1.42-.36-2.4-1.65-2.4-3.11C7.1 8.45 8.96 6.9 11.13 6.83V5c0-.55.45-1 1-1s1 .45 1 1v1.83c1.43.2 2.61 1.15 3.15 2.43.19.46-.14.97-.64.97h-.12c-.35 0-.65-.22-.74-.55-.29-1.07-1.25-1.85-2.4-1.85-1.28 0-2.33.99-2.33 2.21 0 1.03.7 1.9 1.67 2.16l2.73.69c1.42.36 2.4 1.65 2.4 3.11 0 1.84-1.86 3.39-4.03 3.46z"/>
+                </svg>
+            </div>
+            <div class="stat-info">
+                <h3>Tsh {{ total_rent_collected|floatformat:0|intcomma|default:"0" }}</h3>
+                <p>Rent Collected</p>
+                <span class="stat-change positive">{{ total_rent_collected|default:0 }} payments processed</span>
+            </div>
+        </div>
+        
+        <div class="stat-card financial-stat" 
+             data-trend="positive"
+             data-card-type="total-revenue"
+             tabindex="0"
+             role="button"
+             aria-label="View total revenue details">
+            <div class="stat-icon total-revenue">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M16 6V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H2v13c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6h-6zm-6-2h4v2h-4V4zM4 8h16v11H4V8z"/>
+                    <path d="M8 10v2h2v-2H8zm4 0v2h2v-2h-2zm4 0v2h2v-2h-2z"/>
+                </svg>
+            </div>
+            <div class="stat-info">
+                <h3>Tsh {{ total_rent_collected|floatformat:0|intcomma|default:"0" }}</h3>
+                <p>Total Revenue</p>
+                <span class="stat-change positive">All income streams combined</span>
+            </div>
+        </div>
+        
+        <div class="stat-card financial-stat" 
+             data-trend="neutral"
+             data-card-type="expenses"
+             tabindex="0"
+             role="button"
+             aria-label="View expense details">
+            <div class="stat-icon expenses">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+                </svg>
+            </div>
+            <div class="stat-info">
+                <h3>Tsh 0</h3>
+                <p>Total Expenses</p>
+                <span class="stat-change neutral">No expenses recorded</span>
+            </div>
+        </div>
+        
+        <div class="stat-card financial-stat" 
+             data-trend="positive"
+             data-card-type="net-income"
+             tabindex="0"
+             role="button"
+             aria-label="View net income details">
+            <div class="stat-icon net-income">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/>
+                </svg>
+            </div>
+            <div class="stat-info">
+                <h3>Tsh {{ total_rent_collected|floatformat:0|intcomma|default:"0" }}</h3>
+                <p>Net Income</p>
+                <span class="stat-change positive">Revenue minus expenses</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Payment Transactions -->
+    <div class="content-section">
+        <div class="card mb-6">
+            <div class="card-header-section">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="fas fa-receipt"></i>
+                        <div>
+                            <h3>Recent Payment Transactions</h3>
+                            <p>Latest rent payments and transaction history</p>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="payment-count-badge">
+                            {{ rent_payments|length|default:0 }} payments
+                        </span>
+                        <a href="#" class="view-all-link">View All Transactions</a>
+                    </div>
+                </div>
+            </div>
+            <div class="payment-transactions-content">
+                {% if rent_payments %}
+                    <div class="transactions-table-wrapper">
+                        <div class="professional-table">
+                            <div class="table-header">
+                                <div class="table-header-cell">Date</div>
+                                <div class="table-header-cell">Tenant</div>
+                                <div class="table-header-cell">Property</div>
+                                <div class="table-header-cell">Amount</div>
+                                <div class="table-header-cell">Status</div>
+                                <div class="table-header-cell">Method</div>
+                                <div class="table-header-cell">Actions</div>
+                            </div>
+                            <div class="table-body">
+                                {% for payment in rent_payments %}
+                                <div class="table-row">
+                                    <div class="table-cell">
+                                        <div class="date-info">
+                                            <div class="date-icon">
+                                                <i class="fas fa-calendar-day"></i>
+                                            </div>
+                                            <div class="text-600">
+                                                <div class="primary-text">{{ payment.payment_date|date:"M d, Y" }}</div>
+                                                <div class="secondary-text">{{ payment.payment_date|date:"l" }}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="table-cell">
+                                        <div class="d-flex flex-column">
+                                            <div class="tenant-avatar">
+                                                <i class="fas fa-user"></i>
+                                            </div>
+                                            <div class="tenant-text">
+                                                <div class="primary-text">{{ payment.tenant.get_full_name|default:"N/A" }}</div>
+                                                <div class="secondary-text">{{ payment.tenant.email|default:"No email" }}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="table-cell">
+                                        <div class="d-flex align-items-center">
+                                            <div class="primary-text">{{ payment.lease.property.name|default:"Property" }}</div>
+                                            <div class="secondary-text">{{ payment.lease.property.location|default:"Location" }}</div>
+                                        </div>
+                                    </div>
+                                    <div class="table-cell">
+                                        <div class="amount-display">Tsh {{ payment.amount|floatformat:0|intcomma }}</div>
+                                    </div>
+                                    <div class="table-cell">
+                                        <span class="badge {% if payment.status == 'completed' %}completed{% elif payment.status == 'pending' %}pending{% else %}failed{% endif %}">
+                                            {{ payment.get_status_display|default:"Completed" }}
+                                        </span>
+                                    </div>
+                                    <div class="table-cell">
+                                        <div class="payment-method">
+                                            <i class="fas fa-{% if payment.payment_method == 'bank_transfer' %}university{% elif payment.payment_method == 'mobile_money' %}mobile-alt{% elif payment.payment_method == 'cash' %}money-bill{% else %}credit-card{% endif %}"></i>
+                                            <span>{{ payment.get_payment_method_display|default:"Bank Transfer" }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="table-cell">
+                                        <div class="btn btn-primarys">
+                                            <button class="btn btn-link text-600 btn btn-primary-sm dropdown-toggle dropdown-caret-none btn btn-primary-primary view" title="View Details">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button class="btn btn-link text-600 btn btn-primary-sm dropdown-toggle dropdown-caret-none btn btn-primary-primary download" title="Download Receipt">
+                                                <i class="fas fa-download"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="text-center py-6">
+                        <div class="text-center py-6-icon">
+                            <i class="fas fa-money-bill-wave"></i>
+                        </div>
+                        <h4>No Payment Records Found</h4>
+                        <p>No rent payments were recorded for the selected date range.</p>
+                        <div class="text-center py-6-actions">
+                            <button class="btn btn-primary" onclick="location.href='#'">
+                                <i class="fas fa-plus me-2"></i>Record Payment
+                            </button>
+                            <button class="secondary-btn btn-primary" onclick="document.getElementById('start_date').valueAsDate = new Date(Date.now() - 30*24*60*60*1000); document.getElementById('end_date').valueAsDate = new Date(); document.querySelector('.filter-form').submit();">
+                                <i class="fas fa-calendar me-2"></i>Last 30 Days
+                            </button>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

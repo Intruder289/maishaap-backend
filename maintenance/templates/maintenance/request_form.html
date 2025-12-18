@@ -1,0 +1,176 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}New Maintenance Request{% endblock %}
+{% block page_title %}New Maintenance Request{% endblock %}
+{% block page_description %}Submit a maintenance request for your property{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'maintenance:request_list' %}">Maintenance</a></li>
+<li class="breadcrumb-item active">New Request</li>
+{% endblock %}
+
+{% block page_actions %}
+<div class="d-flex gap-2">
+  <a href="{% url 'maintenance:request_list' %}" class="btn btn-secondary">
+    <i class="fas fa-arrow-left me-2"></i>Back to Requests
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-8">
+    <div class="card">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-tools me-2"></i>New Maintenance Request</h5>
+      </div>
+      <div class="card-body">
+        <form method="post" id="maintenanceForm">
+          {% csrf_token %}
+          
+          <div class="row g-3">
+            <div class="col-12">
+              <label for="title" class="form-label">Title <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="title" name="title" required placeholder="Brief description of the issue">
+              <div class="form-text">Provide a brief, descriptive title for the maintenance issue</div>
+            </div>
+            
+            <div class="col-12">
+              <label for="description" class="form-label">Description <span class="text-danger">*</span></label>
+              <textarea class="form-control" id="description" name="description" rows="4" required placeholder="Describe the issue in detail..."></textarea>
+              <div class="form-text">Describe the issue in detail. Include what's wrong, when it started, and any relevant information</div>
+            </div>
+            
+            <div class="col-md-6">
+              <label for="property" class="form-label">Property <span class="text-danger">*</span></label>
+              <select class="form-select" id="property" name="property" required>
+                <option value="">Select a property</option>
+                {% for property in user_properties %}
+                <option value="{{ property.id }}">{{ property.title }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            
+            <div class="col-md-6">
+              <label for="priority" class="form-label">Priority</label>
+              <select class="form-select" id="priority" name="priority">
+                {% for value, display in priority_choices %}
+                <option value="{{ value }}" {% if value == 'medium' %}selected{% endif %}>{{ display }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            
+            <div class="col-12">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="is_emergency" name="is_emergency">
+                <label class="form-check-label" for="is_emergency">
+                  <strong class="text-danger">Emergency Request</strong>
+                </label>
+              </div>
+              <div class="form-text">Check this only for urgent issues that require immediate attention (gas leaks, flooding, electrical hazards)</div>
+            </div>
+          </div>
+          
+          <div class="d-flex justify-content-end gap-2 mt-4">
+            <a href="{% url 'maintenance:request_list' %}" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary" id="submitBtn">Submit Request</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Emergency Alert -->
+<div class="row mt-4" id="emergencyAlert" style="display: none;">
+  <div class="col-12">
+    <div class="alert alert-danger">
+      <h5 class="alert-heading"><i class="fas fa-exclamation-triangle me-2"></i>Emergency Request</h5>
+      <p class="mb-0">Emergency requests are for urgent issues that pose immediate safety risks or could cause significant damage if not addressed quickly. Examples include gas leaks, major water leaks, electrical hazards, or security issues.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Tips Card -->
+<div class="row mt-4">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h6 class="mb-0"><i class="fas fa-lightbulb me-2"></i>Tips for Better Reports</h6>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <ul class="mb-0">
+              <li>Provide clear, detailed descriptions</li>
+              <li>Include when the issue started</li>
+            </ul>
+          </div>
+          <div class="col-md-6">
+            <ul class="mb-0">
+              <li>Mention any access details or gate codes</li>
+              <li>Specify your availability for maintenance work</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const emergencyCheckbox = document.getElementById('is_emergency');
+    const emergencyAlert = document.getElementById('emergencyAlert');
+    const submitBtn = document.querySelector('button[type="submit"]');
+    
+    function toggleEmergencyAlert() {
+        if (emergencyCheckbox.checked) {
+            emergencyAlert.style.display = 'block';
+            submitBtn.innerHTML = '<i class="fas fa-fire me-2"></i>Submit Emergency Request';
+            submitBtn.style.backgroundColor = '#dc3545';
+            submitBtn.style.borderColor = '#dc3545';
+        } else {
+            emergencyAlert.style.display = 'none';
+            submitBtn.innerHTML = 'Submit Request';
+            submitBtn.style.backgroundColor = '#ff7a00';
+            submitBtn.style.borderColor = '#ff7a00';
+        }
+    }
+    
+    emergencyCheckbox.addEventListener('change', toggleEmergencyAlert);
+    
+    // Form validation
+    document.querySelector('form').addEventListener('submit', function(e) {
+        const title = document.getElementById('title').value.trim();
+        const description = document.getElementById('description').value.trim();
+        const property = document.getElementById('property').value;
+        
+        if (!title || !description || !property) {
+            e.preventDefault();
+            alert('Please fill in all required fields.');
+            return;
+        }
+        
+        if (title.length < 5) {
+            e.preventDefault();
+            alert('Please provide a more descriptive title (at least 5 characters).');
+            return;
+        }
+        
+        if (description.length < 20) {
+            e.preventDefault();
+            alert('Please provide a more detailed description (at least 20 characters).');
+            return;
+        }
+        
+        // Disable submit button to prevent double submission
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Submitting...';
+    });
+});
+</script>
+{% endblock %}

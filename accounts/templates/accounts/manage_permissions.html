@@ -1,0 +1,88 @@
+{% extends 'accounts/base.html' %}
+
+{% block title %}Permission Management{% endblock %}
+
+{% block page_title %}Permission Management{% endblock %}
+
+{% block header_title %}Permission Management{% endblock %}
+
+{% block content %}
+<div class="permissions-container">
+  <!-- Header -->
+  <div class="permissions-header">
+    <h1>Permission Management</h1>
+    <a href="{% url 'accounts:role_list' %}" class="back-btn btn-primary">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+        <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Back to Roles
+    </a>
+  </div>
+
+  {% if permissions %}
+    <!-- Statistics -->
+    <div class="stats-grid">
+      {% regroup permissions by content_type.app_label as app_groups %}
+      <div class="stat-card">
+        <div class="h4 mb-0">{{ permissions.count }}</div>
+        <div class="text-500">Total Permissions</div>
+      </div>
+      <div class="stat-card">
+        <div class="h4 mb-0">{{ app_groups|length }}</div>
+        <div class="text-500">Applications</div>
+      </div>
+      <div class="stat-card">
+        <div class="h4 mb-0">
+          {% for app in app_groups %}
+            {% if app.grouper == 'accounts' %}{{ app.list|length }}{% endif %}
+          {% endfor %}
+        </div>
+        <div class="text-500">Account Permissions</div>
+      </div>
+    </div>
+
+    <!-- Permissions by App -->
+    <div class="permissions-grid">
+      {% regroup permissions by content_type.app_label as app_groups %}
+      {% for app in app_groups %}
+        <div class="app-section">
+          <div class="app-header">
+            {{ app.grouper|title }} ({{ app.list|length }} permission{{ app.list|length|pluralize }})
+          </div>
+          <div class="permissions-list">
+            {% for permission in app.list %}
+              <div class="permission-item">
+                <div class="permission-info">
+                  <div class="permission-name">
+                    {{ permission.name }}
+                  </div>
+                  <div class="permission-codename">
+                    {{ permission.content_type.app_label }}.{{ permission.codename }}
+                  </div>
+                </div>
+                <div class="permission-badge">
+                  {{ permission.content_type.model|title }}
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="text-center py-6">
+      <svg viewBox="0 0 24 24" fill="none">
+        <path d="M9 12l2 2 4-4M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <h3>No permissions found</h3>
+      <p>There are no permissions in the system.</p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  console.log('Permissions page loaded with {{ permissions.count }} total permissions');
+</script>
+{% endblock %}

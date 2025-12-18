@@ -1,0 +1,702 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}House Management Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Breadcrumb Navigation -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'properties:house_dashboard' %}"><i class="fas fa-home me-1"></i>House Management</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'properties:house_bookings' %}"><i class="fas fa-calendar-check me-1"></i>Bookings</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'properties:house_tenants' %}"><i class="fas fa-users me-1"></i>Tenants</a></li>
+            <li class="breadcrumb-item active" aria-current="page"><i class="fas fa-tachometer-alt me-1"></i>Dashboard</li>
+        </ol>
+    </nav>
+
+
+    <div class="row">
+        <div class="col-12">
+            <!-- Page Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="mb-1">
+                        <i class="fas fa-home text-primary me-2"></i>House Management Dashboard
+                    </h2>
+                    <p class="text-muted mb-0">Manage house rentals, tenants, and maintenance</p>
+                    {% if selected_property %}
+                        <div class="mt-2">
+                            <span class="badge bg-primary">
+                                <i class="fas fa-building me-1"></i>Managing: {{ selected_property.title }}
+                            </span>
+                            <a href="{% url 'properties:house_clear_selection' %}" class="btn btn-sm btn-outline-secondary ms-2">
+                                <i class="fas fa-times me-1"></i>Clear Selection
+                            </a>
+                        </div>
+                    {% else %}
+                        <div class="mt-2">
+                            <span class="badge bg-info">
+                                <i class="fas fa-globe me-1"></i>Managing: All Houses
+                            </span>
+                            <a href="{% url 'properties:house_select_property' %}" class="btn btn-sm btn-outline-primary ms-2">
+                                <i class="fas fa-building me-1"></i>Select House
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+                <div>
+                    <a href="{% url 'properties:house_rent_reminders_dashboard' %}" class="btn btn-success me-2">
+                        <i class="fas fa-bell me-2"></i>Rent Reminders
+                    </a>
+                    <a href="{% url 'properties:create_house_booking' %}" class="btn btn-primary">
+                        <i class="fas fa-plus me-2"></i>New Rental
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Stats Cards -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-0">{{ total_houses }}</h4>
+                                    <p class="mb-0">Total Houses</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-home fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-0">{{ active_bookings }}</h4>
+                                    <p class="mb-0">Active Rentals</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-user-check fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-0">{{ total_bookings }}</h4>
+                                    <p class="mb-0">Total Rentals</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-key fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-0">Tsh{{ revenue|floatformat:0 }}</h4>
+                                    <p class="mb-0">Total Revenue</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-dollar-sign fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            
+            <!-- Properties Overview -->
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="row flex-between-center">
+                                <div class="col">
+                                    <h6 class="mb-2">Properties Overview</h6>
+                                    <h5 class="mb-0">Manage and monitor all house properties</h5>
+                                </div>
+                                <div class="col-auto">
+                                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newPropertyModal">
+                                        <span class="fas fa-plus me-2"></span>New Property
+                                    </button>
+                                    <button type="button" class="btn btn-secondary ms-2" onclick="clearAllFilters()">
+                                        <span class="fas fa-times me-2"></span>Clear All
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Search and Filters -->
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label for="search-input" class="form-label">Search</label>
+                                    <input type="text" class="form-control" id="search-input" placeholder="Search properties..." value="{{ search_query }}">
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="status-filter" class="form-label">Status</label>
+                                    <select class="form-select" id="status-filter">
+                                        <option value="">All Statuses</option>
+                                        <option value="occupied" {% if status_filter == 'occupied' %}selected{% endif %}>Occupied</option>
+                                        <option value="available" {% if status_filter == 'available' %}selected{% endif %}>Available</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="page-size-select" class="form-label">Items per page</label>
+                            <select class="form-select" id="page-size-select" onchange="changePageSize()">
+                                <option value="5" {% if request.GET.page_size == '5' or not request.GET.page_size %}selected{% endif %}>5</option>
+                                <option value="10" {% if request.GET.page_size == '10' %}selected{% endif %}>10</option>
+                                <option value="25" {% if request.GET.page_size == '25' %}selected{% endif %}>25</option>
+                                <option value="50" {% if request.GET.page_size == '50' %}selected{% endif %}>50</option>
+                            </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Property</th>
+                                            <th>Address</th>
+                                            <th>Type</th>
+                                            <th>Tenant</th>
+                                            <th>Rent</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for property in house_properties %}
+                                        <tr data-property-id="{{ property.id }}">
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3 fw-bold">
+                                                        {{ property.title|first|upper }}
+                                                    </div>
+                                                    <div>
+                                                        <strong>
+                                                            <a href="{% url 'properties:property_detail' property.id %}" class="text-decoration-none">
+                                                                {{ property.title }}
+                                                            </a>
+                                                        </strong>
+                                                        <div class="text-muted small">{{ property.bedrooms|default:"N/A" }}BR, {{ property.bathrooms|default:"N/A" }}BA</div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <i class="fas fa-map-marker-alt text-muted me-2"></i>
+                                                    <div>
+                                                        <div class="fw-bold">{{ property.address|truncatechars:30 }}</div>
+                                                        <div class="text-muted small">{{ property.region.name|default:"N/A" }}</div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                {% if property.rent_amount >= 1000000 %}
+                                                    <span class="badge bg-success">Luxury</span>
+                                                {% elif property.rent_amount >= 500000 %}
+                                                    <span class="badge bg-primary">Standard</span>
+                                                {% else %}
+                                                    <span class="badge bg-warning">Budget</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% with property.bookings.all|first as latest_booking %}
+                                                    {% if latest_booking %}
+                                                        <div class="d-flex align-items-center">
+                                                            <i class="fas fa-user text-muted me-2"></i>
+                                                            <div>
+                                                                <div class="fw-bold">{{ latest_booking.customer.full_name }}</div>
+                                                                <div class="text-muted small">{{ latest_booking.customer.phone }}</div>
+                                                            </div>
+                                                        </div>
+                                                    {% else %}
+                                                        <div class="d-flex align-items-center">
+                                                            <i class="fas fa-home text-muted me-2"></i>
+                                                            <div>
+                                                                <div class="fw-bold text-success">Available</div>
+                                                                <div class="text-muted small">For rent</div>
+                                                            </div>
+                                                        </div>
+                                                    {% endif %}
+                                                {% endwith %}
+                                            </td>
+                                            <td>
+                                                <div class="fw-bold">Tsh{{ property.rent_amount|floatformat:0 }}</div>
+                                                <div class="text-muted small">per month</div>
+                                            </td>
+                                            <td>
+                                                {% with property.bookings.all|first as latest_booking %}
+                                                    {% if latest_booking and latest_booking.booking_status in 'confirmed,checked_in' %}
+                                                        <span class="badge bg-success">Occupied</span>
+                                                    {% else %}
+                                                        <span class="badge bg-warning">Available</span>
+                                                    {% endif %}
+                                                {% endwith %}
+                                            </td>
+                                            <td>
+                                                <div class="dropdown">
+                                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                                        <i class="fas fa-ellipsis-v"></i>
+                                                    </button>
+                                                    <ul class="dropdown-menu">
+                                                        <li><a class="dropdown-item" href="{% url 'properties:property_detail' property.id %}">
+                                                            <i class="fas fa-eye me-2"></i>View Details
+                                                        </a></li>
+                                                        {% with property.bookings.all|first as latest_booking %}
+                                                            {% if latest_booking %}
+                                                                <li><a class="dropdown-item" href="{% url 'properties:house_bookings' %}?property_id={{ property.id }}">
+                                                                    <i class="fas fa-edit me-2"></i>Manage Booking
+                                                                </a></li>
+                                                                <li><a class="dropdown-item" href="{% url 'properties:house_payments' %}?property_id={{ property.id }}">
+                                                                    <i class="fas fa-credit-card me-2"></i>View Payments
+                                                                </a></li>
+                                                            {% else %}
+                                                                <li><a class="dropdown-item" href="{% url 'properties:create_house_booking' %}?property_id={{ property.id }}">
+                                                                    <i class="fas fa-plus me-2"></i>Create Booking
+                                                                </a></li>
+                                                            {% endif %}
+                                                        {% endwith %}
+                                                        <li><hr class="dropdown-divider"></li>
+                                                        <li><a class="dropdown-item" href="{% url 'properties:house_rent_reminders_dashboard' %}?property_id={{ property.id }}">
+                                                            <i class="fas fa-bell me-2"></i>Rent Reminders
+                                                        </a></li>
+                                                        <li><a class="dropdown-item" href="{% url 'properties:house_reports' %}?property_id={{ property.id }}">
+                                                            <i class="fas fa-chart-bar me-2"></i>Reports
+                                                        </a></li>
+                                                    </ul>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr>
+                                            <td colspan="7" class="text-center py-4">
+                                                <div class="text-muted">
+                                                    <i class="fas fa-home fa-2x mb-3"></i>
+                                                    <p>No house properties found.</p>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <!-- Pagination -->
+                            {% if house_properties.has_other_pages %}
+                            <div class="card-footer bg-white border-0 py-3">
+                                <div class="row align-items-center">
+                                    <div class="col-md-6">
+                                        <div class="text-muted">
+                                            Showing {{ house_properties.start_index }} to {{ house_properties.end_index }} of {{ house_properties.paginator.count }} entries
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <nav aria-label="Page navigation" class="d-flex justify-content-end">
+                                            <ul class="pagination pagination-sm mb-0">
+                                                {% if house_properties.has_previous %}
+                                                <li class="page-item">
+                                                    <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}" title="First Page">
+                                                        <i class="fas fa-angle-double-left"></i>
+                                                    </a>
+                                                </li>
+                                                <li class="page-item">
+                                                    <a class="page-link" href="?page={{ house_properties.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}" title="Previous Page">
+                                                        <i class="fas fa-angle-left"></i>
+                                                    </a>
+                                                </li>
+                                                {% endif %}
+                                                
+                                                <!-- Page numbers -->
+                                                {% for num in house_properties.paginator.page_range %}
+                                                    {% if house_properties.number == num %}
+                                                <li class="page-item active">
+                                                    <span class="page-link">{{ num }}</span>
+                                                </li>
+                                                    {% elif num > house_properties.number|add:'-3' and num < house_properties.number|add:'3' %}
+                                                    <li class="page-item">
+                                                        <a class="page-link" href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}">{{ num }}</a>
+                                                    </li>
+                                                    {% endif %}
+                                                {% endfor %}
+                                                
+                                                {% if house_properties.has_next %}
+                                                <li class="page-item">
+                                                    <a class="page-link" href="?page={{ house_properties.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}" title="Next Page">
+                                                        <i class="fas fa-angle-right"></i>
+                                                    </a>
+                                                </li>
+                                                <li class="page-item">
+                                                    <a class="page-link" href="?page={{ house_properties.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}" title="Last Page">
+                                                        <i class="fas fa-angle-double-right"></i>
+                                                    </a>
+                                                </li>
+                                                {% endif %}
+                                            </ul>
+                                        </nav>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Property Status</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between">
+                                    <span>Occupied</span>
+                                    <span class="badge bg-success">{{ active_bookings }}</span>
+                                </div>
+                                <div class="progress mt-1" style="height: 8px;">
+                                    <div class="progress-bar bg-success" style="width: {{ occupied_percentage }}%"></div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between">
+                                    <span>Available</span>
+                                    <span class="badge bg-warning">{{ total_houses|add:"-"|add:active_bookings }}</span>
+                                </div>
+                                <div class="progress mt-1" style="height: 8px;">
+                                    <div class="progress-bar bg-warning" style="width: {{ available_percentage }}%"></div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between">
+                                    <span>Under Maintenance</span>
+                                    <span class="badge bg-danger">0</span>
+                                </div>
+                                <div class="progress mt-1" style="height: 8px;">
+                                    <div class="progress-bar bg-danger" style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <h5 class="mb-0">Recent Payments</h5>
+                        </div>
+                        <div class="card-body">
+                            {% for booking in recent_bookings %}
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div>
+                                    <strong>{{ booking.property_obj.title }}</strong><br>
+                                    <small class="text-muted">{{ booking.customer.full_name }}</small>
+                                </div>
+                                <div class="text-end">
+                                    <strong>Tsh{{ booking.total_amount|floatformat:0 }}</strong><br>
+                                    {% if booking.payment_status == 'paid' %}
+                                        <small class="text-success">Paid</small>
+                                    {% elif booking.payment_status == 'pending' %}
+                                        <small class="text-warning">Pending</small>
+                                    {% else %}
+                                        <small class="text-danger">{{ booking.payment_status|title }}</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% if not forloop.last %}<hr>{% endif %}
+                            {% empty %}
+                            <div class="text-center text-muted p-3">
+                                <i class="fas fa-receipt fa-2x mb-2"></i>
+                                <p>No recent payments</p>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New Rental Modal -->
+<div class="modal fade" id="newBookingModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">New Rental Agreement</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="newRentalForm">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Property *</label>
+                            <select class="form-control" required>
+                                <option value="">Select Property</option>
+                                {% for property in house_properties %}
+                                <option value="{{ property.id }}">{{ property.title }} - {{ property.address }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Tenant Name *</label>
+                            <input type="text" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Email *</label>
+                            <input type="email" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Phone Number *</label>
+                            <input type="tel" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Move-in Date *</label>
+                            <input type="date" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Lease Duration *</label>
+                            <select class="form-control" required>
+                                <option value="">Select Duration</option>
+                                <option value="6">6 Months</option>
+                                <option value="12">12 Months</option>
+                                <option value="24">24 Months</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Monthly Rent *</label>
+                            <input type="number" class="form-control" step="0.01" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Security Deposit *</label>
+                            <input type="number" class="form-control" step="0.01" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Number of Occupants *</label>
+                            <input type="number" class="form-control" min="1" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Employment Status</label>
+                            <select class="form-control">
+                                <option value="employed">Employed</option>
+                                <option value="self_employed">Self-Employed</option>
+                                <option value="student">Student</option>
+                                <option value="retired">Retired</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Additional Notes</label>
+                            <textarea class="form-control" rows="3" placeholder="Special requirements, pets, etc."></textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary">Create Rental</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Maintenance Modal -->
+<div class="modal fade" id="maintenanceModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Maintenance Requests</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="list-group">
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>House #001</strong><br>
+                            <small class="text-muted">Plumbing issue - Kitchen sink</small>
+                        </div>
+                        <span class="badge bg-warning">Pending</span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>House #002</strong><br>
+                            <small class="text-muted">Electrical - Light fixture</small>
+                        </div>
+                        <span class="badge bg-info">In Progress</span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>House #004</strong><br>
+                            <small class="text-muted">HVAC - Air conditioning</small>
+                        </div>
+                        <span class="badge bg-success">Completed</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary">Add Request</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Inspection Modal -->
+<div class="modal fade" id="inspectionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Property Inspections</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="list-group">
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>House #001</strong><br>
+                            <small class="text-muted">Move-in inspection - Jan 15</small>
+                        </div>
+                        <span class="badge bg-success">Completed</span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>House #002</strong><br>
+                            <small class="text-muted">Quarterly inspection - Due</small>
+                        </div>
+                        <span class="badge bg-warning">Scheduled</span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>House #003</strong><br>
+                            <small class="text-muted">Pre-rental inspection</small>
+                        </div>
+                        <span class="badge bg-info">Pending</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary">Schedule Inspection</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Floating Action Button -->
+<div class="position-fixed" style="bottom: 20px; right: 20px; z-index: 1000;">
+    <div class="dropdown dropup">
+        <button class="btn btn-primary btn-lg rounded-circle shadow" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="width: 60px; height: 60px;">
+            <i class="fas fa-plus"></i>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+            <li><a class="dropdown-item" href="{% url 'properties:create_house_booking' %}">
+                <i class="fas fa-plus-circle me-2"></i>New Rental
+            </a></li>
+            <li><a class="dropdown-item" href="{% url 'properties:property_create' %}?type=house">
+                <i class="fas fa-home me-2"></i>Add House
+            </a></li>
+            <li><a class="dropdown-item" href="{% url 'properties:house_rent_reminders_dashboard' %}">
+                <i class="fas fa-bell me-2"></i>Rent Reminders
+            </a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="{% url 'properties:house_bookings' %}">
+                <i class="fas fa-calendar-check me-2"></i>View Bookings
+            </a></li>
+            <li><a class="dropdown-item" href="{% url 'properties:house_tenants' %}">
+                <i class="fas fa-users me-2"></i>Manage Tenants
+            </a></li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    console.log('House Dashboard initialized');
+    
+    // Search input handler
+    var searchTimeout;
+    $('#search-input').on('input', function() {
+        var searchValue = $(this).val();
+        console.log('Search input changed:', searchValue);
+        
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(function() {
+            console.log('Search timeout triggered');
+            applyFilters();
+        }, 500);
+    });
+    
+    // Status filter change handler
+    $('#status-filter').on('change', function() {
+        var statusValue = $(this).val();
+        console.log('Status filter changed:', statusValue);
+        applyFilters();
+    });
+    
+    // Clear all filters function
+    window.clearAllFilters = function() {
+        console.log('Clearing all filters');
+        $('#search-input').val('');
+        $('#status-filter').val('');
+        applyFilters();
+    };
+    
+    // Apply filters function
+    function applyFilters() {
+        var search = $('#search-input').val() || '';
+        var status = $('#status-filter').val() || '';
+        var pageSize = $('#page-size-select').val() || '5';
+        
+        console.log('Applying filters:', {search: search, status: status, pageSize: pageSize});
+        
+        // Build URL with parameters
+        var url = new URL(window.location);
+        url.searchParams.set('page', '1'); // Reset to first page
+        if (search) {
+            url.searchParams.set('search', search);
+        } else {
+            url.searchParams.delete('search');
+        }
+        if (status) {
+            url.searchParams.set('status', status);
+        } else {
+            url.searchParams.delete('status');
+        }
+        if (pageSize) {
+            url.searchParams.set('page_size', pageSize);
+        }
+        
+        // Redirect to new URL
+        window.location.href = url.toString();
+    }
+    
+    // Page size change function
+    window.changePageSize = function() {
+        console.log('Page size changed');
+        applyFilters();
+    };
+    
+    // Auto-refresh every 30 seconds
+    setInterval(function() {
+        console.log('Refreshing house dashboard data...');
+    }, 30000);
+});
+</script>
+{% endblock %}
+

@@ -1,0 +1,101 @@
+<div class="row">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <div class="avatar-lg bg-primary text-white rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3 fw-bold" style="width: 80px; height: 80px; font-size: 2rem;">
+                    {{ tenant.full_name|first|upper }}
+                </div>
+                <h5 class="card-title">{{ tenant.full_name }}</h5>
+                <p class="text-muted">Payment Records: {{ payments.count }}</p>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Payment Summary</h6>
+            </div>
+            <div class="card-body">
+                {% if payments %}
+                    {% for payment in payments %}
+                        {% if forloop.first %}
+                            <div class="mb-2">
+                                <strong>Total Paid:</strong><br>
+                                <span class="text-success">Tsh{{ payment.amount|floatformat:0 }}</span>
+                            </div>
+                            <div class="mb-2">
+                                <strong>Last Payment:</strong><br>
+                                <span class="text-primary">{{ payment.payment_date|date:"M d, Y" }}</span>
+                            </div>
+                            <div class="mb-0">
+                                <strong>Payment Method:</strong><br>
+                                <span class="badge bg-info">{{ payment.get_payment_method_display }}</span>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted text-center">No payment history available</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-money-bill-wave me-2"></i>Payment History</h6>
+            </div>
+            <div class="card-body p-0">
+                {% if payments %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Property</th>
+                                    <th>Amount</th>
+                                    <th>Method</th>
+                                    <th>Type</th>
+                                    <th>Reference</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for payment in payments %}
+                                <tr>
+                                    <td>
+                                        <div class="fw-bold">{{ payment.payment_date|date:"M d, Y" }}</div>
+                                        <div class="text-muted small">{{ payment.payment_date|time:"H:i" }}</div>
+                                    </td>
+                                    <td>
+                                        <div>
+                                            <strong>{{ payment.booking.property_obj.title }}</strong>
+                                            <div class="text-muted small">{{ payment.booking.property_obj.address|truncatechars:25 }}</div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="fw-bold text-success">Tsh{{ payment.amount|floatformat:0 }}</div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-primary">{{ payment.get_payment_method_display }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info">{{ payment.get_payment_type_display }}</span>
+                                    </td>
+                                    <td>
+                                        <div class="text-muted small">{{ payment.transaction_reference|default:"N/A" }}</div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-money-bill-wave fa-3x text-muted mb-3"></i>
+                        <h6 class="text-muted">No Payment History</h6>
+                        <p class="text-muted">This tenant doesn't have any payment records.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>

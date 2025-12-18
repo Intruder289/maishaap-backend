@@ -1,0 +1,439 @@
+{% extends "accounts/base.html" %}
+{% load static %}
+
+{% block title %}Manage Property Types{% endblock %}
+{% block page_title %}Manage Property Types{% endblock %}
+{% block page_description %}Configure property types (apartment, house, etc.){% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'properties:property_list' %}">Properties</a></li>
+<li class="breadcrumb-item active">Configure Property</li>
+<li class="breadcrumb-item active">Property Types</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-lg-8">
+    <!-- Property Types List -->
+    <div class="card">
+      <div class="card-header bg-warning text-dark">
+        <div class="row flex-between-center">
+          <div class="col-auto">
+            <h5 class="mb-0">Property Types 
+              <span class="badge bg-primary-subtle text-primary ms-2">{{ paginator.count }}</span>
+            </h5>
+          </div>
+          <div class="col-auto">
+            <div class="d-flex align-items-center gap-2">
+              <div class="input-group input-group-sm" style="width: 260px;">
+                <input type="search" class="form-control" id="pt-search" placeholder="Search property types..." value="{{ search_query|default:'' }}">
+                <button class="btn btn-outline-secondary" id="pt-clear">Clear</button>
+              </div>
+              <label class="form-label mb-0">Items per page:</label>
+              <select class="form-select form-select-sm" id="pageSizeSelect" style="width: auto;">
+                <option value="5" {% if current_page_size == 5 %}selected{% endif %}>5</option>
+                <option value="10" {% if current_page_size == 10 %}selected{% endif %}>10</option>
+                <option value="25" {% if current_page_size == 25 %}selected{% endif %}>25</option>
+                <option value="50" {% if current_page_size == 50 %}selected{% endif %}>50</option>
+                <option value="100" {% if current_page_size == 100 %}selected{% endif %}>100</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="card-body p-0" id="pt-table-container">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="bg-light">
+              <tr>
+                <th class="border-0">Name</th>
+                <th class="border-0">Description</th>
+                <th class="border-0">Properties</th>
+                <th class="border-0">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for property_type in property_types %}
+              <tr>
+                <td>
+                  <h6 class="mb-0">{{ property_type.name }}</h6>
+                </td>
+                <td class="text-600">
+                  {% if property_type.description %}
+                    {{ property_type.description|truncatechars:50 }}
+                  {% else %}
+                    <span class="text-muted">No description</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <span class="badge bg-info-subtle text-info">{{ property_type.properties.count }}</span>
+                </td>
+                <td>
+                  <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                      <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                    <ul class="dropdown-menu">
+                      <li>
+                        <a class="dropdown-item" href="#" onclick="editPropertyType({{ property_type.id }}, '{{ property_type.name }}', '{{ property_type.description|default:"" }}')">
+                          <i class="fas fa-edit me-2"></i>Edit
+                        </a>
+                      </li>
+                      <li>
+                        <a class="dropdown-item text-danger" href="#" onclick="deletePropertyType({{ property_type.id }}, '{{ property_type.name }}')">
+                          <i class="fas fa-trash me-2"></i>Delete
+                        </a>
+                      </li>
+                    </ul>
+                  </div>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="4" class="text-center text-600 py-5">
+                  <div class="py-4">
+                    <i class="fas fa-home fs-1 text-300 mb-3"></i>
+                    <h5>No property types found</h5>
+                    <p class="text-600">Get started by adding your first property type.</p>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      
+      <!-- Pagination Controls -->
+      {% if page_obj.has_other_pages %}
+      <div class="card-footer bg-white border-0 py-3" id="pt-pagination">
+        <div class="row align-items-center">
+          <div class="col-md-6">
+            <small class="text-muted">
+              Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ paginator.count }} property types
+            </small>
+          </div>
+          <div class="col-md-6">
+            <nav aria-label="Property Types pagination" class="d-flex justify-content-end">
+              <ul class="pagination pagination-sm mb-0">
+                {% if page_obj.has_previous %}
+                  <li class="page-item">
+                    <a class="page-link pt-page" href="#" data-page="1">
+                      <i class="fas fa-angle-double-left"></i>
+                    </a>
+                  </li>
+                  <li class="page-item">
+                    <a class="page-link pt-page" href="#" data-page="{{ page_obj.previous_page_number }}">
+                      <i class="fas fa-angle-left"></i>
+                    </a>
+                  </li>
+                {% endif %}
+                
+                {% for num in page_obj.paginator.page_range %}
+                  {% if page_obj.number == num %}
+                    <li class="page-item active">
+                      <span class="page-link">{{ num }}</span>
+                    </li>
+                  {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                    <li class="page-item">
+                      <a class="page-link pt-page" href="#" data-page="{{ num }}">{{ num }}</a>
+                    </li>
+                  {% endif %}
+                {% endfor %}
+                
+                {% if page_obj.has_next %}
+                  <li class="page-item">
+                    <a class="page-link pt-page" href="#" data-page="{{ page_obj.next_page_number }}">
+                      <i class="fas fa-angle-right"></i>
+                    </a>
+                  </li>
+                  <li class="page-item">
+                    <a class="page-link pt-page" href="#" data-page="{{ page_obj.paginator.num_pages }}">
+                      <i class="fas fa-angle-double-right"></i>
+                    </a>
+                  </li>
+                {% endif %}
+              </ul>
+            </nav>
+          </div>
+        </div>
+      </div>
+      {% else %}
+      <!-- Item Count for single page -->
+      <div class="card-footer bg-white border-0 py-3">
+        <small class="text-muted">Showing {{ paginator.count }} property types</small>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  
+  <div class="col-lg-4">
+    <!-- Add Property Type Form -->
+    <div class="card">
+      <div class="card-header">
+        <h5 class="mb-0">
+          <i class="fas fa-plus-circle me-2"></i>Add New Property Type
+        </h5>
+      </div>
+      <div class="card-body">
+        <form method="post" id="propertyTypeForm">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label for="id_name" class="form-label">Property Type Name *</label>
+            <input type="text" class="form-control" id="id_name" name="name" placeholder="Enter property type name" required>
+          </div>
+          <div class="mb-3">
+            <label for="id_description" class="form-label">Description</label>
+            <textarea class="form-control" id="id_description" name="description" rows="3" placeholder="Enter property type description (optional)"></textarea>
+          </div>
+          <div class="d-grid">
+            <button type="submit" class="btn btn-primary">
+              <i class="fas fa-save me-2"></i>Save Property Type
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Property Type Modal -->
+<div class="modal fade" id="editPropertyTypeModal" tabindex="-1" aria-labelledby="editPropertyTypeModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-warning text-dark">
+        <h5 class="modal-title" id="editPropertyTypeModalLabel">Edit Property Type</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="editPropertyTypeForm">
+          {% csrf_token %}
+          <input type="hidden" id="edit_property_type_id" name="property_type_id">
+          <div class="mb-3">
+            <label for="edit_property_type_name" class="form-label">Property Type Name *</label>
+            <input type="text" class="form-control" id="edit_property_type_name" name="name" required>
+          </div>
+          <div class="mb-3">
+            <label for="edit_property_type_description" class="form-label">Description</label>
+            <textarea class="form-control" id="edit_property_type_description" name="description" rows="3"></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="saveEditPropertyType()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// AJAX behaviors like complaints list
+$(document).ready(function() {
+    function loadTable(page) {
+        const params = new URLSearchParams(window.location.search);
+        const search = $('#pt-search').val() || '';
+        const pageSize = $('#pageSizeSelect').val();
+        if (page) params.set('page', page);
+        if (search) params.set('search', search); else params.delete('search');
+        params.set('page_size', pageSize);
+        
+        $('#pt-table-container').html('<div class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">Loading...</p></div>');
+        $.ajax({
+            url: window.location.pathname + '?' + params.toString(),
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            success: function(html) {
+                const $doc = $('<div>').html(html);
+                const newTable = $doc.find('#pt-table-container').html();
+                const newFooter = $doc.find('#pt-pagination').html();
+                $('#pt-table-container').html(newTable || html);
+                if (newFooter) $('#pt-pagination').html(newFooter);
+            },
+            error: function(xhr) {
+                $('#pt-table-container').html('<div class="text-center py-5"><p class="text-danger">Error loading data.</p></div>');
+            }
+        });
+    }
+    
+    // Debounced search
+    let t;
+    $('#pt-search').on('input', function() {
+        clearTimeout(t);
+        t = setTimeout(function(){ loadTable(1); }, 400);
+    });
+    $('#pt-clear').on('click', function(){ $('#pt-search').val(''); loadTable(1); });
+    
+    // Page size change
+    $('#pageSizeSelect').on('change', function(){ loadTable(1); });
+    
+    // Pagination clicks
+    $(document).on('click', '.pt-page', function(e){ e.preventDefault(); loadTable($(this).data('page')); });
+});
+
+function editPropertyType(id, name, description) {
+    document.getElementById('edit_property_type_id').value = id;
+    document.getElementById('edit_property_type_name').value = name;
+    document.getElementById('edit_property_type_description').value = description;
+    
+    const modal = new bootstrap.Modal(document.getElementById('editPropertyTypeModal'));
+    modal.show();
+}
+
+function saveEditPropertyType() {
+    const form = document.getElementById('editPropertyTypeForm');
+    const formData = new FormData(form);
+    const propertyTypeId = formData.get('property_type_id');
+    
+    // Prepare JSON data
+    const jsonData = {
+        name: formData.get('name'),
+        description: formData.get('description')
+    };
+    
+    // Get CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    const csrftoken = getCookie('csrftoken') || document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+    
+    fetch('/api/property-types/' + propertyTypeId + '/update/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrftoken
+        },
+        body: JSON.stringify(jsonData)
+    })
+    .then(response => {
+        console.log('Response status:', response.status);
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            return response.text().then(text => {
+                throw new Error('Server returned non-JSON response. This might be an authentication or permission error.');
+            });
+        }
+        if (!response.ok) {
+            return response.json().then(err => {
+                throw new Error(err.message || err.error || 'Server error');
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Success response:', data);
+        if (data.success) {
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('editPropertyTypeModal'));
+            if (modal) {
+                modal.hide();
+            }
+            // Reload page to show updated data
+            location.reload();
+        } else {
+            alert('Error updating property type: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error updating property type: ' + error.message);
+    });
+}
+
+function deletePropertyType(id, name) {
+    if (confirm('Are you sure you want to delete the property type "' + name + '"? This action cannot be undone.')) {
+        // Get CSRF token from cookie or form
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+        const csrftoken = getCookie('csrftoken') || document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+        
+        fetch('/api/property-types/' + id + '/delete-ajax/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken || ''
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => {
+            console.log('Delete response status:', response.status);
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                return response.text().then(text => {
+                    throw new Error('Server returned non-JSON response. This might be an authentication or permission error.');
+                });
+            }
+            if (!response.ok) {
+                return response.json().then(err => {
+                    throw new Error(err.message || 'Server error');
+                }).catch(() => {
+                    throw new Error('Server returned error status: ' + response.status);
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Delete response data:', data);
+            if (data.success) {
+                // Find and remove the row
+                const rows = document.querySelectorAll('tbody tr');
+                let targetRow = null;
+                for (let row of rows) {
+                    const deleteLink = row.querySelector(`[onclick*="deletePropertyType(${id}"]`);
+                    if (deleteLink) {
+                        targetRow = row;
+                        break;
+                    }
+                }
+                
+                if (targetRow) {
+                    targetRow.style.transition = 'opacity 0.3s';
+                    targetRow.style.opacity = '0';
+                    setTimeout(() => {
+                        targetRow.remove();
+                        // Check if table is empty
+                        const tbody = document.querySelector('tbody');
+                        if (!tbody || tbody.children.length === 0) {
+                            location.reload();
+                        }
+                    }, 300);
+                } else {
+                    location.reload();
+                }
+            } else {
+                alert('Error deleting property type: ' + (data.message || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Delete error:', error);
+            alert('An error occurred while deleting the property type: ' + error.message);
+        });
+    }
+}
+</script>
+{% endblock %}

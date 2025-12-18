@@ -1,0 +1,1140 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}{{ property.title }} - Maisha{% endblock %}
+
+{% block extra_css %}
+<style>
+.property-thumbnail {
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.property-thumbnail:hover {
+    border-color: #007bff;
+    transform: scale(1.05);
+    box-shadow: 0 4px 8px rgba(0,123,255,0.2);
+}
+
+.property-thumbnail.active {
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0,123,255,0.3);
+}
+
+.carousel-indicators button {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin: 0 5px;
+}
+
+.carousel-indicators button.active {
+    background-color: #007bff;
+}
+
+.image-management-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.25rem;
+}
+
+.image-management-overlay .btn-group-vertical {
+    width: 100%;
+    padding: 0.25rem;
+}
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'properties:property_list' %}">Properties</a></li>
+<li class="breadcrumb-item active">{{ property.title }}</li>
+{% endblock %}
+
+{% block content %}
+<!-- Hidden CSRF Token for AJAX requests -->
+{% csrf_token %}
+<div class="container-fluid">
+    <!-- Property Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <h1 class="mb-2">{{ property.title }}</h1>
+                    <div class="d-flex align-items-center mb-2">
+                        <span class="badge bg-primary me-2">{{ property.property_type.name }}</span>
+                        <span class="badge {% if property.status == 'rented' or property.status == 'occupied' %}bg-danger{% elif property.status == 'available' %}bg-success{% elif property.status == 'under_maintenance' %}bg-warning{% else %}bg-secondary{% endif %} me-2">{{ property.status|title }}</span>
+                        {% if property.is_featured %}
+                            <span class="badge bg-warning">Featured</span>
+                        {% endif %}
+                    </div>
+                    {% if property.status == 'rented' or property.status == 'occupied' or property.status == 'unavailable' %}
+                        {% if current_occupant %}
+                            <div class="alert alert-info mb-2 mt-2" style="background-color: #0d6efd; color: white; border-color: #0d6efd;">
+                                <i class="fas fa-user me-2"></i>
+                                <strong style="color: white;">Currently Occupied by:</strong> 
+                                <span style="color: white;">
+                                {% if active_booking %}
+                                    {{ current_occupant.full_name }}
+                                    {% if current_occupant.email %}
+                                        ({{ current_occupant.email }})
+                                    {% endif %}
+                                    {% if current_occupant.phone %}
+                                        | {{ current_occupant.phone }}
+                                    {% endif %}
+                                {% else %}
+                                    {{ current_occupant.get_full_name|default:current_occupant.username }}
+                                    {% if current_occupant.email %}
+                                        ({{ current_occupant.email }})
+                                    {% endif %}
+                                {% endif %}
+                                </span>
+                                {% if active_lease %}
+                                    <br>
+                                    <small style="color: rgba(255, 255, 255, 0.9);">
+                                        <i class="fas fa-calendar me-1"></i>
+                                        Lease Period: {{ active_lease.start_date|date:"M d, Y" }} - {{ active_lease.end_date|date:"M d, Y" }}
+                                        | Monthly Rent: Tsh {{ active_lease.rent_amount|floatformat:0|intcomma }}
+                                    </small>
+                                {% elif active_booking %}
+                                    <br>
+                                    <small style="color: rgba(255, 255, 255, 0.9);">
+                                        <i class="fas fa-calendar me-1"></i>
+                                        Booking Period: {{ active_booking.check_in_date|date:"M d, Y" }} - {{ active_booking.check_out_date|date:"M d, Y" }}
+                                        | Booking Reference: {{ active_booking.booking_reference }}
+                                    </small>
+                                {% endif %}
+                            </div>
+                        {% else %}
+                            <div class="alert alert-warning mb-2 mt-2">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <strong>Status:</strong> {{ property.status|title }} (No active lease or booking found)
+                            </div>
+                        {% endif %}
+                    {% endif %}
+                    <p class="text-muted mb-0">
+                        <i class="fas fa-map-marker-alt me-1"></i>{{ property.address }}
+                    </p>
+                </div>
+                <div class="d-flex gap-2">
+                    {% if request.user.is_authenticated %}
+                        <button class="btn btn-outline-danger" onclick="toggleFavorite({{ property.id }})">
+                            <i class="fas fa-heart{% if not is_favorited %}-broken{% endif %}"></i>
+                            {% if is_favorited %}Remove from Favorites{% else %}Add to Favorites{% endif %}
+                        </button>
+                    {% endif %}
+                    {% if request.user == property.owner %}
+                        <a href="{% url 'properties:property_edit' property.pk %}" class="btn btn-primary">
+                            <i class="fas fa-edit me-1"></i>Edit Property
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Property Images -->
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-images me-2"></i>Property Images</h5>
+                    {% if request.user == property.owner or request.user.is_staff or request.user.is_superuser %}
+                        <div class="btn-group">
+                            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addImageModal">
+                                <i class="fas fa-plus me-1"></i>Add Image
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleImageManagement()">
+                                <i class="fas fa-cog me-1"></i>Manage
+                            </button>
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="card-body p-0">
+                    {% if property.images.exists %}
+                        <div id="propertyImageCarousel" class="carousel slide" data-bs-ride="carousel">
+                            <!-- Carousel Indicators -->
+                            <div class="carousel-indicators">
+                                {% for image in property.images.all %}
+                                    <button type="button" data-bs-target="#propertyImageCarousel" 
+                                            data-bs-slide-to="{{ forloop.counter0 }}" 
+                                            {% if image.is_primary or forloop.first %}class="active" aria-current="true"{% endif %}
+                                            aria-label="Slide {{ forloop.counter }}"></button>
+                                {% endfor %}
+                            </div>
+                            
+                            <div class="carousel-inner">
+                                {% for image in property.images.all %}
+                                    <div class="carousel-item {% if image.is_primary or forloop.first %}active{% endif %}" data-image-id="{{ image.id }}">
+                                        <img src="{{ image.image.url }}" class="d-block w-100" 
+                                             style="height: 400px; object-fit: cover;" 
+                                             alt="{{ image.caption|default:property.title }}">
+                                        {% if image.caption %}
+                                            <div class="carousel-caption d-none d-md-block">
+                                                <p>{{ image.caption }}</p>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            
+                            {% if property.images.count > 1 %}
+                                <button class="carousel-control-prev" type="button" data-bs-target="#propertyImageCarousel" data-bs-slide="prev">
+                                    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                                    <span class="visually-hidden">Previous</span>
+                                </button>
+                                <button class="carousel-control-next" type="button" data-bs-target="#propertyImageCarousel" data-bs-slide="next">
+                                    <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                                    <span class="visually-hidden">Next</span>
+                                </button>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Image Gallery Thumbnails with Management -->
+                        <div class="p-3">
+                            <h6 class="mb-2">All Images ({{ property.images.count }})</h6>
+                            <div class="row g-2" id="imageGallery">
+                                {% for image in property.images.all %}
+                                    <div class="col-3 col-md-2 position-relative" data-image-id="{{ image.id }}">
+                                        <img src="{{ image.image.url }}" 
+                                             class="img-thumbnail property-thumbnail {% if image.is_primary or forloop.first %}active{% endif %}" 
+                                             style="height: 80px; object-fit: cover; cursor: pointer; width: 100%;"
+                                             alt="{{ image.caption|default:property.title }}"
+                                             onclick="showImageInCarousel({{ forloop.counter0 }})"
+                                             title="{{ image.caption|default:property.title }}">
+                                        {% if request.user == property.owner or request.user.is_staff or request.user.is_superuser %}
+                                            <div class="image-management-overlay" style="display: none;">
+                                                <div class="btn-group-vertical btn-group-sm">
+                                                    {% if not image.is_primary %}
+                                                        <button class="btn btn-sm btn-success mb-1" onclick="setPrimaryImage({{ property.id }}, {{ image.id }})" title="Set as Primary">
+                                                            <i class="fas fa-star"></i>
+                                                        </button>
+                                                    {% else %}
+                                                        <span class="badge bg-warning mb-1">Primary</span>
+                                                    {% endif %}
+                                                    <button class="btn btn-sm btn-danger" onclick="deleteImage({{ property.id }}, {{ image.id }})" title="Delete Image">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="d-flex align-items-center justify-content-center" style="height: 400px; background-color: #f8f9fa;">
+                            <div class="text-center text-muted">
+                                <i class="fas fa-image fa-3x mb-3"></i>
+                                <p>No images available</p>
+                                {% if request.user == property.owner or request.user.is_staff or request.user.is_superuser %}
+                                    <button type="button" class="btn btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#addImageModal">
+                                        <i class="fas fa-plus me-1"></i>Add First Image
+                                    </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Property Description -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Description</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-0">{{ property.description|linebreaks }}</p>
+                </div>
+            </div>
+
+            <!-- Property Features -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-star me-2"></i>Features</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <ul class="list-unstyled">
+                                <li class="mb-2">
+                                    <i class="fas fa-bed me-2 text-primary"></i>
+                                    <strong>Bedrooms:</strong> {{ property.bedrooms }}
+                                </li>
+                                <li class="mb-2">
+                                    <i class="fas fa-bath me-2 text-primary"></i>
+                                    <strong>Bathrooms:</strong> {{ property.bathrooms }}
+                                </li>
+                                <li class="mb-2">
+                                    <i class="fas fa-expand-arrows-alt me-2 text-primary"></i>
+                                    <strong>Size:</strong> {{ property.size_sqft|floatformat:0 }} sq ft
+                                </li>
+                                {% if property.floor_number %}
+                                    <li class="mb-2">
+                                        <i class="fas fa-layer-group me-2 text-primary"></i>
+                                        <strong>Floor:</strong> {{ property.floor_number }}{% if property.total_floors %} of {{ property.total_floors }}{% endif %}
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <ul class="list-unstyled">
+                                {% if property.utilities_included %}
+                                    <li class="mb-2">
+                                        <i class="fas fa-check text-success me-2"></i>
+                                        Utilities Included
+                                    </li>
+                                {% endif %}
+                                {% if property.is_furnished %}
+                                    <li class="mb-2">
+                                        <i class="fas fa-check text-success me-2"></i>
+                                        Furnished
+                                    </li>
+                                {% endif %}
+                                {% if property.pets_allowed %}
+                                    <li class="mb-2">
+                                        <i class="fas fa-check text-success me-2"></i>
+                                        Pets Allowed
+                                    </li>
+                                {% endif %}
+                                {% if property.smoking_allowed %}
+                                    <li class="mb-2">
+                                        <i class="fas fa-check text-success me-2"></i>
+                                        Smoking Allowed
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Amenities -->
+            {% if property.amenities.exists %}
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-list-check me-2"></i>Amenities</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            {% for amenity in property.amenities.all %}
+                                <div class="col-md-4 col-sm-6 mb-2">
+                                    <i class="fas fa-check text-success me-2"></i>{{ amenity.name }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Property Details Sidebar -->
+        <div class="col-lg-4">
+            <!-- Pricing Card -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Pricing</h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-3">
+                        <h3 class="text-primary mb-1">Tsh {{ property.rent_amount|floatformat:0|intcomma }}</h3>
+                        {% if property.property_type.name|lower != 'venue' %}
+                        <p class="text-muted mb-0">
+                            {% if property.property_type.name|lower == 'house' %}
+                                per month
+                            {% elif property.property_type.name|lower == 'hotel' or property.property_type.name|lower == 'lodge' %}
+                                per day
+                            {% else %}
+                                per month
+                            {% endif %}
+                        </p>
+                        {% endif %}
+                    </div>
+                    {% if property.deposit_amount %}
+                        <div class="d-flex justify-content-between">
+                            <span>Security Deposit:</span>
+                            <strong>Tsh {{ property.deposit_amount|floatformat:0|intcomma }}</strong>
+                        </div>
+                    {% endif %}
+                    {% if property.available_from %}
+                        <div class="d-flex justify-content-between mt-2">
+                            <span>Available From:</span>
+                            <strong>{{ property.available_from|date:"M j, Y" }}</strong>
+                        </div>
+                    {% endif %}
+                    {% if property.property_type.name|lower == 'house' %}
+                        <div class="d-flex justify-content-between mt-2 pt-2 border-top">
+                            <span>Visit Cost:</span>
+                            {% if property.visit_cost %}
+                                <strong class="text-primary">Tsh {{ property.visit_cost|floatformat:0|intcomma }}</strong>
+                            {% else %}
+                                <span class="text-muted">Not set</span>
+                            {% endif %}
+                        </div>
+                        <small class="text-muted d-block mt-1">
+                            <i class="fas fa-info-circle me-1"></i>One-time fee to view owner contact & location
+                            {% if not property.visit_cost and request.user == property.owner %}
+                                <br><a href="{% url 'properties:property_edit' property.pk %}" class="text-primary">Set visit cost</a>
+                            {% endif %}
+                        </small>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Property Owner -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-user me-2"></i>Property Owner</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="avatar avatar-lg me-3">
+                            <div class="avatar-name rounded-circle bg-primary text-white">
+                                {{ property.owner.first_name|first|default:property.owner.username|first|upper }}
+                            </div>
+                        </div>
+                        <div>
+                            <h6 class="mb-1">{{ property.owner.get_full_name|default:property.owner.username }}</h6>
+                            <p class="mb-1">
+                                <i class="fas fa-envelope me-1 text-primary"></i>
+                                <strong>{{ property.owner.email }}</strong>
+                            </p>
+                            {% if can_see_owner_contact %}
+                                {% if owner_phone %}
+                                    <p class="mb-0">
+                                        <i class="fas fa-phone me-1 text-success"></i>
+                                        <strong>{{ owner_phone }}</strong>
+                                    </p>
+                                {% else %}
+                                    <p class="text-muted mb-0 small">
+                                        <i class="fas fa-info-circle me-1"></i>Phone number not set in profile
+                                    </p>
+                                {% endif %}
+                            {% elif property.property_type.name|lower == 'house' and property.visit_cost and not has_visit_access and request.user.is_authenticated and request.user != property.owner %}
+                                <p class="text-warning mb-0 mt-1">
+                                    <i class="fas fa-lock me-1"></i>Phone hidden - Pay visit cost (Tsh {{ property.visit_cost|floatformat:0|intcomma }}) to view
+                                </p>
+                            {% elif property.property_type.name|lower == 'house' and not property.visit_cost and request.user == property.owner %}
+                                <p class="text-info mb-0 mt-1 small">
+                                    <i class="fas fa-info-circle me-1"></i>Set visit cost to enable contact viewing for visitors
+                                </p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if request.user.is_authenticated and request.user != property.owner %}
+                        <div class="mt-3">
+                            {% if property.property_type.name|lower == 'house' and property.visit_cost and not has_visit_access %}
+                                <button type="button" class="btn btn-primary w-100" data-bs-toggle="modal" data-bs-target="#visitPaymentModal" onclick="openVisitPaymentModal({{ property.pk }}, {{ property.visit_cost }})">
+                                    <i class="fas fa-eye me-1"></i>Pay to View Contact (Tsh {{ property.visit_cost|floatformat:0|intcomma }})
+                                </button>
+                            {% else %}
+                                <button class="btn btn-outline-primary w-100">
+                                    <i class="fas fa-envelope me-1"></i>Contact Owner
+                                </button>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Property Info -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-info me-2"></i>Property Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Property ID:</span>
+                        <strong>#{{ property.id }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Address:</span>
+                        <strong>{{ property.address|truncatechars:30 }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Region:</span>
+                        <strong>{{ property.region.name }}</strong>
+                    </div>
+                    {% if property.district %}
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>District:</span>
+                        <strong>{{ property.district.name }}</strong>
+                    </div>
+                    {% endif %}
+                    {% if property.latitude and property.longitude %}
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Coordinates:</span>
+                        <strong class="text-muted small">{{ property.latitude|floatformat:6 }}, {{ property.longitude|floatformat:6 }}</strong>
+                    </div>
+                    {% endif %}
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Type:</span>
+                        <strong>{{ property.property_type.name }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Status:</span>
+                        <span class="badge bg-{% if property.status == 'available' %}success{% elif property.status == 'rented' %}warning{% else %}secondary{% endif %}">
+                            {{ property.status|title }}
+                        </span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Listed:</span>
+                        <strong>{{ property.created_at|date:"M j, Y" }}</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Location Details -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-map-marker-alt me-2"></i>Location Details</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-2">
+                        <strong><i class="fas fa-map-marker-alt me-1 text-primary"></i>Address:</strong>
+                        <p class="mb-0 mt-1">{{ property.address }}</p>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-2">
+                            <strong>Region:</strong>
+                            <p class="mb-0">{{ property.region.name }}</p>
+                        </div>
+                        {% if property.district %}
+                        <div class="col-md-6 mb-2">
+                            <strong>District:</strong>
+                            <p class="mb-0">{{ property.district.name }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% if property.latitude and property.longitude %}
+                    <div class="mb-2">
+                        <strong>Coordinates:</strong>
+                        <p class="mb-0 text-muted small">{{ property.latitude|floatformat:6 }}, {{ property.longitude|floatformat:6 }}</p>
+                    </div>
+                    {% endif %}
+                    {% if can_see_owner_contact or request.user == property.owner or request.user.is_staff %}
+                        <div class="alert alert-info mb-0 mt-2">
+                            <i class="fas fa-info-circle me-1"></i>
+                            <strong>Full Location Access:</strong> You have access to view the complete location details.
+                        </div>
+                    {% elif property.property_type.name|lower == 'house' and property.visit_cost %}
+                        <div class="alert alert-warning mb-0 mt-2">
+                            <i class="fas fa-lock me-1"></i>
+                            <strong>Location Access:</strong> Pay visit cost (Tsh {{ property.visit_cost|floatformat:0|intcomma }}) to view exact location coordinates.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Location Map (if coordinates available) -->
+            {% if property.latitude and property.longitude %}
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-map me-2"></i>Map View</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="propertyMap" style="height: 200px;"></div>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Related Properties -->
+    {% if related_properties %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <h4 class="mb-3">Related Properties</h4>
+                <div class="row">
+                    {% for related_property in related_properties %}
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100">
+                                {% with primary_image=related_property.get_primary_image %}
+                                {% if primary_image %}
+                                    <img src="{{ primary_image.image.url }}" 
+                                         class="card-img-top" 
+                                         style="height: 200px; object-fit: cover;" 
+                                         alt="{{ related_property.title }}">
+                                {% else %}
+                                    <div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 200px;">
+                                        <i class="fas fa-image fa-2x text-muted"></i>
+                                    </div>
+                                {% endif %}
+                                {% endwith %}
+                                <div class="card-body">
+                                    <h6 class="card-title">{{ related_property.title }}</h6>
+                                    <p class="card-text text-muted small">{{ related_property.address|truncatechars:50 }}</p>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <span class="text-primary fw-bold">Tsh {{ related_property.rent_amount|floatformat:0|intcomma }}</span>
+                                            {% if related_property.property_type.name|lower != 'venue' %}
+                                            <small class="text-muted d-block">
+                                                {% if related_property.property_type.name|lower == 'house' %}
+                                                    per month
+                                                {% elif related_property.property_type.name|lower == 'hotel' or related_property.property_type.name|lower == 'lodge' %}
+                                                    per day
+                                                {% else %}
+                                                    per month
+                                                {% endif %}
+                                            </small>
+                                            {% endif %}
+                                        </div>
+                                        <a href="{% url 'properties:property_detail' related_property.pk %}" class="btn btn-sm btn-outline-primary">View</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Map Script (if coordinates available) -->
+{% if property.latitude and property.longitude %}
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    // Initialize map when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        const map = L.map('propertyMap').setView([{{ property.latitude }}, {{ property.longitude }}], 15);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+        
+        L.marker([{{ property.latitude }}, {{ property.longitude }}]).addTo(map)
+            .bindPopup('{{ property.title }}')
+            .openPopup();
+    });
+</script>
+{% endif %}
+
+<!-- Thumbnail Click Handler -->
+<script>
+    function showImageInCarousel(index) {
+        const carousel = document.getElementById('propertyImageCarousel');
+        if (carousel) {
+            const carouselInstance = new bootstrap.Carousel(carousel);
+            carouselInstance.to(index);
+            
+            // Update thumbnail active state
+            document.querySelectorAll('.property-thumbnail').forEach((thumb, i) => {
+                thumb.classList.toggle('active', i === index);
+            });
+        }
+    }
+    
+    // Update thumbnail active state when carousel changes
+    document.addEventListener('DOMContentLoaded', function() {
+        const carousel = document.getElementById('propertyImageCarousel');
+        if (carousel) {
+            carousel.addEventListener('slide.bs.carousel', function(event) {
+                const activeIndex = event.to;
+                document.querySelectorAll('.property-thumbnail').forEach((thumb, i) => {
+                    thumb.classList.toggle('active', i === activeIndex);
+                });
+            });
+        }
+    });
+</script>
+
+<!-- Favorite Toggle Script -->
+<script>
+    // Helper function to get CSRF token from cookies
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    
+    function toggleFavorite(propertyId) {
+        // Get CSRF token from multiple sources
+        let csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
+                       document.querySelector('meta[name=csrf-token]')?.getAttribute('content') ||
+                       getCookie('csrftoken');
+        
+        if (!csrfToken) {
+            console.error('CSRF token not found');
+            alert('Security token not found. Please refresh the page and try again.');
+            return;
+        }
+        
+        fetch(`/properties/toggle-favorite/${propertyId}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken,
+                'Content-Type': 'application/json',
+            },
+            credentials: 'same-origin', // Include cookies in the request
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            // The view returns is_favorited and favorites_count, not success
+            // Reload the page to update the favorite status
+            location.reload();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while updating favorites. Please try again.');
+        });
+    }
+</script>
+
+<!-- Image Management Scripts -->
+<script>
+    let imageManagementMode = false;
+    
+    function toggleImageManagement() {
+        imageManagementMode = !imageManagementMode;
+        const overlays = document.querySelectorAll('.image-management-overlay');
+        overlays.forEach(overlay => {
+            overlay.style.display = imageManagementMode ? 'flex' : 'none';
+        });
+        
+        const btn = event.target.closest('button');
+        if (btn) {
+            btn.classList.toggle('active', imageManagementMode);
+        }
+    }
+    
+    function deleteImage(propertyId, imageId) {
+        if (!confirm('Are you sure you want to delete this image?')) {
+            return;
+        }
+        
+        let csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
+                       getCookie('csrftoken');
+        
+        fetch(`/properties/${propertyId}/images/${imageId}/delete/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken,
+                'Content-Type': 'application/json',
+            },
+            credentials: 'same-origin',
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to delete image'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while deleting the image.');
+        });
+    }
+    
+    function setPrimaryImage(propertyId, imageId) {
+        let csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
+                       getCookie('csrftoken');
+        
+        fetch(`/properties/${propertyId}/images/${imageId}/set-primary/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken,
+                'Content-Type': 'application/json',
+            },
+            credentials: 'same-origin',
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to set primary image'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while setting primary image.');
+        });
+    }
+    
+    // Handle image upload form
+    document.addEventListener('DOMContentLoaded', function() {
+        const addImageForm = document.getElementById('addImageForm');
+        if (addImageForm) {
+            addImageForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const formData = new FormData();
+                const imageFile = document.getElementById('imageFileInput').files[0];
+                const caption = document.getElementById('imageCaptionInput').value;
+                const isPrimary = document.getElementById('imagePrimaryCheckbox').checked;
+                
+                if (!imageFile) {
+                    alert('Please select an image file');
+                    return;
+                }
+                
+                formData.append('image', imageFile);
+                formData.append('caption', caption);
+                formData.append('is_primary', isPrimary);
+                
+                let csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
+                               getCookie('csrftoken');
+                
+                fetch(`/properties/{{ property.id }}/images/add/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken,
+                    },
+                    body: formData,
+                    credentials: 'same-origin',
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('addImageModal'));
+                        modal.hide();
+                        location.reload();
+                    } else {
+                        alert('Error: ' + (data.error || 'Failed to add image'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while uploading the image.');
+                });
+            });
+        }
+    });
+</script>
+
+<!-- Add Image Modal -->
+{% if request.user == property.owner or request.user.is_staff or request.user.is_superuser %}
+<div class="modal fade" id="addImageModal" tabindex="-1" aria-labelledby="addImageModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addImageModalLabel">
+                    <i class="fas fa-plus me-2"></i>Add Property Image
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="addImageForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="imageFileInput" class="form-label">Image File</label>
+                        <input type="file" class="form-control" id="imageFileInput" accept="image/*" required>
+                        <small class="text-muted">Supported formats: JPG, PNG, WEBP. Maximum 10 images per property.</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="imageCaptionInput" class="form-label">Caption (Optional)</label>
+                        <input type="text" class="form-control" id="imageCaptionInput" placeholder="Enter image caption">
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="imagePrimaryCheckbox">
+                        <label class="form-check-label" for="imagePrimaryCheckbox">
+                            Set as primary image
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-upload me-1"></i>Upload Image
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Visit Payment Modal -->
+{% if request.user.is_authenticated and request.user != property.owner and property.property_type.name|lower == 'house' and property.visit_cost and not has_visit_access %}
+<div class="modal fade" id="visitPaymentModal" tabindex="-1" aria-labelledby="visitPaymentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="visitPaymentModalLabel">
+                    <i class="fas fa-lock me-2"></i>Pay to View Contact & Location
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="visitPaymentContent">
+                    <!-- Payment form will be loaded here -->
+                    <div class="text-center mb-4">
+                        <i class="fas fa-home fa-3x text-primary mb-3"></i>
+                        <h5>{{ property.title }}</h5>
+                        <p class="text-muted">{{ property.address }}</p>
+                    </div>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>One-time payment</strong> to view owner contact information and exact property location.
+                    </div>
+                    <div class="card bg-light mb-3">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span>Amount to Pay:</span>
+                                <span class="fw-bold text-primary" id="visitPaymentAmount">Tsh {{ property.visit_cost|floatformat:0|intcomma }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="visitPaymentStatus" class="mb-3"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="visitPaymentBtn" onclick="initiateVisitPayment()">
+                    <i class="fas fa-credit-card me-1"></i>Proceed to Payment
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Visit Payment JavaScript -->
+<script>
+let currentPropertyId = {{ property.id }};
+let currentVisitCost = {{ property.visit_cost|default:0 }};
+let currentTransactionId = null;
+let paymentCheckInterval = null;
+
+function openVisitPaymentModal(propertyId, visitCost) {
+    currentPropertyId = propertyId;
+    currentVisitCost = visitCost;
+    currentTransactionId = null;
+    
+    // Reset modal state
+    document.getElementById('visitPaymentStatus').innerHTML = '';
+    document.getElementById('visitPaymentBtn').disabled = false;
+    document.getElementById('visitPaymentBtn').innerHTML = '<i class="fas fa-credit-card me-1"></i>Proceed to Payment';
+    
+    // Check payment status
+    checkVisitPaymentStatus();
+}
+
+function checkVisitPaymentStatus() {
+    fetch(`/properties/api/visit-payment/${currentPropertyId}/status/`, {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin',
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.has_paid) {
+            // User has already paid, show contact info
+            showContactAndLocation(data);
+        }
+    })
+    .catch(error => {
+        console.error('Error checking payment status:', error);
+    });
+}
+
+function initiateVisitPayment() {
+    const btn = document.getElementById('visitPaymentBtn');
+    const statusDiv = document.getElementById('visitPaymentStatus');
+    
+    // Disable button and show loading
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Processing...';
+    statusDiv.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin me-2"></i>Initiating payment...</div>';
+    
+    fetch(`/properties/api/visit-payment/${currentPropertyId}/initiate/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+            payment_method: 'online'
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            currentTransactionId = data.transaction_id;
+            
+            // Show payment link
+            if (data.payment_link) {
+                statusDiv.innerHTML = `
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle me-2"></i>Payment initiated successfully!
+                        <br><br>
+                        <a href="${data.payment_link}" target="_blank" class="btn btn-success w-100">
+                            <i class="fas fa-external-link-alt me-1"></i>Complete Payment
+                        </a>
+                        <small class="text-muted d-block mt-2 text-center">You will be redirected to the payment gateway</small>
+                    </div>
+                `;
+                
+                // Start polling for payment verification
+                startPaymentVerification();
+            } else {
+                statusDiv.innerHTML = '<div class="alert alert-warning">Payment link not available. Please try again.</div>';
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-credit-card me-1"></i>Proceed to Payment';
+            }
+        } else {
+            statusDiv.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>${data.error || 'Failed to initiate payment'}</div>`;
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-credit-card me-1"></i>Proceed to Payment';
+        }
+    })
+    .catch(error => {
+        console.error('Error initiating payment:', error);
+        statusDiv.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>An error occurred. Please try again.</div>';
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-credit-card me-1"></i>Proceed to Payment';
+    });
+}
+
+function startPaymentVerification() {
+    // Poll for payment verification every 3 seconds
+    paymentCheckInterval = setInterval(() => {
+        if (currentTransactionId) {
+            verifyVisitPayment();
+        }
+    }, 3000);
+    
+    // Stop polling after 5 minutes
+    setTimeout(() => {
+        if (paymentCheckInterval) {
+            clearInterval(paymentCheckInterval);
+        }
+    }, 300000);
+}
+
+function verifyVisitPayment() {
+    if (!currentTransactionId) return;
+    
+    fetch(`/properties/api/visit-payment/${currentPropertyId}/verify/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+            transaction_id: currentTransactionId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Stop polling
+            if (paymentCheckInterval) {
+                clearInterval(paymentCheckInterval);
+                paymentCheckInterval = null;
+            }
+            
+            // Show contact and location
+            showContactAndLocation(data);
+        }
+    })
+    .catch(error => {
+        console.error('Error verifying payment:', error);
+    });
+}
+
+function showContactAndLocation(data) {
+    const statusDiv = document.getElementById('visitPaymentStatus');
+    const btn = document.getElementById('visitPaymentBtn');
+    
+    let contactHtml = '';
+    if (data.owner_contact) {
+        contactHtml = `
+            <div class="card mb-3">
+                <div class="card-header bg-success text-white">
+                    <i class="fas fa-user me-2"></i>Owner Contact Information
+                </div>
+                <div class="card-body">
+                    <p class="mb-2"><strong>Name:</strong> ${data.owner_contact.name || 'N/A'}</p>
+                    <p class="mb-2"><strong>Email:</strong> ${data.owner_contact.email || 'N/A'}</p>
+                    ${data.owner_contact.phone ? `<p class="mb-0"><strong>Phone:</strong> <a href="tel:${data.owner_contact.phone}">${data.owner_contact.phone}</a></p>` : '<p class="mb-0 text-muted">Phone number not available</p>'}
+                </div>
+            </div>
+        `;
+    }
+    
+    let locationHtml = '';
+    if (data.location) {
+        locationHtml = `
+            <div class="card mb-3">
+                <div class="card-header bg-info text-white">
+                    <i class="fas fa-map-marker-alt me-2"></i>Property Location
+                </div>
+                <div class="card-body">
+                    <p class="mb-2"><strong>Address:</strong> ${data.location.address || 'N/A'}</p>
+                    ${data.location.region ? `<p class="mb-2"><strong>Region:</strong> ${data.location.region}</p>` : ''}
+                    ${data.location.district ? `<p class="mb-2"><strong>District:</strong> ${data.location.district}</p>` : ''}
+                    ${data.location.latitude && data.location.longitude ? `
+                        <p class="mb-0">
+                            <strong>Coordinates:</strong> 
+                            <a href="https://www.google.com/maps?q=${data.location.latitude},${data.location.longitude}" target="_blank">
+                                ${data.location.latitude}, ${data.location.longitude} <i class="fas fa-external-link-alt"></i>
+                            </a>
+                        </p>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    }
+    
+    statusDiv.innerHTML = `
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle me-2"></i><strong>Payment Successful!</strong> You now have access to contact and location information.
+        </div>
+        ${contactHtml}
+        ${locationHtml}
+    `;
+    
+    btn.style.display = 'none';
+    
+    // Update the page to show contact info
+    setTimeout(() => {
+        location.reload();
+    }, 2000);
+}
+
+// Clean up interval when modal is closed
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('visitPaymentModal');
+    if (modal) {
+        modal.addEventListener('hidden.bs.modal', function() {
+            if (paymentCheckInterval) {
+                clearInterval(paymentCheckInterval);
+                paymentCheckInterval = null;
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

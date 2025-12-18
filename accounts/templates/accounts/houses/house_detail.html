@@ -1,0 +1,854 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}{{ property.title }} - Property Details{% endblock %}
+
+{% block content %}
+<div class="property-detail-container">
+  <!-- Property Hero Section -->
+  <div class="property-hero">
+    <div class="property-hero-header">
+      <div class="property-badge status-{{ property.status }}">
+        {{ property.get_status_display }}
+      </div>
+      
+      <div class="property-hero-content">
+        <div class="property-title-section">
+          <div>
+            <div>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="white">
+                <path d="M12 3l10 9h-3v9h-6v-6H11v6H5v-9H2z"/>
+              </svg>
+            </div>
+            <div>
+              <h1>{{ property.title }}</h1>
+              <p>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+                </svg>
+                {{ property.property_type.name }} in {{ property.region.name }}
+              </p>
+            </div>
+          </div>
+          
+          <div>
+            <div>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="rgba(255, 255, 255, 0.8)">
+                <path d="M7 14c1.66 0 3-1.34 3-3S8.66 8 7 8s-3 1.34-3 3 1.34 3 3 3zm0-4c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm12-3h-8v8H3V5H1v15h2v-3h18v3h2v-9c0-2.21-1.79-4-4-4z"/>
+              </svg>
+              <span>{{ property.bedrooms }} Bedrooms</span>
+            </div>
+            <div>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="rgba(255, 255, 255, 0.8)">
+                <path d="M9 2v1h6V2h2v1h1c1.1 0 2 .9 2 2v14c0 1.1-.9 2-2 2H6c-1.1 0-2-.9-2-2V5c0-1.1.9-2 2-2h1V2h2z"/>
+              </svg>
+              <span>{{ property.bathrooms }} Bathrooms</span>
+            </div>
+            {% if property.size_sqft %}
+            <div>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="rgba(255, 255, 255, 0.8)">
+                <path d="M3 17h18v2H3zm0-6h18v2H3zm0-6h18v2H3z"/>
+              </svg>
+              <span>{{ property.size_sqft }} sqft</span>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        
+        <div class="property-actions">
+          <a href="{% url 'accounts:houses_list' %}" class="btn btn-primary-modern btn btn-primary-white">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 12H5M12 19l-7-7 7-7"/>
+            </svg>
+            Back to Houses
+          </a>
+          {% if property.owner == request.user %}
+            <a href="{% url 'accounts:house_edit' property.pk %}" class="btn btn-primary-modern btn btn-primary-white">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+              Edit
+            </a>
+            <a href="{% url 'accounts:house_delete' property.pk %}" class="btn btn-primary-modern btn btn-primary-danger">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14z"/>
+              </svg>
+              Delete
+            </a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content Area -->
+  <div class="property-main-content">
+    <!-- Left Column - Main Content -->
+    <div>
+      <!-- Interactive Image Gallery -->
+      {% if property.images.all %}
+      <div class="content-card">
+        <h3 class="card-title">
+          <div class="card-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+              <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+            </svg>
+          </div>
+          Property Photos ({{ property.images.all.count }})
+        </h3>
+        
+        <div class="image-gallery">
+          <div class="main-image" onclick="openImageModal('{{ property.images.first.image.url }}')">
+            <img src="{{ property.images.first.image.url }}" alt="{{ property.title }}" id="mainImage">
+            <div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+                <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2z"/>
+              </svg>
+              Click to enlarge
+            </div>
+          </div>
+          
+          <div class="thumbnail-grid">
+            {% for image in property.images.all|slice:":4" %}
+              {% if not forloop.first %}
+              <div class="thumbnail" onclick="changeMainImage('{{ image.image.url }}')">
+                <img src="{{ image.image.url }}" alt="{{ image.caption|default:property.title }}">
+              </div>
+              {% endif %}
+            {% endfor %}
+            
+            {% if property.images.all.count > 4 %}
+            <div class="thumbnail more-images" onclick="showAllImages()">
+              +{{ property.images.all.count|add:"-4" }} more
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    
+      <!-- Property Description -->
+      <div class="content-card">
+        <h3 class="card-title">
+          <div class="card-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM18 18H6V4h7v5h5z"/>
+            </svg>
+          </div>
+          Property Description
+        </h3>
+        <div>
+          {{ property.description|linebreaks }}
+        </div>
+      </div>
+    
+      <!-- Property Features -->
+      <div class="content-card">
+        <h3 class="card-title">
+          <div class="card-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            </svg>
+          </div>
+          Key Features
+        </h3>
+        
+        <div class="features-grid">
+          <div class="feature-card">
+            <div class="feature-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M7 14c1.66 0 3-1.34 3-3S8.66 8 7 8s-3 1.34-3 3 1.34 3 3 3zm0-4c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm12-3h-8v8H3V5H1v15h2v-3h18v3h2v-9c0-2.21-1.79-4-4-4z"/>
+              </svg>
+            </div>
+            <div class="feature-value">{{ property.bedrooms }}</div>
+            <div class="feature-label">Bedrooms</div>
+          </div>
+          
+          <div class="feature-card">
+            <div class="feature-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M9 2v1h6V2h2v1h1c1.1 0 2 .9 2 2v14c0 1.1-.9 2-2 2H6c-1.1 0-2-.9-2-2V5c0-1.1.9-2 2-2h1V2h2z"/>
+              </svg>
+            </div>
+            <div class="feature-value">{{ property.bathrooms }}</div>
+            <div class="feature-label">Bathrooms</div>
+          </div>
+          
+          {% if property.size_sqft %}
+          <div class="feature-card">
+            <div class="feature-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M3 17h18v2H3zm0-6h18v2H3zm0-6h18v2H3z"/>
+              </svg>
+            </div>
+            <div class="feature-value">{{ property.size_sqft }}</div>
+            <div class="feature-label">Square Feet</div>
+          </div>
+          {% endif %}
+          
+          {% if property.floor_number %}
+          <div class="feature-card">
+            <div class="feature-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2l0 20M2 7l10-5 10 5M6 20v-2c0-1 1-1 1-1h8s1 0 1 1v2"/>
+              </svg>
+            </div>
+            <div class="feature-value">{{ property.floor_number }}{% if property.total_floors %}/{{ property.total_floors }}{% endif %}</div>
+            <div class="feature-label">Floor Level</div>
+          </div>
+          {% endif %}
+        </div>
+      
+        <!-- Amenities Section -->
+        {% if property.amenities.all %}
+        <div>
+          <h4>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="#ff6b35">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            </svg>
+            Available Amenities
+          </h4>
+          <div class="amenities-grid">
+            {% for amenity in property.amenities.all %}
+            <div class="amenity-tag">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="#10b981">
+                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              {{ amenity.name }}
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+        
+        <!-- Property Tags -->
+        <div class="property-tags">
+          {% if property.is_furnished %}
+          <div class="property-tag tag-furnished">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+            </svg>
+            Furnished
+          </div>
+          {% endif %}
+          {% if property.pets_allowed %}
+          <div class="property-tag tag-pets">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M4.5 13.5C3 12 3 9.75 4.5 8.25S8.25 6.75 9.75 8.25 11.25 12 9.75 13.5 6 15 4.5 13.5z"/>
+            </svg>
+            Pet Friendly
+          </div>
+          {% endif %}
+          {% if property.smoking_allowed %}
+          <div class="property-tag tag-smoking">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M2 16h20v2H2zm1.5-5h17v2h-17z"/>
+            </svg>
+            Smoking Allowed
+          </div>
+          {% endif %}
+          {% if property.utilities_included %}
+          <div class="property-tag tag-utilities">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M13 12.5h2L12 7v5h-1z"/>
+            </svg>
+            Utilities Included
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    
+      <!-- Location Information -->
+      <div class="content-card">
+        <h3 class="card-title">
+          <div class="card-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+            </svg>
+          </div>
+          Location Details
+        </h3>
+        
+        <div>
+          <div>
+            <div>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+              </svg>
+            </div>
+            <div>
+              <div>{{ property.address }}</div>
+              <div>{{ property.region.name }}, Tanzania</div>
+            </div>
+          </div>
+          
+          {% if property.latitude and property.longitude %}
+          <div>
+            <div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+              </svg>
+              GPS Coordinates: {{ property.latitude }}, {{ property.longitude }}
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  
+    <!-- Right Column - Sidebar -->
+    <div>
+      <!-- Pricing Section -->
+      <div class="pricing-section">
+        <div>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="white">
+            <path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/>
+          </svg>
+        </div>
+        <div class="price-main">Tsh {{ property.rent_amount|floatformat:0|intcomma }}</div>
+        <div class="price-period">per month</div>
+        
+        {% if property.deposit_amount %}
+        <div class="price-deposit">
+          Security Deposit: Tsh {{ property.deposit_amount|floatformat:0|intcomma }}
+        </div>
+        {% endif %}
+        
+        {% if property.available_from %}
+        <div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+            <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/>
+          </svg>
+          Available from {{ property.available_from|date:"M j, Y" }}
+        </div>
+        {% endif %}
+      </div>
+    
+      <!-- Owner Information -->
+      <div class="content-card">
+        <h3 class="card-title">
+          <div class="card-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+              <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+            </svg>
+          </div>
+          Property Owner
+        </h3>
+        
+        <div class="owner-card">
+          <div class="owner-avatar">
+            {{ property.owner.first_name.0|default:property.owner.username.0|upper }}
+          </div>
+          <div>
+            <div>
+              {{ property.owner.get_full_name|default:property.owner.username }}
+            </div>
+            {% if property.owner.email %}
+            <div>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+              </svg>
+              {{ property.owner.email }}
+            </div>
+            {% endif %}
+            
+            <div>
+              <button class="btn btn-primary-modern" onclick="contactOwner()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+                  <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+                </svg>
+                Contact Owner
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    
+      <!-- Property Statistics -->
+      <div class="content-card">
+        <h3 class="card-title">
+          <div class="card-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+              <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/>
+            </svg>
+          </div>
+          Property Information
+        </h3>
+        
+        <div class="stats-grid">
+          <div class="stat-row">
+            <div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/>
+              </svg>
+              Listed on
+            </div>
+            <span>{{ property.created_at|date:"M j, Y" }}</span>
+          </div>
+          
+          <div class="stat-row">
+            <div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M9 11H7v6h2v-6zm4 0h-2v6h2v-6zm4 0h-2v6h2v-6zM4 22h16v-2H4v2zm0-4h16v-2H4v2z"/>
+              </svg>
+              Last updated
+            </div>
+            <span>{{ property.updated_at|date:"M j, Y" }}</span>
+          </div>
+          
+          <div class="stat-row">
+            <div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+              </svg>
+              Property ID
+            </div>
+            <span>#{{ property.id }}</span>
+          </div>
+          
+          {% if property.is_featured %}
+          <div class="stat-row">
+            <div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+              </svg>
+              Featured Property
+            </div>
+            <span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+              </svg>
+              Yes
+            </span>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Related Properties Section -->
+  {% if related_properties %}
+  <div class="related-properties">
+    <div class="content-card">
+      <h3 class="card-title">
+        <div class="card-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+          </svg>
+        </div>
+        Similar Properties You Might Like
+      </h3>
+      
+      <div class="related-grid">
+        {% for related in related_properties %}
+        <div class="related-card">
+          <div class="related-image">
+            {% if related.images.first %}
+              <img src="{{ related.images.first.image.url }}" alt="{{ related.title }}">
+            {% else %}
+              <div>
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 3l10 9h-3v9h-6v-6H11v6H5v-9H2z"/>
+                </svg>
+              </div>
+            {% endif %}
+            
+            <div>
+              {{ related.property_type.name }}
+            </div>
+          </div>
+          
+          <div>
+            <h4>
+              <a href="{% url 'accounts:house_detail' related.pk %}">
+                {{ related.title }}
+              </a>
+            </h4>
+            
+            <div>
+              <div>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M7 14c1.66 0 3-1.34 3-3S8.66 8 7 8s-3 1.34-3 3 1.34 3 3 3z"/>
+                </svg>
+                {{ related.bedrooms }} bed
+              </div>
+              <div>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M9 2v1h6V2h2v1h1c1.1 0 2 .9 2 2v14c0 1.1-.9 2-2 2H6c-1.1 0-2-.9-2-2V5c0-1.1.9-2 2-2h1V2h2z"/>
+                </svg>
+                {{ related.bathrooms }} bath
+              </div>
+            </div>
+            
+            <div>
+              <div>
+                Tsh {{ related.rent_amount|floatformat:0|intcomma }}/mo
+              </div>
+              <a href="{% url 'accounts:house_detail' related.pk %}" class="btn btn-primary-modern">
+                View Details
+              </a>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{% block extra_js %}
+<script>
+// Property Detail Page Interactive Features
+
+document.addEventListener('DOMContentLoaded', function() {
+  initializeImageGallery();
+  initializeAnimations();
+  initializeInteractiveElements();
+});
+
+// Image Gallery Functions
+function changeMainImage(imageUrl) {
+  const mainImage = document.getElementById('mainImage');
+  if (mainImage) {
+    mainImage.style.opacity = '0';
+    setTimeout(() => {
+      mainImage.src = imageUrl;
+      mainImage.style.opacity = '1';
+    }, 150);
+  }
+}
+
+function openImageModal(imageUrl) {
+  const modal = createImageModal(imageUrl);
+  document.body.appendChild(modal);
+  
+  setTimeout(() => {
+    modal.style.opacity = '1';
+    modal.querySelector('.modal-content').style.transform = 'scale(1)';
+  }, 10);
+}
+
+function createImageModal(imageUrl) {
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    backdrop-filter: blur(8px);
+  `;
+  
+  modal.innerHTML = `
+    <div class="modal-content">
+      <img src="${imageUrl}">
+      <button onclick="closeImageModal(this)" onmouseover="this.style.background='white'; this.style.transform='scale(1.1)'" 
+         onmouseout="this.style.background='rgba(255, 255, 255, 0.9)'; this.style.transform='scale(1)'">
+        ×
+      </button>
+    </div>
+  `;
+  
+  modal.addEventListener('click', function(e) {
+    if (e.target === modal) {
+      closeImageModal(modal.querySelector('button'));
+    }
+  });
+  
+  return modal;
+}
+
+function closeImageModal(button) {
+  const modal = button.closest('div[style*="position: fixed"]');
+  modal.style.opacity = '0';
+  modal.querySelector('.modal-content').style.transform = 'scale(0.9)';
+  
+  setTimeout(() => {
+    document.body.removeChild(modal);
+  }, 300);
+}
+
+function showAllImages() {
+  // Create a gallery modal with all images
+  const images = Array.from(document.querySelectorAll('.thumbnail img')).map(img => img.src);
+  const mainImg = document.getElementById('mainImage').src;
+  const allImages = [mainImg, ...images.filter(src => src !== mainImg)];
+  
+  createGalleryModal(allImages);
+}
+
+function createGalleryModal(images) {
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.95);
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    backdrop-filter: blur(8px);
+  `;
+  
+  let currentIndex = 0;
+  
+  modal.innerHTML = `
+    <div>
+      <div>
+        <h3>Property Gallery</h3>
+        <button onclick="closeGalleryModal()">Close ×</button>
+      </div>
+      
+      <div>
+        <button onclick="previousImage()">‹</button>
+        
+        <img id="galleryMainImage" src="${images[0]}">
+        
+        <button onclick="nextImage()">›</button>
+      </div>
+      
+      <div>
+        ${images.map((img, index) => `
+          <img src="${img}" onclick="setGalleryImage(${index})" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='${index === 0 ? '1' : '0.6'}'">
+        `).join('')}
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+  
+  // Store references for navigation
+  window.galleryImages = images;
+  window.currentGalleryIndex = 0;
+  window.galleryModal = modal;
+  
+  setTimeout(() => {
+    modal.style.opacity = '1';
+  }, 10);
+}
+
+function closeGalleryModal() {
+  const modal = window.galleryModal;
+  modal.style.opacity = '0';
+  setTimeout(() => {
+    document.body.removeChild(modal);
+    delete window.galleryImages;
+    delete window.currentGalleryIndex;
+    delete window.galleryModal;
+  }, 300);
+}
+
+function setGalleryImage(index) {
+  const mainImg = document.getElementById('galleryMainImage');
+  const thumbnails = document.querySelectorAll('[onclick*="setGalleryImage"]');
+  
+  mainImg.style.opacity = '0.5';
+  setTimeout(() => {
+    mainImg.src = window.galleryImages[index];
+    mainImg.style.opacity = '1';
+    
+    // Update thumbnail states
+    thumbnails.forEach((thumb, i) => {
+      thumb.style.opacity = i === index ? '1' : '0.6';
+      thumb.style.border = i === index ? '2px solid #ff6b35' : '2px solid transparent';
+    });
+    
+    window.currentGalleryIndex = index;
+  }, 150);
+}
+
+function previousImage() {
+  const newIndex = window.currentGalleryIndex > 0 ? window.currentGalleryIndex - 1 : window.galleryImages.length - 1;
+  setGalleryImage(newIndex);
+}
+
+function nextImage() {
+  const newIndex = window.currentGalleryIndex < window.galleryImages.length - 1 ? window.currentGalleryIndex + 1 : 0;
+  setGalleryImage(newIndex);
+}
+
+// Contact Owner Function
+function contactOwner() {
+  const ownerEmail = '{{ property.owner.email }}';
+  const propertyTitle = '{{ property.title|escapejs }}';
+  
+  if (ownerEmail) {
+    const subject = encodeURIComponent(`Inquiry about ${propertyTitle}`);
+    const body = encodeURIComponent(`Hello,\n\nI am interested in the property "${propertyTitle}" listed on your platform. Could you please provide more information?\n\nThank you!`);
+    
+    window.location.href = `mailto:${ownerEmail}?subject=${subject}&body=${body}`;
+  } else {
+    showNotification('Owner contact information is not available.', 'warning');
+  }
+}
+
+// Initialize Image Gallery
+function initializeImageGallery() {
+  // Add keyboard navigation for gallery
+  document.addEventListener('keydown', function(e) {
+    if (window.galleryModal) {
+      if (e.key === 'ArrowLeft') {
+        previousImage();
+      } else if (e.key === 'ArrowRight') {
+        nextImage();
+      } else if (e.key === 'Escape') {
+        closeGalleryModal();
+      }
+    }
+  });
+}
+
+// Initialize Animations
+function initializeAnimations() {
+  // Intersection Observer for scroll animations
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.style.opacity = '1';
+        entry.target.style.transform = 'translateY(0)';
+      }
+    });
+  }, { threshold: 0.1 });
+  
+  document.querySelectorAll('.content-card, .feature-card, .related-card').forEach(el => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(20px)';
+    el.style.transition = 'all 0.6s ease';
+    observer.observe(el);
+  });
+  
+  // Add staggered animation to feature cards
+  const featureCards = document.querySelectorAll('.feature-card');
+  featureCards.forEach((card, index) => {
+    setTimeout(() => {
+      card.style.opacity = '1';
+      card.style.transform = 'translateY(0)';
+    }, index * 100 + 300);
+  });
+}
+
+// Initialize Interactive Elements
+function initializeInteractiveElements() {
+  // Add smooth scrolling to anchor links
+  document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', function (e) {
+      e.preventDefault();
+      const target = document.querySelector(this.getAttribute('href'));
+      if (target) {
+        target.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start'
+        });
+      }
+    });
+  });
+  
+  // Add loading states to buttons
+  document.querySelectorAll('.btn btn-primary-modern').forEach(btn btn-primary => {
+    btn btn-primary.addEventListener('click', function() {
+      if (this.href && !this.href.includes('mailto:')) {
+        this.style.opacity = '0.7';
+        this.innerHTML = `
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+          </svg>
+          Loading...
+        `;
+      }
+    });
+  });
+}
+
+// Utility function for notifications
+function showNotification(message, type = 'info') {
+  const notification = document.createElement('div');
+  notification.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: ${type === 'warning' ? '#f59e0b' : type === 'error' ? '#ef4444' : '#10b981'};
+    color: white;
+    padding: 1rem 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+    z-index: 1001;
+    font-weight: 500;
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+  `;
+  
+  notification.textContent = message;
+  document.body.appendChild(notification);
+  
+  setTimeout(() => {
+    notification.style.transform = 'translateX(0)';
+  }, 10);
+  
+  setTimeout(() => {
+    notification.style.transform = 'translateX(100%)';
+    setTimeout(() => {
+      document.body.removeChild(notification);
+    }, 300);
+  }, 3000);
+}
+
+// Add CSS animations
+const style = document.createElement('style');
+style.textContent = `
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .animate-fadeInUp {
+    animation: fadeInUp 0.6s ease-out;
+  }
+  
+  /* Smooth scrolling for the whole document */
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  /* Enhanced hover effects */
+  .feature-card:hover {
+    transform: translateY(-4px) !important;
+  }
+  
+  .related-card:hover a {
+    color: #ff6b35 !important;
+  }
+  
+  /* Loading button styles */
+  .btn btn-primary-modern[disabled] {
+    opacity: 0.6 !important;
+    cursor: not-allowed !important;
+  }
+`;
+document.head.appendChild(style);
+</script>
+{% endblock %}
+{% endblock %}

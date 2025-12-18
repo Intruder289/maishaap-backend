@@ -1,0 +1,314 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}Reminder Templates{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1"><i class="fas fa-file-alt text-primary me-2"></i>Reminder Templates</h2>
+            <p class="text-muted mb-0">Manage email and SMS templates for rent reminders.</p>
+        </div>
+        <div>
+            <a href="{% url 'properties:house_rent_reminders_dashboard' %}" class="btn btn-outline-secondary me-2">
+                <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+            </a>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addTemplateModal">
+                <i class="fas fa-plus me-2"></i>Add Template
+            </button>
+        </div>
+    </div>
+
+    <!-- Templates List -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Available Templates</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Name</th>
+                            <th>Type</th>
+                            <th>Category</th>
+                            <th>Subject</th>
+                            <th>Default</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for template in templates %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'properties:house_rent_reminder_template_detail' template.id %}">
+                                    {{ template.name }}
+                                </a>
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary">
+                                    <i class="fas fa-{{ template.template_type|default:'envelope' }} me-1"></i>
+                                    {{ template.get_template_type_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge bg-info">{{ template.get_category_display }}</span>
+                            </td>
+                            <td>{{ template.subject|truncatechars:50 }}</td>
+                            <td>
+                                {% if template.is_default %}
+                                    <span class="badge bg-success">Default</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Custom</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if template.is_active %}
+                                    <span class="badge bg-success">Active</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Inactive</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <a href="{% url 'properties:house_rent_reminder_template_detail' template.id %}" 
+                                       class="btn btn-outline-info" title="View Details">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <button class="btn btn-outline-primary" 
+                                            onclick="editTemplate({{ template.id }})" 
+                                            title="Edit Template">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-outline-danger" 
+                                            onclick="deleteTemplate({{ template.id }})" 
+                                            title="Delete Template">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center p-4">
+                                <div class="text-muted">
+                                    <i class="fas fa-file-alt fa-3x mb-3"></i>
+                                    <h5>No templates found</h5>
+                                    <p>Create templates for your rent reminders.</p>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Template Variables Help -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5 class="mb-0">Available Template Variables</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6 class="text-muted">Tenant Information</h6>
+                    <ul class="list-unstyled">
+                        <li><code>{{ tenant_name }}</code> - Tenant's full name</li>
+                        <li><code>{{ tenant_email }}</code> - Tenant's email address</li>
+                        <li><code>{{ tenant_phone }}</code> - Tenant's phone number</li>
+                    </ul>
+                    
+                    <h6 class="text-muted">Property Information</h6>
+                    <ul class="list-unstyled">
+                        <li><code>{{ property_title }}</code> - Property title</li>
+                        <li><code>{{ property_address }}</code> - Property address</li>
+                        <li><code>{{ property_rent }}</code> - Monthly rent amount</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="text-muted">Payment Information</h6>
+                    <ul class="list-unstyled">
+                        <li><code>{{ due_date }}</code> - Payment due date</li>
+                        <li><code>{{ amount }}</code> - Amount due</li>
+                        <li><code>{{ days_overdue }}</code> - Days overdue (for overdue reminders)</li>
+                        <li><code>{{ invoice_link }}</code> - Link to invoice</li>
+                    </ul>
+                    
+                    <h6 class="text-muted">System Information</h6>
+                    <ul class="list-unstyled">
+                        <li><code>{{ current_date }}</code> - Current date</li>
+                        <li><code>{{ company_name }}</code> - Your company name</li>
+                        <li><code>{{ contact_info }}</code> - Contact information</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Template Modal -->
+<div class="modal fade" id="addTemplateModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Template</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form method="post" id="addTemplateForm">
+                    {% csrf_token %}
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="name" class="form-label">Template Name</label>
+                                <input type="text" class="form-control" id="name" name="name" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="template_type" class="form-label">Template Type</label>
+                                <select name="template_type" id="template_type" class="form-select" required>
+                                    <option value="">Select Type</option>
+                                    <option value="email">Email Template</option>
+                                    <option value="sms">SMS Template</option>
+                                    <option value="push">Push Notification Template</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="category" class="form-label">Category</label>
+                                <select name="category" id="category" class="form-select" required>
+                                    <option value="">Select Category</option>
+                                    <option value="upcoming">Upcoming Payment</option>
+                                    <option value="overdue_1">First Overdue</option>
+                                    <option value="overdue_2">Second Overdue</option>
+                                    <option value="overdue_3">Third Overdue</option>
+                                    <option value="final_notice">Final Notice</option>
+                                    <option value="escalation">Escalation Notice</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="subject" class="form-label">Subject</label>
+                                <input type="text" class="form-control" id="subject" name="subject" 
+                                       placeholder="e.g., Rent Payment Reminder - {{ property_title }}">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="content" class="form-label">Template Content</label>
+                        <textarea class="form-control" id="content" name="content" rows="8" required
+                                  placeholder="Enter your template content here. Use variables like {{ tenant_name }}, {{ property_title }}, etc."></textarea>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="is_default" name="is_default">
+                                <label class="form-check-label" for="is_default">
+                                    Set as default template for this category
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="is_active" name="is_active" checked>
+                                <label class="form-check-label" for="is_active">
+                                    Template is active
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveTemplate()">
+                    <i class="fas fa-save me-2"></i>Save Template
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function editTemplate(templateId) {
+    // Implementation for editing template
+    alert('Edit functionality will be implemented');
+}
+
+function deleteTemplate(templateId) {
+    if (confirm('Are you sure you want to delete this template?')) {
+        // Implementation for deleting template
+        alert('Delete functionality will be implemented');
+    }
+}
+
+function saveTemplate() {
+    const form = document.getElementById('addTemplateForm');
+    const formData = new FormData(form);
+    
+    fetch('{% url "properties:house_rent_reminder_templates" %}', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Template saved successfully!');
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    });
+}
+
+// Auto-generate subject based on template type and category
+document.getElementById('template_type').addEventListener('change', function() {
+    const type = this.value;
+    const category = document.getElementById('category').value;
+    const subjectField = document.getElementById('subject');
+    
+    if (type && category) {
+        let subject = '';
+        if (type === 'email') {
+            if (category === 'upcoming') {
+                subject = 'Rent Payment Reminder - {{ property_title }}';
+            } else if (category.startsWith('overdue')) {
+                subject = 'Overdue Rent Payment - {{ property_title }}';
+            } else if (category === 'final_notice') {
+                subject = 'Final Notice - Overdue Rent Payment';
+            } else if (category === 'escalation') {
+                subject = 'Escalation Notice - Overdue Rent';
+            }
+        } else if (type === 'sms') {
+            subject = 'Rent Reminder';
+        } else if (type === 'push') {
+            subject = 'Rent Payment Due';
+        }
+        
+        if (subject) {
+            subjectField.value = subject;
+        }
+    }
+});
+
+document.getElementById('category').addEventListener('change', function() {
+    // Trigger the template type change event to update subject
+    document.getElementById('template_type').dispatchEvent(new Event('change'));
+});
+</script>
+{% endblock %}

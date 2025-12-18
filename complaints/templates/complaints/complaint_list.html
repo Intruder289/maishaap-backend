@@ -1,0 +1,765 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}Complaints Management{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <div class="row flex-between-center">
+      <div class="col">
+        <h6 class="mb-2">Complaints Management</h6>
+        <h5 class="mb-0">Monitor and manage all customer complaints and feedback</h5>
+      </div>
+      <div class="col-auto">
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newComplaintModal">
+          <span class="fas fa-plus me-2"></span>New Complaint
+        </button>
+        <button type="button" class="btn btn-secondary ms-2" onclick="clearAllFilters()">
+          <span class="fas fa-times me-2"></span>Clear All
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Search and Filters -->
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label for="search-input" class="form-label">Search</label>
+        <input type="text" class="form-control" id="search-input" placeholder="Search complaints...">
+      </div>
+      <div class="col-md-4">
+        <label for="status-filter" class="form-label">Status</label>
+        <select class="form-select" id="status-filter">
+          <option value="">All Statuses</option>
+          {% for value, display in status_choices %}
+          <option value="{{ value }}">{{ display }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label for="priority-filter" class="form-label">Priority</label>
+        <select class="form-select" id="priority-filter">
+          <option value="">All Priorities</option>
+          {% for value, display in priority_choices %}
+          <option value="{{ value }}">{{ display }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+  </div>
+  
+  <div class="card-body p-0">
+    <div id="table-container">
+      <!-- Table will be loaded here via AJAX -->
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Complaint</th>
+              <th>Property</th>
+              {% if user.is_staff %}
+              <th>User</th>
+            {% endif %}
+              <th>Priority</th>
+              <th>Status</th>
+              <th>Category</th>
+              <th>Created</th>
+              <th>Actions</th>
+          </tr>
+        </thead>
+          <tbody id="complaints-table-body">
+          {% for complaint in complaints %}
+            <tr data-complaint-id="{{ complaint.id }}">
+            <td>
+              <div class="d-flex align-items-center">
+                  <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3 fw-bold">
+                    {{ complaint.title|first|upper }}
+                  </div>
+                  <div>
+                    <strong>
+                      <a href="{% url 'complaints:complaint_detail' complaint.id %}" class="text-decoration-none">
+                        {{ complaint.title }}
+                      </a>
+                    </strong>
+                    <div class="text-muted small">{{ complaint.description|truncatechars:50 }}</div>
+                </div>
+              </div>
+            </td>
+            <td>
+                {% if complaint.property %}
+                <div class="d-flex align-items-center">
+                  <i class="fas fa-home text-muted me-2"></i>
+              <div>
+                    <div class="fw-bold">{{ complaint.property.title }}</div>
+                    <div class="text-muted small">{{ complaint.property.address|truncatechars:30 }}</div>
+                  </div>
+              </div>
+                {% else %}
+                <span class="text-muted">No property</span>
+                {% endif %}
+            </td>
+              {% if user.is_staff %}
+            <td>
+                <div class="d-flex align-items-center">
+                  <i class="fas fa-user text-muted me-2"></i>
+              <div>
+                    <div class="fw-bold">{{ complaint.user.get_full_name|default:complaint.user.username }}</div>
+                    <div class="text-muted small">{{ complaint.user.email }}</div>
+                  </div>
+              </div>
+            </td>
+              {% endif %}
+            <td>
+              {% if complaint.priority == 'urgent' %}
+                <span class="badge bg-danger">{{ complaint.get_priority_display }}</span>
+              {% elif complaint.priority == 'high' %}
+                <span class="badge bg-warning">{{ complaint.get_priority_display }}</span>
+              {% elif complaint.priority == 'medium' %}
+                <span class="badge bg-info">{{ complaint.get_priority_display }}</span>
+              {% else %}
+                <span class="badge bg-success">{{ complaint.get_priority_display }}</span>
+              {% endif %}
+            </td>
+            <td>
+                {% if complaint.status == 'resolved' %}
+                <span class="badge bg-success">{{ complaint.get_status_display }}</span>
+              {% elif complaint.status == 'in_progress' %}
+                <span class="badge bg-primary">{{ complaint.get_status_display }}</span>
+                {% elif complaint.status == 'pending' %}
+                <span class="badge bg-warning">{{ complaint.get_status_display }}</span>
+              {% else %}
+                <span class="badge bg-secondary">{{ complaint.get_status_display }}</span>
+              {% endif %}
+            </td>
+            <td>
+                <span class="badge bg-secondary">{{ complaint.get_category_display }}</span>
+            </td>
+              <td>
+                <div class="text-muted small">
+                  {{ complaint.created_at|date:"M d, Y" }}<br>
+                  {{ complaint.created_at|time:"g:i A" }}
+              </div>
+            </td>
+            <td>
+              <div class="dropdown">
+                  <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                    <i class="fas fa-ellipsis-v"></i>
+                </button>
+                <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="#" onclick="openViewModal({{ complaint.id }})">
+                <i class="fas fa-eye me-2"></i>View Details
+                  </a></li>
+                  {% if user.is_staff %}
+              <li><a class="dropdown-item" href="#" onclick="openStartWorkModal({{ complaint.id }})">
+                <i class="fas fa-play me-2"></i>Start Work
+              </a></li>
+              <li><a class="dropdown-item" href="#" onclick="openMarkResolvedModal({{ complaint.id }})">
+                <i class="fas fa-check me-2"></i>Mark Resolved
+                  </a></li>
+              {% if complaint.status == 'resolved' %}
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item text-danger" href="#" onclick="openDeleteModal({{ complaint.id }})">
+                <i class="fas fa-trash me-2"></i>Delete
+                  </a></li>
+                  {% endif %}
+              {% endif %}
+                </ul>
+              </div>
+            </td>
+          </tr>
+            {% empty %}
+            <tr>
+              <td colspan="8" class="text-center py-4">
+                <div class="text-muted">
+                  <i class="fas fa-inbox fa-2x mb-3"></i>
+                  <p>No complaints found.</p>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    
+    <!-- Pagination -->
+    {% if complaints.has_other_pages %}
+      <div class="card-footer bg-white border-0 py-3">
+        <div class="row align-items-center">
+          <div class="col-md-6">
+            <div class="text-muted">
+          Showing {{ complaints.start_index }} to {{ complaints.end_index }} of {{ complaints.paginator.count }} entries
+        </div>
+          </div>
+          <div class="col-md-6">
+            <nav aria-label="Page navigation" class="d-flex justify-content-end">
+          <ul class="pagination pagination-sm mb-0">
+            {% if complaints.has_previous %}
+            <li class="page-item">
+                  <a class="page-link" href="#" onclick="loadPage(1); return false;" title="First Page">
+                    <i class="fas fa-angle-double-left"></i>
+              </a>
+            </li>
+            <li class="page-item">
+                  <a class="page-link" href="#" onclick="loadPage({{ complaints.previous_page_number }}); return false;" title="Previous Page">
+                    <i class="fas fa-angle-left"></i>
+              </a>
+            </li>
+            {% endif %}
+            
+                <!-- Page numbers -->
+                {% for num in complaints.paginator.page_range %}
+                  {% if complaints.number == num %}
+            <li class="page-item active">
+                    <span class="page-link">{{ num }}</span>
+                  </li>
+                  {% elif num > complaints.number|add:'-3' and num < complaints.number|add:'3' %}
+                  <li class="page-item">
+                    <a class="page-link" href="#" onclick="loadPage({{ num }}); return false;">{{ num }}</a>
+            </li>
+                  {% endif %}
+                {% endfor %}
+            
+            {% if complaints.has_next %}
+            <li class="page-item">
+                  <a class="page-link" href="#" onclick="loadPage({{ complaints.next_page_number }}); return false;" title="Next Page">
+                    <i class="fas fa-angle-right"></i>
+              </a>
+            </li>
+            <li class="page-item">
+                  <a class="page-link" href="#" onclick="loadPage({{ complaints.paginator.num_pages }}); return false;" title="Last Page">
+                    <i class="fas fa-angle-double-right"></i>
+              </a>
+            </li>
+            {% endif %}
+          </ul>
+        </nav>
+      </div>
+        </div>
+      </div>
+        {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- New Complaint Modal -->
+<div class="modal fade" id="newComplaintModal" tabindex="-1" aria-labelledby="newComplaintModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="newComplaintModalLabel">New Complaint</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="post" action="{% url 'complaints:complaint_create' %}">
+        {% csrf_token %}
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="title" class="form-label">Title</label>
+            <input type="text" class="form-control" id="title" name="title" required>
+          </div>
+          <div class="mb-3">
+            <label for="description" class="form-label">Description</label>
+            <textarea class="form-control" id="description" name="description" rows="3" required></textarea>
+          </div>
+          <div class="mb-3">
+            <label for="property" class="form-label">Property</label>
+            <select class="form-select" id="property" name="property">
+              <option value="">Select Property</option>
+              {% for property in properties %}
+              <option value="{{ property.id }}">{{ property.title }} - {{ property.address }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="priority" class="form-label">Priority</label>
+            <select class="form-select" id="priority" name="priority">
+              {% for value, display in priority_choices %}
+              <option value="{{ value }}" {% if value == 'medium' %}selected{% endif %}>{{ display }}</option>
+                {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-paper-plane me-2"></i>Submit Complaint
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- View Details Modal -->
+<div class="modal fade" id="viewModal" tabindex="-1" aria-labelledby="viewModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="viewModalLabel">Complaint Details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-12">
+            <h6 id="viewModalTitle" class="fw-bold"></h6>
+            <p id="viewModalDescription" class="text-muted"></p>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-bold">Property:</label>
+            <p id="viewModalProperty"></p>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-bold">Status:</label>
+            <p id="viewModalStatus"></p>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-bold">Priority:</label>
+            <p id="viewModalPriority"></p>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-bold">Category:</label>
+            <p id="viewModalCategory"></p>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-bold">User:</label>
+            <p id="viewModalUser"></p>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-bold">Created:</label>
+            <p id="viewModalCreated"></p>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Start Work Modal -->
+<div class="modal fade" id="startWorkModal" tabindex="-1" aria-labelledby="startWorkModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="startWorkModalLabel">Start Work</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="startWorkComplaintId">
+        <input type="hidden" id="startWorkComplaintStatus">
+        <div class="mb-3" id="startWorkReasonGroup" style="display: none;">
+          <label for="startWorkReason" class="form-label">
+            Reason for Status Change <span class="text-danger">*</span>
+          </label>
+          <textarea class="form-control" id="startWorkReason" rows="4" 
+              placeholder="Please provide a reason for changing the status from Resolved..."></textarea>
+          <small class="form-text text-muted">
+            A reason is required when changing status from Resolved to ensure proper tracking.
+          </small>
+        </div>
+        <div class="mb-3">
+          <label for="startWorkNotes" class="form-label">Work Notes (Optional)</label>
+          <textarea class="form-control" id="startWorkNotes" rows="3" placeholder="Add any notes about starting work on this complaint..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="startWorkBtn">
+          <i class="fas fa-play me-2"></i>Start Work
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Mark Resolved Modal -->
+<div class="modal fade" id="markResolvedModal" tabindex="-1" aria-labelledby="markResolvedModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="markResolvedModalLabel">Mark Resolved</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="markResolvedComplaintId">
+        <div class="mb-3">
+          <label for="markResolvedNotes" class="form-label">Resolution Notes (Optional)</label>
+          <textarea class="form-control" id="markResolvedNotes" rows="3" placeholder="Add notes about how the complaint was resolved..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-success" id="markResolvedBtn">
+          <i class="fas fa-check me-2"></i>Mark Resolved
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="deleteModalLabel">Delete Complaint</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="deleteComplaintId">
+        <div class="alert alert-warning">
+          <i class="fas fa-exclamation-triangle me-2"></i>
+          <strong>Warning!</strong> This action cannot be undone. Are you sure you want to delete this complaint?
+        </div>
+        <p>This will permanently remove the complaint and all associated data.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" id="deleteBtn">
+          <i class="fas fa-trash me-2"></i>Delete Complaint
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Wait for jQuery to be available
+function waitForJQuery() {
+    if (typeof $ !== 'undefined') {
+        initializeComplaintsPage();
+    } else {
+        setTimeout(waitForJQuery, 100);
+    }
+}
+
+function initializeComplaintsPage() {
+    console.log('=== COMPLAINTS PAGE LOADED ===');
+    
+    // AJAX function to load filtered table
+    function loadTable(page = 1) {
+        var search = $('#search-input').val() || '';
+        var status = $('#status-filter').val() || '';
+        var priority = $('#priority-filter').val() || '';
+        
+        console.log('=== LOADING TABLE ===');
+        console.log('Search:', search);
+        console.log('Status:', status);
+        console.log('Priority:', priority);
+        console.log('Page:', page);
+        
+        // Show loading
+        $('#table-container').html('<div class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">Loading...</p></div>');
+        
+        $.ajax({
+            url: '{% url "complaints:test_ajax" %}',
+            type: 'GET',
+            data: {
+                'search': search,
+                'status': status,
+                'priority': priority,
+                'page': page
+            },
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(data) {
+                console.log('=== AJAX SUCCESS ===');
+                console.log('Data length:', data.length);
+                console.log('Data preview:', data.substring(0, 200));
+                
+                // Replace the table container with the new HTML
+                $('#table-container').html(data);
+                
+                console.log('Table updated successfully');
+            },
+            error: function(xhr, status, error) {
+                console.log('=== AJAX ERROR ===');
+                console.log('Error:', error);
+                console.log('Status:', status);
+                console.log('Response:', xhr.responseText);
+                
+                $('#table-container').html('<div class="text-center py-5"><p class="text-danger">Error loading data: ' + error + '</p><button class="btn btn-primary" onclick="location.reload()">Refresh Page</button></div>');
+            }
+        });
+    }
+    
+    // Search input handler
+    var searchTimeout;
+    $('#search-input').on('input', function() {
+        var searchValue = $(this).val();
+        console.log('Search input changed:', searchValue);
+        
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(function() {
+            console.log('Search timeout triggered');
+            loadTable(1);
+        }, 500);
+    });
+    
+    // Handle search clear
+    $('#search-input').on('keyup', function() {
+        var searchValue = $(this).val();
+        if (searchValue === '') {
+            console.log('Search cleared - resetting filters');
+            $('#status-filter').val('');
+            $('#priority-filter').val('');
+            loadTable(1);
+        }
+    });
+    
+    // Filter change handlers
+    $('#status-filter').on('change', function() {
+        var statusValue = $(this).val();
+        console.log('Status filter changed:', statusValue);
+        loadTable(1);
+    });
+    
+    $('#priority-filter').on('change', function() {
+        var priorityValue = $(this).val();
+        console.log('Priority filter changed:', priorityValue);
+        loadTable(1);
+    });
+    
+    // Global functions for pagination
+    window.loadPage = function(page) {
+        console.log('Loading page:', page);
+        loadTable(page);
+    };
+    
+    // Clear all filters function
+    window.clearAllFilters = function() {
+        console.log('=== CLEARING ALL FILTERS ===');
+        $('#search-input').val('');
+        $('#status-filter').val('');
+        $('#priority-filter').val('');
+        loadTable(1);
+    };
+    
+    // Status update function
+    window.updateStatus = function(complaintId, newStatus) {
+        console.log('Updating status for complaint:', complaintId, 'to:', newStatus);
+        
+        $.ajax({
+            url: '{% url "complaints:complaint_list" %}',
+            type: 'POST',
+            data: {
+                'complaint_id': complaintId,
+                'new_status': newStatus,
+                'csrfmiddlewaretoken': getCookie('csrftoken')
+            },
+            success: function(response) {
+                console.log('Status updated successfully');
+                loadTable();
+            },
+            error: function(xhr, status, error) {
+                console.log('Error updating status:', error);
+                alert('Error updating status. Please try again.');
+            }
+        });
+    };
+    
+    // Modal functions
+    window.openViewModal = function(complaintId) {
+        // Load complaint details and show modal
+        loadComplaintDetails(complaintId);
+    };
+    
+    window.openStartWorkModal = function(complaintId) {
+        $('#startWorkComplaintId').val(complaintId);
+        
+        // Check complaint status to show/hide reason field
+        $.ajax({
+            url: '{% url "complaints:complaint_list" %}',
+            type: 'POST',
+            data: {
+                'action': 'get_details',
+                'complaint_id': complaintId,
+                'csrfmiddlewaretoken': getCookie('csrftoken')
+            },
+            success: function(response) {
+                // Check if complaint is resolved (use status_value if available, fallback to status)
+                var isResolved = (response.status_value === 'resolved') || 
+                                 (response.status === 'Resolved' || response.status === 'resolved');
+                if (isResolved) {
+                    $('#startWorkComplaintStatus').val('resolved');
+                    $('#startWorkReasonGroup').show();
+                    $('#startWorkReason').attr('required', 'required');
+                } else {
+                    $('#startWorkComplaintStatus').val('');
+                    $('#startWorkReasonGroup').hide();
+                    $('#startWorkReason').removeAttr('required');
+                    $('#startWorkReason').val('');
+                }
+                $('#startWorkModal').modal('show');
+            },
+            error: function() {
+                // If we can't get status, show modal anyway
+                $('#startWorkModal').modal('show');
+            }
+        });
+    };
+    
+    window.openMarkResolvedModal = function(complaintId) {
+        $('#markResolvedComplaintId').val(complaintId);
+        $('#markResolvedModal').modal('show');
+    };
+    
+    window.openDeleteModal = function(complaintId) {
+        $('#deleteComplaintId').val(complaintId);
+        $('#deleteModal').modal('show');
+    };
+    
+    // Load complaint details for view modal
+    function loadComplaintDetails(complaintId) {
+        console.log('Loading complaint details for ID:', complaintId);
+        
+        $.ajax({
+            url: '{% url "complaints:complaint_list" %}',
+            type: 'POST',
+            data: {
+                'action': 'get_details',
+                'complaint_id': complaintId,
+                'csrfmiddlewaretoken': getCookie('csrftoken')
+            },
+            success: function(response) {
+                console.log('Complaint details loaded:', response);
+                
+                // Update modal content with complaint details
+                $('#viewModalTitle').text(response.title);
+                $('#viewModalDescription').text(response.description);
+                $('#viewModalProperty').text(response.property || 'No property');
+                $('#viewModalStatus').text(response.status);
+                $('#viewModalPriority').text(response.priority);
+                $('#viewModalCategory').text(response.category);
+                $('#viewModalUser').text(response.user);
+                $('#viewModalCreated').text(response.created_at);
+                $('#viewModal').modal('show');
+            },
+            error: function(xhr, status, error) {
+                console.log('Error loading complaint details:', error);
+                console.log('Response:', xhr.responseText);
+                alert('Error loading complaint details. Please try again.');
+            }
+        });
+    }
+    
+    // Action handlers
+    $('#startWorkBtn').on('click', function() {
+        var complaintId = $('#startWorkComplaintId').val();
+        var complaintStatus = $('#startWorkComplaintStatus').val();
+        var notes = $('#startWorkNotes').val();
+        var reason = $('#startWorkReason').val();
+        
+        // Validate reason if complaint is resolved
+        if (complaintStatus === 'resolved' && !reason.trim()) {
+            alert('Please provide a reason for changing the status from Resolved.');
+            $('#startWorkReason').focus();
+            return;
+        }
+        
+        $.ajax({
+            url: '{% url "complaints:complaint_list" %}',
+            type: 'POST',
+            data: {
+                'action': 'start_work',
+                'complaint_id': complaintId,
+                'status_change_reason': reason,
+                'notes': notes,
+                'csrfmiddlewaretoken': getCookie('csrftoken')
+            },
+            success: function(response) {
+                $('#startWorkModal').modal('hide');
+                $('#startWorkNotes').val('');
+                $('#startWorkReason').val('');
+                $('#startWorkReasonGroup').hide();
+                loadTable();
+                alert('Work started successfully!');
+            },
+            error: function(xhr, status, error) {
+                console.log('Error starting work:', error);
+                var errorResponse = xhr.responseJSON;
+                if (errorResponse && errorResponse.requires_reason) {
+                    alert(errorResponse.error || 'Reason is required when changing status from Resolved.');
+                    $('#startWorkReason').focus();
+                } else {
+                    alert(errorResponse && errorResponse.error ? errorResponse.error : 'Error starting work. Please try again.');
+                }
+            }
+        });
+    });
+    
+    $('#markResolvedBtn').on('click', function() {
+        var complaintId = $('#markResolvedComplaintId').val();
+        var notes = $('#markResolvedNotes').val();
+        
+        $.ajax({
+            url: '{% url "complaints:complaint_list" %}',
+            type: 'POST',
+            data: {
+                'action': 'mark_resolved',
+                'complaint_id': complaintId,
+                'notes': notes,
+                'csrfmiddlewaretoken': getCookie('csrftoken')
+            },
+            success: function(response) {
+                $('#markResolvedModal').modal('hide');
+                $('#markResolvedNotes').val('');
+                loadTable();
+                alert('Complaint marked as resolved!');
+            },
+            error: function(xhr, status, error) {
+                console.log('Error marking resolved:', error);
+                alert('Error marking resolved. Please try again.');
+            }
+        });
+    });
+    
+    $('#deleteBtn').on('click', function() {
+        var complaintId = $('#deleteComplaintId').val();
+        
+        $.ajax({
+            url: '{% url "complaints:complaint_list" %}',
+            type: 'POST',
+            data: {
+                'action': 'delete',
+                'complaint_id': complaintId,
+                'csrfmiddlewaretoken': getCookie('csrftoken')
+            },
+            success: function(response) {
+                $('#deleteModal').modal('hide');
+                loadTable();
+                alert('Complaint deleted successfully!');
+            },
+            error: function(xhr, status, error) {
+                console.log('Error deleting complaint:', error);
+                alert('Error deleting complaint. Please try again.');
+            }
+        });
+    });
+    
+    // CSRF token helper
+    function getCookie(name) {
+        var cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            var cookies = document.cookie.split(';');
+            for (var i = 0; i < cookies.length; i++) {
+                var cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    
+    console.log('=== JAVASCRIPT LOADED SUCCESSFULLY ===');
+}
+
+// Start the initialization
+waitForJQuery();
+</script>
+{% endblock %}

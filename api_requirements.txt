@@ -1,0 +1,9 @@
+# Django REST Framework packages for API authentication
+djangorestframework==3.14.0
+djangorestframework-simplejwt==5.3.0
+django-cors-headers==4.3.1
+
+# If you don't have these already, install them too:
+# Django==5.2.5
+# firebase-admin removed (unused)
+# Pillow==10.0.1  # For image handling

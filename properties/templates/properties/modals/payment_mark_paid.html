@@ -1,0 +1,77 @@
+<div class="text-center mb-4">
+    <div class="alert alert-warning" role="alert">
+        <i class="fas fa-exclamation-triangle me-2"></i>
+        <strong>Mark Payment as Paid</strong>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <h6 class="text-muted mb-3">Payment Information</h6>
+        <div class="mb-3">
+            <label class="form-label fw-bold">Payment ID</label>
+            <p class="mb-0">#{{ payment.id }}</p>
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-bold">Amount</label>
+            <p class="mb-0 fs-5 text-success">Tsh{{ payment.amount|floatformat:0 }}</p>
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-bold">Payment Method</label>
+            <p class="mb-0">{{ payment.payment_method|title }}</p>
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-bold">Current Status</label>
+            <p class="mb-0">
+                {% if payment.status == 'completed' %}
+                    <span class="badge bg-success">Paid</span>
+                {% elif payment.status == 'pending' %}
+                    <span class="badge bg-warning">Pending</span>
+                {% elif payment.status == 'overdue' %}
+                    <span class="badge bg-danger">Overdue</span>
+                {% else %}
+                    <span class="badge bg-secondary">{{ payment.status|title }}</span>
+                {% endif %}
+            </p>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <h6 class="text-muted mb-3">Customer Information</h6>
+        <div class="mb-3">
+            <label class="form-label fw-bold">Name</label>
+            <p class="mb-0">{{ payment.booking.customer.full_name }}</p>
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-bold">Email</label>
+            <p class="mb-0">{{ payment.booking.customer.email }}</p>
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-bold">Phone</label>
+            <p class="mb-0">{{ payment.booking.customer.phone }}</p>
+        </div>
+        <div class="mb-3">
+            <label class="form-label fw-bold">Property</label>
+            <p class="mb-0">{{ payment.booking.property_obj.title }}</p>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="alert alert-info" role="alert">
+            <i class="fas fa-info-circle me-2"></i>
+            <strong>Confirmation Required:</strong> This action will mark the payment as completed and update the booking's payment status accordingly.
+        </div>
+    </div>
+</div>
+
+<div class="row mt-3">
+    <div class="col-12 text-center">
+        <button type="button" class="btn btn-success me-2" onclick="confirmMarkPaid()">
+            <i class="fas fa-check me-2"></i>Mark as Paid
+        </button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+            <i class="fas fa-times me-2"></i>Cancel
+        </button>
+    </div>
+</div>

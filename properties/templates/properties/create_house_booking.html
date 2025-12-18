@@ -1,0 +1,170 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}Create House Rental{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="page-title-box">
+                <div class="page-title-right">
+                    <ol class="breadcrumb m-0">
+                        <li class="breadcrumb-item"><a href="{% url 'properties:dashboard' %}">Properties</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'properties:house_dashboard' %}">House Management</a></li>
+                        <li class="breadcrumb-item active">Create Rental</li>
+                    </ol>
+                </div>
+                <h4 class="page-title">Create House Rental</h4>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-home me-2"></i>New House Rental
+                    </h5>
+                    <p class="text-muted mb-0">House: <strong>{{ selected_property.title }}</strong></p>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <!-- Tenant Information -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary mb-3">
+                                    <i class="fas fa-user me-2"></i>Tenant Information
+                                </h6>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">First Name *</label>
+                                <input type="text" class="form-control" name="first_name" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Last Name *</label>
+                                <input type="text" class="form-control" name="last_name" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Email *</label>
+                                <input type="email" class="form-control" name="email" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Phone Number *</label>
+                                <input type="tel" class="form-control" name="phone" required>
+                            </div>
+                        </div>
+
+                        <!-- Rental Details -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary mb-3">
+                                    <i class="fas fa-calendar me-2"></i>Rental Details
+                                </h6>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Move-in Date *</label>
+                                <input type="date" class="form-control" name="check_in_date" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Move-out Date *</label>
+                                <input type="date" class="form-control" name="check_out_date" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Number of Occupants *</label>
+                                <input type="number" class="form-control" name="number_of_guests" min="1" required>
+                                <div class="form-text">House has {{ selected_property.bedrooms|default:0 }} bedrooms</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Rental Type</label>
+                                <select class="form-control" name="rental_type">
+                                    <option value="">Select Rental Type</option>
+                                    <option value="Monthly">Monthly Rental</option>
+                                    <option value="Long-term">Long-term Lease</option>
+                                    <option value="Short-term">Short-term Rental</option>
+                                    <option value="Vacation">Vacation Rental</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Financial Details -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h6 class="text-primary mb-3">
+                                    <i class="fas fa-dollar-sign me-2"></i>Financial Details
+                                </h6>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Monthly Rent *</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">Tsh</span>
+                                    <input type="number" class="form-control" name="total_amount" step="0.01" min="0" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Security Deposit</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">Tsh</span>
+                                    <input type="number" class="form-control" name="security_deposit" step="0.01" min="0">
+                                </div>
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label">Special Terms</label>
+                                <textarea class="form-control" name="special_terms" rows="3" placeholder="Any special rental terms, pet policies, utilities included, etc."></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-2"></i>Create Rental
+                                    </button>
+                                    <a href="{% url 'properties:house_bookings' %}" class="btn btn-secondary">
+                                        <i class="fas fa-times me-2"></i>Cancel
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Set minimum date to today
+    const today = new Date().toISOString().split('T')[0];
+    document.querySelector('input[name="check_in_date"]').min = today;
+    document.querySelector('input[name="check_out_date"]').min = today;
+    
+    // Update move-out date minimum when move-in date changes
+    document.querySelector('input[name="check_in_date"]').addEventListener('change', function() {
+        const moveOutInput = document.querySelector('input[name="check_out_date"]');
+        moveOutInput.min = this.value;
+        if (moveOutInput.value && moveOutInput.value <= this.value) {
+            moveOutInput.value = '';
+        }
+    });
+    
+    // Auto-calculate security deposit (typically 1-2 months rent)
+    const rentInput = document.querySelector('input[name="total_amount"]');
+    const depositInput = document.querySelector('input[name="security_deposit"]');
+    
+    rentInput.addEventListener('input', function() {
+        const rent = parseFloat(this.value);
+        if (rent > 0) {
+            depositInput.value = (rent * 1.5).toFixed(2); // 1.5 months as security deposit
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,177 @@
+{% extends 'accounts/base.html' %}
+
+{% block title %}Create User{% endblock %}
+{% block page_title %}Create User{% endblock %}
+{% block header_title %}Create User{% endblock %}
+
+{% block content %}
+<div>
+  <div>
+    <h1>Create New User</h1>
+    <a href="{% url 'accounts:user_list' %}" 
+      >
+      ← Back to Users
+    </a>
+  </div>
+
+  <!-- Display Messages -->
+  {% if messages %}
+    {% for message in messages %}
+      {% if message.tags == 'error' %}
+        <div>
+          {{ message }}
+        </div>
+      {% else %}
+        <div>
+          {{ message }}
+        </div>
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+    
+    <!-- Basic Information -->
+    <div>
+      <h3>Basic Information</h3>
+      
+      <div>
+        <div>
+          <label for="username">Username *</label>
+          <input type="text" id="username" name="username" required
+                >
+        </div>
+        
+        <div>
+          <label for="email">Email *</label>
+          <input type="email" id="email" name="email" required
+                >
+        </div>
+      </div>
+      
+      <div>
+        <div>
+          <label for="first_name">First Name</label>
+          <input type="text" id="first_name" name="first_name"
+                >
+        </div>
+        
+        <div>
+          <label for="last_name">Last Name</label>
+          <input type="text" id="last_name" name="last_name"
+                >
+        </div>
+      </div>
+    </div>
+
+    <!-- Password -->
+    <div>
+      <h3>Password</h3>
+      
+      <div>
+        <div>
+          <label for="password">Password *</label>
+          <input type="password" id="password" name="password" required
+                >
+        </div>
+        
+        <div>
+          <label for="confirm_password">Confirm Password *</label>
+          <input type="password" id="confirm_password" name="confirm_password" required
+                >
+        </div>
+      </div>
+    </div>
+
+    <!-- User Status -->
+    <div>
+      <h3>User Status</h3>
+      
+      <div>
+        <label>
+          <input type="checkbox" name="is_active" checked
+                >
+          <span>Active User</span>
+        </label>
+        
+        <label>
+          <input type="checkbox" name="is_staff"
+                >
+          <span>Staff Status</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Role Assignment -->
+    {% if available_roles %}
+    <div>
+      <h3>
+        Role Assignment
+        <span>(Optional)</span>
+      </h3>
+      
+      <div>
+        {% for role in available_roles %}
+          <label>
+            <input type="checkbox" name="roles" value="{{ role.id }}"
+                  >
+            <div>
+              <div>{{ role.name }}</div>
+              {% if role.description %}
+                <div>{{ role.description|truncatechars:50 }}</div>
+              {% endif %}
+            </div>
+          </label>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Submit Buttons -->
+    <div>
+      <a href="{% url 'accounts:user_list' %}" 
+        >
+        Cancel
+      </a>
+      
+      <button type="submit" 
+             >
+        Create User
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+// Password confirmation validation
+document.getElementById('confirm_password').addEventListener('input', function() {
+  const password = document.getElementById('password').value;
+  const confirmPassword = this.value;
+  
+  if (password && confirmPassword && password !== confirmPassword) {
+    this.style.borderColor = '#dc2626';
+    this.style.backgroundColor = '#fef2f2';
+  } else {
+    this.style.borderColor = '#d1d5db';
+    this.style.backgroundColor = 'white';
+  }
+});
+
+// Role selection visual feedback
+document.querySelectorAll('input[name="roles"]').forEach(checkbox => {
+  checkbox.addEventListener('change', function() {
+    const label = this.closest('label');
+    if (this.checked) {
+      label.style.backgroundColor = '#fbbf24';
+      label.style.borderColor = '#f59e0b';
+      label.style.transform = 'translateY(-1px)';
+    } else {
+      label.style.backgroundColor = '#fef3c7';
+      label.style.borderColor = '#fbbf24';
+      label.style.transform = 'none';
+    }
+  });
+});
+</script>
+{% endblock %}

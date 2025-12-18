@@ -1,0 +1,586 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}Lodge Bookings Management{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <div class="row flex-between-center">
+      <div class="col">
+        <h6 class="mb-2">Lodge Bookings Management</h6>
+        <h5 class="mb-0">Manage lodge bookings, check-ins, check-outs, and outdoor activities</h5>
+      </div>
+      <div class="col-auto">
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newBookingModal">
+          <span class="fas fa-plus me-2"></span>New Booking
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Search and Filters -->
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-3">
+        <label for="bookingSearch" class="form-label">Search</label>
+        <input type="text" class="form-control" id="bookingSearch" placeholder="Search bookings...">
+      </div>
+      <div class="col-md-3">
+        <label for="statusFilter" class="form-label">Status</label>
+        <select class="form-select" id="statusFilter">
+          <option value="">All Status</option>
+          <option value="pending">Pending</option>
+          <option value="confirmed">Confirmed</option>
+          <option value="checked_in">Checked In</option>
+          <option value="checked_out">Checked Out</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label for="checkinFilter" class="form-label">Check-in Date</label>
+        <input type="date" class="form-control" id="checkinFilter">
+      </div>
+      <div class="col-md-3">
+        <label for="paymentFilter" class="form-label">Payment Status</label>
+        <select class="form-select" id="paymentFilter">
+          <option value="">All Payments</option>
+          <option value="pending">Pending</option>
+          <option value="partial">Partial</option>
+          <option value="paid">Paid</option>
+        </select>
+      </div>
+    </div>
+  </div>
+  
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Booking Ref</th>
+            <th>Customer</th>
+            <th>Property</th>
+            <th>Check-in</th>
+            <th>Check-out</th>
+            <th>Guests</th>
+            <th>Amount</th>
+            <th>Status</th>
+            <th>Payment</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for booking in bookings %}
+          <tr data-booking-id="{{ booking.id }}">
+            <td>
+              <div class="d-flex align-items-center">
+                <span class="badge bg-primary me-2">{{ booking.booking_reference }}</span>
+              </div>
+            </td>
+            <td>
+              <div class="d-flex align-items-center">
+                <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3 fw-bold">
+                  {{ booking.customer.full_name|first|upper }}
+                </div>
+                <div>
+                  <strong>{{ booking.customer.full_name }}</strong>
+                  <div class="text-muted small">{{ booking.customer.email|default:booking.customer.phone }}</div>
+                </div>
+              </div>
+            </td>
+            <td>
+              {% if booking.property_obj %}
+              <div class="d-flex align-items-center">
+                <i class="fas fa-home text-muted me-2"></i>
+                <div>
+                  <div class="fw-bold">{{ booking.property_obj.title }}</div>
+                  <div class="text-muted small">{{ booking.property_obj.address|truncatechars:30 }}</div>
+                </div>
+              </div>
+              {% else %}
+              <span class="text-muted">No property</span>
+              {% endif %}
+            </td>
+            <td>{{ booking.check_in_date|date:"M d, Y" }}</td>
+            <td>{{ booking.check_out_date|date:"M d, Y" }}</td>
+            <td>
+              <div class="text-muted small">
+                <i class="fas fa-users me-1"></i>{{ booking.number_of_guests }} {{ booking.number_of_guests|pluralize:"guest,guests" }}
+              </div>
+            </td>
+            <td>
+              <div class="fw-bold">Tsh{{ booking.total_amount|floatformat:2 }}</div>
+              <div class="text-muted small">Duration: {{ booking.duration_days }} {{ booking.duration_days|pluralize:"day,days" }}</div>
+            </td>
+            <td>
+              {% if booking.booking_status == 'checked_in' %}
+              <span class="badge bg-success">{{ booking.get_booking_status_display }}</span>
+              {% elif booking.booking_status == 'checked_out' %}
+              <span class="badge bg-secondary">{{ booking.get_booking_status_display }}</span>
+              {% elif booking.booking_status == 'confirmed' %}
+              <span class="badge bg-primary">{{ booking.get_booking_status_display }}</span>
+              {% elif booking.booking_status == 'cancelled' %}
+              <span class="badge bg-danger">{{ booking.get_booking_status_display }}</span>
+              {% else %}
+              <span class="badge bg-warning">{{ booking.get_booking_status_display }}</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if booking.payment_status == 'paid' %}
+              <span class="badge bg-success">{{ booking.get_payment_status_display }}</span>
+              {% elif booking.payment_status == 'partial' %}
+              <span class="badge bg-warning">{{ booking.get_payment_status_display }}</span>
+              {% else %}
+              <span class="badge bg-danger">{{ booking.get_payment_status_display }}</span>
+              {% endif %}
+            </td>
+            <td>
+              <div class="dropdown">
+                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                  <i class="fas fa-ellipsis-v"></i>
+                </button>
+                <ul class="dropdown-menu">
+                  <li><a class="dropdown-item" href="#" onclick="viewLodgeBooking({{ booking.id }})"><i class="fas fa-eye me-2"></i>View Details</a></li>
+                  <li><a class="dropdown-item" href="#" onclick="editLodgeBooking({{ booking.id }})"><i class="fas fa-edit me-2"></i>Edit</a></li>
+                  {% if booking.booking_status == 'confirmed' %}
+                  <li><hr class="dropdown-divider"></li>
+                  <li><a class="dropdown-item" href="#" onclick="checkinLodgeBooking({{ booking.id }})"><i class="fas fa-sign-in-alt me-2"></i>Check-in</a></li>
+                  {% elif booking.booking_status == 'checked_in' %}
+                  <li><hr class="dropdown-divider"></li>
+                  <li><a class="dropdown-item" href="#" onclick="checkoutLodgeBooking({{ booking.id }})"><i class="fas fa-sign-out-alt me-2"></i>Check-out</a></li>
+                  {% endif %}
+                  {% if booking.booking_status != 'cancelled' %}
+                  <li><hr class="dropdown-divider"></li>
+                  <li><a class="dropdown-item text-danger" href="#" onclick="cancelLodgeBooking({{ booking.id }})"><i class="fas fa-times me-2"></i>Cancel</a></li>
+                  {% endif %}
+                </ul>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="10" class="text-center py-4">
+              <div class="text-muted">
+                <i class="fas fa-calendar-times fa-2x mb-3"></i>
+                <p>No lodge bookings found.</p>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    
+    <!-- Pagination -->
+    {% if bookings.has_other_pages %}
+    <div class="card-footer bg-white border-0 py-3">
+      <div class="row align-items-center">
+        <div class="col-md-6">
+          <div class="text-muted">
+            Showing {{ bookings.start_index }} to {{ bookings.end_index }} of {{ bookings.paginator.count }} entries
+          </div>
+        </div>
+        <div class="col-md-6">
+          <nav aria-label="Page navigation" class="d-flex justify-content-end">
+            <ul class="pagination pagination-sm mb-0">
+              {% if bookings.has_previous %}
+              <li class="page-item">
+                <a class="page-link" href="?page=1{% if request.GET.statusFilter %}&status={{ request.GET.statusFilter }}{% endif %}{% if request.GET.paymentFilter %}&payment_status={{ request.GET.paymentFilter }}{% endif %}" title="First Page">
+                  <i class="fas fa-angle-double-left"></i>
+                </a>
+              </li>
+              <li class="page-item">
+                <a class="page-link" href="?page={{ bookings.previous_page_number }}{% if request.GET.statusFilter %}&status={{ request.GET.statusFilter }}{% endif %}{% if request.GET.paymentFilter %}&payment_status={{ request.GET.paymentFilter }}{% endif %}" title="Previous Page">
+                  <i class="fas fa-angle-left"></i>
+                </a>
+              </li>
+              {% endif %}
+              
+              <!-- Page numbers -->
+              {% for num in bookings.paginator.page_range %}
+                {% if bookings.number == num %}
+              <li class="page-item active">
+                <span class="page-link">{{ num }}</span>
+              </li>
+                {% elif num > bookings.number|add:'-3' and num < bookings.number|add:'3' %}
+                <li class="page-item">
+                  <a class="page-link" href="?page={{ num }}{% if request.GET.statusFilter %}&status={{ request.GET.statusFilter }}{% endif %}{% if request.GET.paymentFilter %}&payment_status={{ request.GET.paymentFilter }}{% endif %}">{{ num }}</a>
+                </li>
+                {% endif %}
+              {% endfor %}
+              
+              {% if bookings.has_next %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ bookings.next_page_number }}{% if request.GET.statusFilter %}&status={{ request.GET.statusFilter }}{% endif %}{% if request.GET.paymentFilter %}&payment_status={{ request.GET.paymentFilter }}{% endif %}" title="Next Page">
+                  <i class="fas fa-angle-right"></i>
+                </a>
+              </li>
+              <li class="page-item">
+                <a class="page-link" href="?page={{ bookings.paginator.num_pages }}{% if request.GET.statusFilter %}&status={{ request.GET.statusFilter }}{% endif %}{% if request.GET.paymentFilter %}&payment_status={{ request.GET.paymentFilter }}{% endif %}" title="Last Page">
+                  <i class="fas fa-angle-double-right"></i>
+                </a>
+              </li>
+              {% endif %}
+            </ul>
+          </nav>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- New Booking Modal -->
+<div class="modal fade" id="newBookingModal" tabindex="-1" aria-labelledby="newBookingModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="newBookingModalLabel">New Lodge Booking</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="newBookingForm">
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Customer Name *</label>
+              <input type="text" class="form-control" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Phone Number *</label>
+              <input type="tel" class="form-control" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Email</label>
+              <input type="email" class="form-control">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Accommodation Type *</label>
+              <select class="form-control" required>
+                <option value="">Select Accommodation Type</option>
+                <option value="cabin">Cabin</option>
+                <option value="tent">Tent Site</option>
+                <option value="chalet">Chalet</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Check-in Date *</label>
+              <input type="date" class="form-control" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Check-out Date *</label>
+              <input type="date" class="form-control" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Number of Guests *</label>
+              <input type="number" class="form-control" min="1" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Total Amount *</label>
+              <input type="number" class="form-control" step="0.01" required>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Outdoor Activities</label>
+              <div class="row">
+                <div class="col-md-3">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="hiking">
+                    <label class="form-check-label" for="hiking">Hiking</label>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="camping">
+                    <label class="form-check-label" for="camping">Camping</label>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="bird_watching">
+                    <label class="form-check-label" for="bird_watching">Bird Watching</label>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="nature_photography">
+                    <label class="form-check-label" for="nature_photography">Nature Photography</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Special Requests</label>
+              <textarea class="form-control" rows="3" placeholder="Any special dietary requirements, equipment needs, or activity preferences..."></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Booking</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Booking Details Modal -->
+<div class="modal fade" id="lodgeBookingDetailsModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Booking Details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="text-center text-muted py-4">
+          <i class="fas fa-spinner fa-spin me-2"></i> Loading...
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Booking Edit Modal -->
+<div class="modal fade" id="lodgeBookingEditModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Edit Booking</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="text-center text-muted py-4">
+          <i class="fas fa-spinner fa-spin me-2"></i> Loading form...
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Check-in Modal -->
+<div class="modal fade" id="lodgeCheckinModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Check-in Guest</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to check-in this guest?</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="confirmCheckinBtn">Confirm Check-in</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Check-out Modal -->
+<div class="modal fade" id="lodgeCheckoutModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Check-out Guest</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to check-out this guest?</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="confirmCheckoutBtn">Confirm Check-out</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Cancel Booking Modal -->
+<div class="modal fade" id="lodgeCancelBookingModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Cancel Booking</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-0">Are you sure you want to cancel this booking? This action cannot be undone.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">No</button>
+        <button type="button" class="btn btn-danger" id="confirmCancelLodgeBtn">Yes, Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentLodgeBookingId = null;
+
+// Lodge booking management functions
+function viewLodgeBooking(bookingId) {
+  $.get(`/properties/api/booking/${bookingId}/details/`, function(data) {
+    $('#lodgeBookingDetailsModal .modal-body').html(data);
+    $('#lodgeBookingDetailsModal').modal('show');
+  }).fail(function() {
+    showNotification('Error loading booking details', 'error');
+  });
+}
+
+function editLodgeBooking(bookingId) {
+  $.get(`/properties/api/booking/${bookingId}/edit/`, function(data) {
+    $('#lodgeBookingEditModal .modal-body').html(data);
+    $('#lodgeBookingEditModal').modal('show');
+  }).fail(function() {
+    showNotification('Error loading booking edit form', 'error');
+  });
+}
+
+function checkinLodgeBooking(bookingId) {
+  currentLodgeBookingId = bookingId;
+  $('#lodgeCheckinModal').modal('show');
+}
+
+function checkoutLodgeBooking(bookingId) {
+  currentLodgeBookingId = bookingId;
+  $('#lodgeCheckoutModal').modal('show');
+}
+
+function cancelLodgeBooking(bookingId) {
+  currentLodgeBookingId = bookingId;
+  $('#lodgeCancelBookingModal').modal('show');
+}
+
+function showNotification(message, type = 'info') {
+  const notification = $(
+    `<div class="alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show position-fixed" 
+       style="top: 20px; right: 20px; z-index: 9999;">
+      ${message}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>`
+  );
+  $('body').append(notification);
+  setTimeout(function() {
+    notification.alert('close');
+  }, 5000);
+}
+
+$(document).ready(function() {
+    console.log('Lodge Bookings page initialized');
+    
+    // Filter functionality
+    $('#bookingSearch, #statusFilter, #checkinFilter, #paymentFilter').on('change keyup', function() {
+        filterBookings();
+    });
+    
+    function filterBookings() {
+        const searchTerm = $('#bookingSearch').val().toLowerCase();
+        const statusFilter = $('#statusFilter').val();
+        const paymentFilter = $('#paymentFilter').val();
+        const checkinFilter = $('#checkinFilter').val();
+        
+        $('table tbody tr').each(function() {
+            const row = $(this);
+            let showRow = true;
+            
+            // Search filter - check all text content
+            if (searchTerm) {
+                const rowText = row.text().toLowerCase();
+                if (!rowText.includes(searchTerm)) {
+                    showRow = false;
+                }
+            }
+            
+            // Status filter - check the status badge
+            if (statusFilter) {
+                const statusText = row.find('td:nth-child(8)').text().toLowerCase();
+                if (!statusText.includes(statusFilter.toLowerCase())) {
+                    showRow = false;
+                }
+            }
+            
+            // Payment filter - check the payment badge
+            if (paymentFilter) {
+                const paymentText = row.find('td:nth-child(9)').text().toLowerCase();
+                if (!paymentText.includes(paymentFilter.toLowerCase())) {
+                    showRow = false;
+                }
+            }
+            
+            // Check-in date filter
+            if (checkinFilter) {
+                const checkinDate = row.find('td:nth-child(4)').text().trim();
+                // Simple date comparison (format: MMM DD, YYYY)
+                if (!checkinDate.includes(checkinFilter)) {
+                    showRow = false;
+                }
+            }
+            
+            row.toggle(showRow);
+        });
+    }
+});
+
+// Bind confirm buttons
+$(function() {
+  $('#confirmCheckinBtn').on('click', function() {
+    if (!currentLodgeBookingId) return;
+    $.post(`/properties/api/booking/${currentLodgeBookingId}/checkin/`, {
+      csrfmiddlewaretoken: $('[name=csrfmiddlewaretoken]').val()
+    }, function(response) {
+      if (response.success) {
+        showNotification('Guest checked in successfully', 'success');
+        $('#lodgeCheckinModal').modal('hide');
+        location.reload();
+      } else {
+        showNotification(response.message || 'Failed to check-in guest', 'error');
+      }
+    }).fail(function() {
+      showNotification('Error checking in guest', 'error');
+    });
+  });
+
+  $('#confirmCheckoutBtn').on('click', function() {
+    if (!currentLodgeBookingId) return;
+    $.post(`/properties/api/booking/${currentLodgeBookingId}/checkout/`, {
+      csrfmiddlewaretoken: $('[name=csrfmiddlewaretoken]').val()
+    }, function(response) {
+      if (response.success) {
+        showNotification('Guest checked out successfully', 'success');
+        $('#lodgeCheckoutModal').modal('hide');
+        location.reload();
+      } else {
+        showNotification(response.message || 'Failed to check-out guest', 'error');
+      }
+    }).fail(function() {
+      showNotification('Error checking out guest', 'error');
+    });
+  });
+
+  $('#confirmCancelLodgeBtn').on('click', function() {
+    if (!currentLodgeBookingId) return;
+    $.post(`/properties/api/booking/${currentLodgeBookingId}/cancel/`, {
+      csrfmiddlewaretoken: $('[name=csrfmiddlewaretoken]').val()
+    }, function(response) {
+      if (response.success) {
+        showNotification('Booking cancelled successfully', 'success');
+        $('#lodgeCancelBookingModal').modal('hide');
+        location.reload();
+      } else {
+        showNotification(response.message || 'Failed to cancel booking', 'error');
+      }
+    }).fail(function() {
+      showNotification('Error cancelling booking', 'error');
+    });
+  });
+});
+</script>
+{% endblock %}

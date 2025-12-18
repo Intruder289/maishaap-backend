@@ -1,0 +1,750 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}Properties{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="card-title mb-0">
+                        <i class="fas fa-building me-2"></i>Properties Management
+                    </h3>
+                    <button type="button" class="btn btn-primary" id="addPropertyBtn">
+                        <i class="fas fa-plus me-2"></i>Add Property
+                    </button>
+                </div>
+                <div class="card-body">
+                    <!-- Search and Filter Section -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                <input type="text" class="form-control" id="propertySearch" placeholder="Search properties...">
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <select class="form-select" id="propertyTypeFilter">
+                                <option value="">All Types</option>
+                                <option value="House">House</option>
+                                <option value="Hotel">Hotel</option>
+                                <option value="Lodge">Lodge</option>
+                                <option value="Venue">Venue</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <select class="form-select" id="statusFilter">
+                                <option value="">All Status</option>
+                                <option value="available">Available</option>
+                                <option value="rented">Rented</option>
+                                <option value="under_maintenance">Under Maintenance</option>
+                                <option value="unavailable">Unavailable</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <select class="form-select" id="activeFilter">
+                                <option value="">All</option>
+                                <option value="true">Active</option>
+                                <option value="false">Inactive</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <button type="button" class="btn btn-outline-secondary" onclick="clearFilters()">
+                                <i class="fas fa-times me-2"></i>Clear Filters
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Properties Table -->
+                    <div class="table-responsive">
+                        <table class="table table-hover" id="properties-table">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Property</th>
+                                    <th>Type</th>
+                                    <th>Status</th>
+                                    <th>Rent</th>
+                                    <th>Size</th>
+                                    <th>Active</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for property in properties %}
+                                <tr>
+                                    <td>
+                                        <div>
+                                            <h6 class="mb-1">{{ property.title }}</h6>
+                                            <small class="text-muted">{{ property.address|truncatechars:50 }}</small>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-primary">{{ property.property_type.name }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge {% if property.status == 'available' %}bg-success{% elif property.status == 'rented' %}bg-warning{% elif property.status == 'under_maintenance' %}bg-info{% else %}bg-secondary{% endif %}">
+                                            {{ property.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <strong>Tsh{{ property.rent_amount|floatformat:2 }}</strong>
+                                        {% if property.deposit_amount %}
+                                            <br><small class="text-muted">Deposit: Tsh{{ property.deposit_amount|floatformat:2 }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ property.size_sqft }} sq ft</td>
+                                    <td>
+                                        <span class="badge {% if property.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                                            {% if property.is_active %}Active{% else %}Inactive{% endif %}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="dropdown">
+                                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                                <i class="fas fa-ellipsis-v"></i>
+                                            </button>
+                                            <ul class="dropdown-menu">
+                                                <li><a class="dropdown-item" href="{% url 'properties:property_detail' property.id %}">
+                                                    <i class="fas fa-eye me-2"></i>View
+                                                </a></li>
+                                                <li><a class="dropdown-item" href="{% url 'properties:property_edit' property.id %}">
+                                                    <i class="fas fa-edit me-2"></i>Edit
+                                                </a></li>
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li><a class="dropdown-item" href="#" onclick="togglePropertyStatus({{ property.id }}, {{ property.is_active|yesno:'true,false' }})">
+                                                    <i class="fas fa-power-off me-2"></i>
+                                                    {% if property.is_active %}Deactivate{% else %}Activate{% endif %}
+                                                </a></li>
+                                                <li><a class="dropdown-item text-danger" href="#" onclick="deleteProperty({{ property.id }}, '{{ property.title }}')">
+                                                    <i class="fas fa-trash me-2"></i>Delete
+                                                </a></li>
+                                            </ul>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="7" class="text-center py-4">
+                                        <div class="text-muted">
+                                            <i class="fas fa-building fa-3x mb-3"></i>
+                                            <p>No properties found. Click "Add Property" to get started.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Item Count -->
+                    <div class="mt-3">
+                        <small class="text-muted">Showing <span id="item-count">{{ properties|length }}</span> properties</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Property Modal -->
+<div class="modal fade" id="addPropertyModal" tabindex="-1" aria-labelledby="addPropertyModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="addPropertyModalLabel">
+          <i class="fas fa-plus-circle me-2"></i>Add New Property
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <!-- Step 1: Property Type Selection -->
+        <div id="step1-property-type" class="step-content">
+          <div class="text-center mb-4">
+            <h4>Select Property Type</h4>
+            <p class="text-muted">Choose the type of property you want to add</p>
+          </div>
+          
+          <div class="row g-4">
+            <div class="col-md-6 col-lg-3">
+              <div class="card property-type-card" data-type="House" onclick="selectPropertyType('House')">
+                <div class="card-body text-center">
+                  <i class="fas fa-home fa-3x text-primary mb-3"></i>
+                  <h5 class="card-title">House</h5>
+                  <p class="card-text text-muted">Residential house with bedrooms, bathrooms, and living spaces</p>
+                </div>
+              </div>
+            </div>
+            
+            <div class="col-md-6 col-lg-3">
+              <div class="card property-type-card" data-type="Hotel" onclick="selectPropertyType('Hotel')">
+                <div class="card-body text-center">
+                  <i class="fas fa-bed fa-3x text-success mb-3"></i>
+                  <h5 class="card-title">Hotel</h5>
+                  <p class="card-text text-muted">Accommodation facility with multiple rooms and services</p>
+                </div>
+              </div>
+            </div>
+            
+            <div class="col-md-6 col-lg-3">
+              <div class="card property-type-card" data-type="Lodge" onclick="selectPropertyType('Lodge')">
+                <div class="card-body text-center">
+                  <i class="fas fa-mountain fa-3x text-warning mb-3"></i>
+                  <h5 class="card-title">Lodge</h5>
+                  <p class="card-text text-muted">Rustic accommodation with rooms and outdoor facilities</p>
+                </div>
+              </div>
+            </div>
+            
+            <div class="col-md-6 col-lg-3">
+              <div class="card property-type-card" data-type="Venue" onclick="selectPropertyType('Venue')">
+                <div class="card-body text-center">
+                  <i class="fas fa-calendar-alt fa-3x text-info mb-3"></i>
+                  <h5 class="card-title">Venue</h5>
+                  <p class="card-text text-muted">Event space for meetings, weddings, conferences</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Step 2: Property Form (Dynamic) -->
+        <div id="step2-property-form" class="step-content" style="display: none;">
+          <div class="d-flex align-items-center mb-4">
+            <button type="button" class="btn btn-outline-secondary me-3" onclick="goBackToStep1()">
+              <i class="fas fa-arrow-left me-2"></i>Back
+            </button>
+            <div>
+              <h4 class="mb-0">Add <span id="selected-property-type"></span></h4>
+              <p class="text-muted mb-0">Fill in the details for your property</p>
+            </div>
+          </div>
+          
+          <form id="addPropertyForm">
+            {% csrf_token %}
+            <input type="hidden" id="selected_property_type" name="property_type">
+            
+            <!-- Dynamic form content will be loaded here -->
+            <div id="dynamic-form-content">
+              <!-- Content will be loaded based on property type -->
+            </div>
+          </form>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="savePropertyBtn" style="display: none;">
+          <i class="fas fa-save me-2"></i>Save Property
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.property-type-card {
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+}
+
+.property-type-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+  border-color: #007bff;
+}
+
+.property-type-card.selected {
+  border-color: #007bff;
+  background-color: #f8f9fa;
+}
+
+.step-content {
+  min-height: 400px;
+}
+
+.form-section {
+  margin-bottom: 2rem;
+}
+
+.form-section h5 {
+  color: #495057;
+  border-bottom: 2px solid #e9ecef;
+  padding-bottom: 0.5rem;
+  margin-bottom: 1rem;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    console.log('Document ready - initializing property modal...');
+    
+    // Open modal when button is clicked
+    $('#addPropertyBtn').on('click', function(e) {
+        console.log('Add Property button clicked!');
+        e.preventDefault();
+        
+        try {
+            const modal = new bootstrap.Modal(document.getElementById('addPropertyModal'));
+            modal.show();
+            console.log('Modal opened with Bootstrap 5');
+        } catch (error) {
+            console.error('Bootstrap 5 method failed:', error);
+            try {
+                $('#addPropertyModal').modal('show');
+                console.log('Modal opened with jQuery method');
+            } catch (error2) {
+                console.error('jQuery method failed:', error2);
+                $('#addPropertyModal').removeClass('fade').show();
+                console.log('Modal opened manually');
+            }
+        }
+    });
+    
+    // Reset modal when it's hidden
+    $('#addPropertyModal').on('hidden.bs.modal', function() {
+        resetModal();
+    });
+    
+    // Handle form submission
+    $('#savePropertyBtn').on('click', function() {
+        submitPropertyForm();
+    });
+    
+    // Function to reset modal to step 1
+    function resetModal() {
+        $('#step1-property-type').show();
+        $('#step2-property-form').hide();
+        $('#savePropertyBtn').hide();
+        $('.property-type-card').removeClass('selected');
+        $('#dynamic-form-content').empty();
+    }
+    
+    // Property type selection
+    function selectPropertyType(type) {
+        console.log('Property type selected:', type);
+        
+        // Update UI
+        $('.property-type-card').removeClass('selected');
+        $(`.property-type-card[data-type="${type}"]`).addClass('selected');
+        
+        // Set hidden field
+        $('#selected_property_type').val(type);
+        $('#selected-property-type').text(type);
+        
+        // Load dynamic form
+        loadDynamicForm(type);
+        
+        // Show step 2
+        $('#step1-property-type').hide();
+        $('#step2-property-form').show();
+        $('#savePropertyBtn').show();
+    }
+    
+    // Go back to step 1
+    function goBackToStep1() {
+        $('#step2-property-form').hide();
+        $('#step1-property-type').show();
+        $('#savePropertyBtn').hide();
+        $('.property-type-card').removeClass('selected');
+    }
+    
+    // Load dynamic form based on property type
+    function loadDynamicForm(propertyType) {
+        console.log('Loading form for:', propertyType);
+        
+        let formHTML = '';
+        
+        // Common fields
+        formHTML += `
+            <div class="form-section">
+                <h5><i class="fas fa-info-circle me-2"></i>Basic Information</h5>
+                <div class="row g-3">
+                    <div class="col-md-12">
+                        <label for="id_title" class="form-label">Property Title *</label>
+                        <input type="text" class="form-control" id="id_title" name="title" placeholder="Enter property title" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="id_region" class="form-label">Region *</label>
+                        <select class="form-control" id="id_region" name="region" required>
+                            <option value="">Select Region</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="id_size_sqft" class="form-label">Size (sq ft) *</label>
+                        <input type="number" class="form-control" id="id_size_sqft" name="size_sqft" min="1" placeholder="Size in square feet" required>
+                    </div>
+                    <div class="col-md-12">
+                        <label for="id_description" class="form-label">Description</label>
+                        <textarea class="form-control" id="id_description" name="description" rows="3" placeholder="Describe the property..."></textarea>
+                    </div>
+                    <div class="col-md-12">
+                        <label for="id_address" class="form-label">Address *</label>
+                        <textarea class="form-control" id="id_address" name="address" rows="2" placeholder="Enter full address" required></textarea>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Property type specific fields
+        if (propertyType === 'House') {
+            formHTML += `
+                <div class="form-section">
+                    <h5><i class="fas fa-home me-2"></i>House Details</h5>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="id_bedrooms" class="form-label">Bedrooms *</label>
+                            <input type="number" class="form-control" id="id_bedrooms" name="bedrooms" min="0" placeholder="Number of bedrooms" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="id_bathrooms" class="form-label">Bathrooms *</label>
+                            <input type="number" class="form-control" id="id_bathrooms" name="bathrooms" min="0" placeholder="Number of bathrooms" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="id_floor_number" class="form-label">Floor Number</label>
+                            <input type="number" class="form-control" id="id_floor_number" name="floor_number" min="0" placeholder="Floor number">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="id_total_floors" class="form-label">Total Floors</label>
+                            <input type="number" class="form-control" id="id_total_floors" name="total_floors" min="1" placeholder="Total floors">
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else if (propertyType === 'Hotel' || propertyType === 'Lodge') {
+            formHTML += `
+                <div class="form-section">
+                    <h5><i class="fas fa-bed me-2"></i>Tsh{propertyType} Details</h5>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="id_total_rooms" class="form-label">Total Rooms *</label>
+                            <input type="number" class="form-control" id="id_total_rooms" name="total_rooms" min="0" placeholder="Total number of rooms" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="id_bathrooms" class="form-label">Common Bathrooms</label>
+                            <input type="number" class="form-control" id="id_bathrooms" name="bathrooms" min="0" placeholder="Number of bathrooms">
+                        </div>
+                        <div class="col-md-12">
+                            <label for="id_room_types" class="form-label">Room Types</label>
+                            <textarea class="form-control" id="id_room_types" name="room_types" rows="3" placeholder='{"Single": 10, "Double": 5, "Suite": 2}'></textarea>
+                            <div class="form-text">Enter room types and counts in JSON format</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else if (propertyType === 'Venue') {
+            formHTML += `
+                <div class="form-section">
+                    <h5><i class="fas fa-calendar-alt me-2"></i>Venue Details</h5>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="id_capacity" class="form-label">Maximum Capacity *</label>
+                            <input type="number" class="form-control" id="id_capacity" name="capacity" min="0" placeholder="Maximum capacity" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="id_venue_type" class="form-label">Venue Type</label>
+                            <input type="text" class="form-control" id="id_venue_type" name="venue_type" placeholder="e.g., Conference, Wedding, Meeting">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="id_bathrooms" class="form-label">Restrooms</label>
+                            <input type="number" class="form-control" id="id_bathrooms" name="bathrooms" min="0" placeholder="Number of restrooms">
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Pricing section
+        formHTML += `
+            <div class="form-section">
+                <h5><i class="fas fa-dollar-sign me-2"></i>Pricing</h5>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="id_rent_amount" class="form-label">Monthly Rent *</label>
+                        <input type="number" class="form-control" id="id_rent_amount" name="rent_amount" step="0.01" min="0" placeholder="Monthly rent amount" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="id_deposit_amount" class="form-label">Security Deposit</label>
+                        <input type="number" class="form-control" id="id_deposit_amount" name="deposit_amount" step="0.01" min="0" placeholder="Security deposit amount">
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Status and availability
+        formHTML += `
+            <div class="form-section">
+                <h5><i class="fas fa-calendar-check me-2"></i>Status & Availability</h5>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="id_status" class="form-label">Status *</label>
+                        <select class="form-control" id="id_status" name="status" required>
+                            <option value="">Select Status</option>
+                            <option value="available">Available</option>
+                            <option value="rented">Rented</option>
+                            <option value="under_maintenance">Under Maintenance</option>
+                            <option value="unavailable">Unavailable</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="id_available_from" class="form-label">Available From</label>
+                        <input type="date" class="form-control" id="id_available_from" name="available_from">
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Features section
+        formHTML += `
+            <div class="form-section">
+                <h5><i class="fas fa-star me-2"></i>Features</h5>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="id_utilities_included" name="utilities_included">
+                            <label class="form-check-label" for="id_utilities_included">Utilities Included</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="id_is_furnished" name="is_furnished">
+                            <label class="form-check-label" for="id_is_furnished">Furnished</label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="id_pets_allowed" name="pets_allowed">
+                            <label class="form-check-label" for="id_pets_allowed">Pets Allowed</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="id_smoking_allowed" name="smoking_allowed">
+                            <label class="form-check-label" for="id_smoking_allowed">Smoking Allowed</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Amenities section
+        formHTML += `
+            <div class="form-section">
+                <h5><i class="fas fa-list me-2"></i>Amenities</h5>
+                <div id="amenities-container" class="row">
+                    <!-- Amenities will be loaded here -->
+                </div>
+            </div>
+        `;
+        
+        // Insert the form HTML
+        $('#dynamic-form-content').html(formHTML);
+        
+        // Load form data (regions and amenities)
+        loadFormData();
+    }
+    
+    // Load form data (regions and amenities)
+    function loadFormData() {
+        console.log('Loading form data...');
+        $.ajax({
+            url: '/api/v1/properties/form-data/',
+            method: 'GET',
+            success: function(response) {
+                console.log('Form data loaded:', response);
+                if (response.success) {
+                    // Populate regions
+                    const regionSelect = $('#id_region');
+                    regionSelect.empty().append('<option value="">Select Region</option>');
+                    response.data.regions.forEach(function(region) {
+                        regionSelect.append(`<option value="${region.id}">${region.name}</option>`);
+                    });
+                    
+                    // Populate amenities
+                    const amenitiesContainer = $('#amenities-container');
+                    amenitiesContainer.empty();
+                    response.data.amenities.forEach(function(amenity) {
+                        amenitiesContainer.append(`
+                            <div class="col-md-4 col-lg-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="amenity_${amenity.id}" name="amenities" value="${amenity.id}">
+                                    <label class="form-check-label" for="amenity_${amenity.id}">${amenity.name}</label>
+                                </div>
+                            </div>
+                        `);
+                    });
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Error loading form data:', error);
+            }
+        });
+    }
+    
+    // Submit property form
+    function submitPropertyForm() {
+        console.log('Submitting property form...');
+        
+        const form = document.getElementById('addPropertyForm');
+        const formData = new FormData(form);
+        
+        // Collect amenities
+        const amenities = [];
+        $('input[name="amenities"]:checked').each(function() {
+            amenities.push(parseInt($(this).val()));
+        });
+        formData.append('amenities', JSON.stringify(amenities));
+        
+        console.log('Form data:', Object.fromEntries(formData));
+        
+        $.ajax({
+            url: '/api/v1/properties/create/',
+            method: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            headers: {
+                'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+            },
+            success: function(response) {
+                console.log('Property created successfully:', response);
+                if (response.success) {
+                    alert('Property created successfully!');
+                    closeModal();
+                    // Redirect to properties list page
+                    window.location.href = '/properties/';
+                } else {
+                    alert('Error creating property: ' + response.message);
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Error creating property:', error);
+                alert('An error occurred while creating the property.');
+            }
+        });
+    }
+    
+    // Make functions globally available
+    window.selectPropertyType = selectPropertyType;
+    window.goBackToStep1 = goBackToStep1;
+    window.clearFilters = clearFilters;
+    window.togglePropertyStatus = togglePropertyStatus;
+    window.deleteProperty = deleteProperty;
+    
+    // Property filtering functions
+    function applyFilters() {
+        const searchTerm = $('#propertySearch').val().toLowerCase();
+        const typeFilter = $('#propertyTypeFilter').val();
+        const statusFilter = $('#statusFilter').val();
+        const activeFilter = $('#activeFilter').val();
+        
+        $('#properties-table tbody tr').each(function() {
+            const row = $(this);
+            const propertyTitle = row.find('h6').text().toLowerCase();
+            const propertyType = row.find('.badge').first().text();
+            const statusBadge = row.find('.badge').eq(1).text();
+            const activeBadge = row.find('.badge').last().text();
+            
+            let showRow = true;
+            
+            if (searchTerm && !propertyTitle.includes(searchTerm)) {
+                showRow = false;
+            }
+            
+            if (typeFilter && propertyType !== typeFilter) {
+                showRow = false;
+            }
+            
+            if (statusFilter) {
+                const statusText = statusFilter === 'available' ? 'Available' : 
+                                 statusFilter === 'rented' ? 'Rented' :
+                                 statusFilter === 'under_maintenance' ? 'Under Maintenance' : 'Unavailable';
+                if (statusBadge !== statusText) {
+                    showRow = false;
+                }
+            }
+            
+            if (activeFilter) {
+                const activeText = activeFilter === 'true' ? 'Active' : 'Inactive';
+                if (activeBadge !== activeText) {
+                    showRow = false;
+                }
+            }
+            
+            row.toggle(showRow);
+        });
+        
+        updateItemCount();
+    }
+    
+    function clearFilters() {
+        $('#propertySearch').val('');
+        $('#propertyTypeFilter').val('');
+        $('#statusFilter').val('');
+        $('#activeFilter').val('');
+        $('#properties-table tbody tr').show();
+        updateItemCount();
+    }
+    
+    function updateItemCount() {
+        const visibleRows = $('#properties-table tbody tr:visible').length;
+        $('#item-count').text(visibleRows);
+    }
+    
+    // Property action functions
+    function togglePropertyStatus(propertyId, currentStatus) {
+        const isActive = (currentStatus === true) || (currentStatus === 'true') || (currentStatus === 1) || (currentStatus === '1');
+        const newActive = !isActive;
+        const action = newActive ? 'activate' : 'deactivate';
+        
+        if (confirm(`Are you sure you want to ${action} this property?`)) {
+            $.ajax({
+                url: `/api/v1/properties/${propertyId}/toggle-status/`,
+                method: 'PATCH',
+                headers: {
+                    'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+                },
+                contentType: 'application/json',
+                data: JSON.stringify({ is_active: newActive }),
+                success: function(response) {
+                    if (response && response.success) {
+                        location.reload();
+                    } else {
+                        alert('Error updating property status: ' + (response && response.message ? response.message : 'Unknown error'));
+                    }
+                },
+                error: function() {
+                    alert('An error occurred while updating the property status.');
+                }
+            });
+        }
+    }
+    
+    function deleteProperty(propertyId, propertyTitle) {
+        if (confirm(`Are you sure you want to delete "Tsh{propertyTitle}"? This action cannot be undone.`)) {
+            $.ajax({
+                url: `/api/v1/properties/Tsh{propertyId}/delete/`,
+                method: 'DELETE',
+                headers: {
+                    'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+                },
+                success: function(response) {
+                    if (response.success) {
+                        location.reload();
+                    } else {
+                        alert('Error deleting property: ' + response.message);
+                    }
+                },
+                error: function() {
+                    alert('An error occurred while deleting the property.');
+                }
+            });
+        }
+    }
+    
+    // Event listeners for filtering
+    $('#propertySearch, #propertyTypeFilter, #statusFilter, #activeFilter').on('change keyup', applyFilters);
+});
+</script>
+{% endblock %}

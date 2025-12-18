@@ -1,0 +1,2295 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Houses - Property Management{% endblock %}
+
+{% block content %}
+<div class="houses-container">
+  <!-- Enhanced Header -->
+  <div class="row mb-4">
+    <div>
+      <div>
+        <div>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <path d="M12 3l10 9h-3v9h-6v-6H11v6H5v-9H2z" fill="white"/>
+          </svg>
+        </div>
+        <div>
+          <h1>Property Management</h1>
+          <p>Manage all properties in your portfolio</p>
+        </div>
+      </div>
+      <div>
+        <!-- <div class="view-toggle">
+          <button class="view-toggle-btn btn-primary active" onclick="switchView('table')" id="tableViewBtn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 4h18v2H3V4zm0 7h12v2H3v-2zm0 7h18v2H3v-2z"/>
+            </svg>
+            Table
+          </button>
+          <button class="view-toggle-btn btn-primary" onclick="switchView('grid')" id="gridViewBtn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="7" height="7"/>
+              <rect x="14" y="3" width="7" height="7"/>
+              <rect x="14" y="14" width="7" height="7"/>
+              <rect x="3" y="14" width="7" height="7"/>
+            </svg>
+            Grid
+          </button>
+        </div> -->
+        <button type="button" id="openAddPropertyModal" class="btn btn-primary-modern btn btn-primary-primary-modern">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 5v14M5 12h14"/>
+          </svg>
+          Add House
+        </button>
+        
+      </div>
+    </div>
+  </div>
+
+  <!-- Statistics Overview -->
+  <div class="stats-overview">
+    <div class="stat-card-modern">
+      <div class="stat-content-modern">
+        <div class="stat-icon-modern">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+            <path d="M12 3l10 9h-3v9h-6v-6H11v6H5v-9H2z"/>
+          </svg>
+        </div>
+        <div>
+          <div class="stat-value-modern">{{ total_properties|default:0 }}</div>
+          <div class="text-500-modern">Total Properties</div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="stat-card-modern">
+      <div class="stat-content-modern">
+        <div class="stat-icon-modern">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+          </svg>
+        </div>
+        <div>
+          <div class="stat-value-modern">{{ available_count|default:0 }}</div>
+          <div class="text-500-modern">Available</div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="stat-card-modern">
+      <div class="stat-content-modern">
+        <div class="stat-icon-modern">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15h2v2h-2zm0-8h2v6h-2z"/>
+          </svg>
+        </div>
+        <div>
+          <div class="stat-value-modern">{{ rented_count|default:0 }}</div>
+          <div class="text-500-modern">Rented</div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="stat-card-modern">
+      <div class="stat-content-modern">
+        <div class="stat-icon-modern">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+            <path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/>
+          </svg>
+        </div>
+        <div>
+          <div class="stat-value-modern">Tsh {{ total_revenue|floatformat:0|intcomma|default:"0" }}</div>
+          <div class="text-500-modern">Monthly Revenue</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Enhanced Search and Filters -->
+  <div class="search-card mb-6">
+    
+    <form method="get" class="filter-grid">
+      {% csrf_token %}
+      <div class="filter-field">
+        <label for="{{ search_form.search.id_for_label }}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3z"/>
+          </svg>
+          Search Properties
+        </label>
+        {{ search_form.search }}
+      </div>
+      
+      <div class="filter-field">
+        <label for="{{ search_form.property_type.id_for_label }}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 3l10 9h-3v9h-6v-6H11v6H5v-9H2z"/>
+          </svg>
+          Property Type
+        </label>
+        {{ search_form.property_type }}
+      </div>
+      
+      <div class="filter-field">
+        <label for="{{ search_form.region.id_for_label }}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+          </svg>
+          Region
+        </label>
+        {{ search_form.region }}
+      </div>
+      
+      <div class="filter-field">
+        <label for="sort">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M3 18h6v-2H3v2zM3 6v2h18V6H3zm0 7h12v-2H3v2z"/>
+          </svg>
+          Sort By
+        </label>
+        <select name="sort" id="sort">
+          <option value="-created_at" {% if request.GET.sort == '-created_at' or not request.GET.sort %}selected{% endif %}>Newest First</option>
+          <option value="created_at" {% if request.GET.sort == 'created_at' %}selected{% endif %}>Oldest First</option>
+          <option value="rent_amount" {% if request.GET.sort == 'rent_amount' %}selected{% endif %}>Price: Low to High</option>
+          <option value="-rent_amount" {% if request.GET.sort == '-rent_amount' %}selected{% endif %}>Price: High to Low</option>
+          <option value="title" {% if request.GET.sort == 'title' %}selected{% endif %}>Title A-Z</option>
+          <option value="-title" {% if request.GET.sort == '-title' %}selected{% endif %}>Title Z-A</option>
+          <option value="-bedrooms" {% if request.GET.sort == '-bedrooms' %}selected{% endif %}>Most Bedrooms</option>
+          <option value="bedrooms" {% if request.GET.sort == 'bedrooms' %}selected{% endif %}>Least Bedrooms</option>
+          <option value="-size_sqft" {% if request.GET.sort == '-size_sqft' %}selected{% endif %}>Largest First</option>
+          <option value="size_sqft" {% if request.GET.sort == 'size_sqft' %}selected{% endif %}>Smallest First</option>
+        </select>
+      </div>
+      
+      <div class="filter-actions">
+        <a href="{% url 'accounts:houses_list' %}" class="btn btn-primary-modern btn btn-primary-secondary-modern">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 4l16 16M4 20L20 4"/>
+          </svg>
+          Clear All
+        </a>
+        <div id="search-status" style="display: none; color: #64748b; font-size: 0.8rem; font-style: italic;">
+          Searching...
+        </div>
+      </div>
+    </form>
+  </div>
+
+<!-- Houses Table -->
+<div id="houses-content">
+{% if page_obj %}
+<div style="background: white; border-radius: 12px; margin-bottom: 32px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); overflow: hidden;">
+  <div>
+    <div>
+      <h5>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+          <path d="M3 4h18v2H3V4zm0 7h12v2H3v-2zm0 7h18v2H3v-2z"/>
+        </svg>
+        Houses List
+      </h5>
+      <div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+          <path d="M12 3l10 9h-3v9h-6v-6H11v6H5v-9H2z"/>
+        </svg>
+        <span>Total: <strong id="total-houses-count">{{ total_properties|default:0 }}</strong> Houses</span>
+      </div>
+    </div>
+  </div>
+  
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>House</th>
+          <th>Type</th>
+          <th>Location</th>
+          <th>Rent</th>
+          <th>Owner</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for property in page_obj %}
+        <tr 
+            onmouseover="this.style.backgroundColor='rgba(255, 107, 53, 0.05)'" 
+            onmouseout="this.style.backgroundColor='transparent'"
+            data-property-id="{{ property.pk }}">
+          
+          <!-- Serial Number Column -->
+          <td>
+            <div class="serial-number">
+              {{ forloop.counter|add:page_obj.start_index|add:"-1" }}
+            </div>
+          </td>
+          
+          <!-- House Column -->
+          <td>
+            <div>
+              <div>
+                {% if property.images.first %}
+                  <img src="{{ property.images.first.image.url }}" alt="{{ property.title }}" 
+                      
+                       onmouseover="this.style.transform='scale(1.05)'" 
+                       onmouseout="this.style.transform='scale(1)'">
+                {% else %}
+                  <div>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="#64748b">
+                      <path d="M12 3l10 9h-3v9h-6v-6H11v6H5v-9H2z"/>
+                    </svg>
+                  </div>
+                {% endif %}
+              </div>
+              <div>
+                <h6>
+                  <a href="{% url 'accounts:house_detail' property.pk %}" 
+                    
+                     onmouseover="this.style.color='#ff6b35'" 
+                     onmouseout="this.style.color='#0f172a'"
+                     title="{{ property.title }}">
+                    {{ property.title|truncatechars:25 }}
+                  </a>
+                </h6>
+                <div>
+                  <span>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M7 14c1.66 0 3-1.34 3-3S8.66 8 7 8s-3 1.34-3 3 1.34 3 3 3z"/>
+                    </svg>
+                    {{ property.bedrooms }}BR
+                  </span>
+                  <span>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M9 2v2H7C5.9 4 5 4.9 5 6v14c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-2V2h-2v2h-4V2H9z"/>
+                    </svg>
+                    {{ property.bathrooms }}BA
+                  </span>
+                </div>
+                {% if property.is_featured %}
+                <span>
+                  ⭐ FEATURED
+                </span>
+                {% endif %}
+              </div>
+            </div>
+          </td>
+          
+          <!-- Type Column -->
+          <td>
+            <span>
+              {{ property.property_type.name|default:"N/A" }}
+            </span>
+          </td>
+          
+          <!-- Location Column -->
+          <td>
+            <div>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="#64748b">
+                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+              </svg>
+              <span>{{ property.region.name|default:"N/A" }}</span>
+            </div>
+            <small>{{ property.address|truncatechars:20 }}</small>
+          </td>
+          
+          <!-- Rent Column -->
+          <td>
+            <div>
+              Tsh {{ property.rent_amount|floatformat:0|intcomma }}
+            </div>
+            <small>per month</small>
+            {% if property.deposit_amount %}
+            <div>Deposit: Tsh {{ property.deposit_amount|floatformat:0|intcomma }}</div>
+            {% endif %}
+          </td>
+          
+          <!-- Owner Column -->
+          <td>
+            <div>
+              <div>
+                {% if property.owner.profile_photo %}
+                  <img src="{{ property.owner.profile_photo.url }}" alt="{{ property.owner.get_full_name }}" 
+                      >
+                {% else %}
+                  <div>
+                    {{ property.owner.first_name.0|default:property.owner.username.0|upper }}
+                  </div>
+                {% endif %}
+              </div>
+              <div>
+                <div>{{ property.owner.get_full_name|default:property.owner.username|truncatechars:15 }}</div>
+                <div>{{ property.owner.email|truncatechars:18 }}</div>
+              </div>
+            </div>
+          </td>
+          
+          <!-- Actions Column - Direct Buttons -->
+          <td>
+            <div class="btn btn-primarys">
+              
+              <!-- View Button (Always visible) -->
+              <a href="{% url 'accounts:house_detail' property.pk %}" 
+                 title="View Details"
+                 class="btn btn-link text-600 btn btn-primary-sm dropdown-toggle dropdown-caret-none btn btn-primary-primary view-btn btn-primary"
+                
+                 onmouseover="this.style.background='#0891b2'; this.style.color='white'; this.style.borderColor='#0891b2'; this.style.transform='translateY(-1px)'; this.style.boxShadow='0 3px 8px rgba(8,145,178,0.3)'" 
+                 onmouseout="this.style.background='#e8f4f8'; this.style.color='#0891b2'; this.style.borderColor='#b4e1e8'; this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              </a>
+
+              {% if property.owner == request.user %}
+              <!-- Edit Button (Only for owners) -->
+              <a href="{% url 'accounts:house_edit' property.pk %}" 
+                 title="Edit Property"
+                 class="btn btn-link text-600 btn btn-primary-sm dropdown-toggle dropdown-caret-none btn btn-primary-primary edit-btn btn-primary"
+                
+                 onmouseover="this.style.background='#ea580c'; this.style.color='white'; this.style.borderColor='#ea580c'; this.style.transform='translateY(-1px)'; this.style.boxShadow='0 3px 8px rgba(234,88,12,0.3)'" 
+                 onmouseout="this.style.background='#fef3e2'; this.style.color='#ea580c'; this.style.borderColor='#fed7aa'; this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+              </a>
+              {% endif %}
+
+              {% if property.owner == request.user or user.is_staff or user.is_superuser %}
+              <!-- Delete Button (Only for owners/staff) -->
+              <button class="btn btn-link text-600 btn btn-primary-sm dropdown-toggle dropdown-caret-none btn btn-primary-primary delete-btn btn-primary delete-house-btn btn-primary" 
+                      data-house-id="{{ property.pk }}" 
+                      data-house-title="{{ property.title }}"
+                      title="Delete Property"
+                     
+                      onmouseover="this.style.background='#dc2626'; this.style.color='white'; this.style.borderColor='#dc2626'; this.style.transform='translateY(-1px)'; this.style.boxShadow='0 3px 8px rgba(220,38,38,0.3)'" 
+                      onmouseout="this.style.background='#fef2f2'; this.style.color='#dc2626'; this.style.borderColor='#fecaca'; this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14zM10 11v6M14 11v6"/>
+                </svg>
+              </button>
+              {% endif %}
+
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 3l10 9h-3v9h-6v-6H11v6H5v-9H2z"/>
+            </svg>
+            <h3>No houses found</h3>
+            <p>There are no houses matching your search criteria.</p>
+            <a href="{% url 'accounts:house_create' %}" class="btn btn-primary-primary">Add First House</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Pagination Controls -->
+{% if page_obj.has_other_pages or total_properties > per_page %}
+<div>
+  <!-- Results Info and Per Page Selector -->
+  <div>
+    <div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="#ff6b35">
+        <path d="M3 4h18v2H3V4zm0 7h12v2H3v-2zm0 7h18v2H3v-2z"/>
+      </svg>
+      <span>Showing <strong>{{ page_obj.start_index }}-{{ page_obj.end_index }}</strong> of <strong>{{ total_properties }}</strong> houses</span>
+    </div>
+    
+    <div>
+      <label for="per_page">Houses per page:</label>
+      <select id="per_page" onchange="changePerPage(this.value)" 
+              onmouseover="this.style.background='#fff5f0'" 
+              onmouseout="this.style.background='white'">
+        {% for option in per_page_options %}
+          <option value="{{ option }}" {% if option == per_page %}selected{% endif %}>{{ option }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+
+  <!-- Pagination Links -->
+  {% if page_obj.has_other_pages %}
+  <div>
+    <!-- First Page -->
+    {% if page_obj.number > 1 %}
+      <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page=1" 
+         class="pagination pagination-sm-btn btn-primary" title="First Page">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M11 17l-5-5 5-5M18 17l-5-5 5-5"/>
+        </svg>
+      </a>
+    {% endif %}
+    
+    <!-- Previous Page -->
+    {% if page_obj.has_previous %}
+      <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}" 
+         class="pagination pagination-sm-btn btn-primary" title="Previous Page">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+      </a>
+    {% endif %}
+    
+    <!-- Page Numbers -->
+    {% for page_num in page_range %}
+      {% if page_num == '...' %}
+        <span class="pagination pagination-sm-ellipsis">...</span>
+      {% elif page_num == page_obj.number %}
+        <span class="pagination pagination-sm-btn btn-primary pagination pagination-sm-current">{{ page_num }}</span>
+      {% else %}
+        <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_num }}" 
+           class="pagination pagination-sm-btn btn-primary">{{ page_num }}</a>
+      {% endif %}
+    {% endfor %}
+    
+    <!-- Next Page -->
+    {% if page_obj.has_next %}
+      <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}" 
+         class="pagination pagination-sm-btn btn-primary" title="Next Page">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 18l6-6-6-6"/>
+        </svg>
+      </a>
+    {% endif %}
+    
+    <!-- Last Page -->
+    {% if page_obj.number < page_obj.paginator.num_pages %}
+      <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.paginator.num_pages }}" 
+         class="pagination pagination-sm-btn btn-primary" title="Last Page">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M13 17l5-5-5-5M6 17l5-5-5-5"/>
+        </svg>
+      </a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+{% else %}
+<div style="background: white; border-radius: 12px; margin-bottom: 32px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); overflow: hidden;">
+  <div>
+    <svg width="64" height="64" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 3l10 9h-3v9h-6v-6H11v6H5v-9H2z"/>
+    </svg>
+    <h3>No houses found</h3>
+    <p>Get started by adding your first house.</p>
+    <a href="{% url 'accounts:house_create' %}" class="btn btn-primary-primary">Add First House</a>
+  </div>
+</div>
+{% endif %}
+</div>
+
+<!-- Add Property Modal -->
+<div id="addPropertyModal" class="modal">
+  <div class="modal-container">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-header-content">
+          <div class="modal-icon-wrapper">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+              <path d="M12 3l10 9h-3v9h-6v-6H11v6H5v-9H2z"/>
+            </svg>
+          </div>
+          <div class="modal-title-section">
+            <h2>Add New Property</h2>
+            <p>Add a new property to your portfolio</p>
+          </div>
+        </div>
+        <button class="close-btn btn-primary" id="closePropertyModalBtn">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      
+      <form id="addPropertyForm" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="modal-body">
+          <div class="modal-form-columns">
+            <!-- Left Column -->
+            <div class="modal-form-main">
+              <!-- Basic Information -->
+              <div class="form-section">
+                <h3>Basic Information</h3>
+                <div class="form-group">
+                  <label for="title">Property Title <span class="required">*</span></label>
+                  <input type="text" id="title" name="title" required placeholder="e.g., Sunrise Apartments">
+                </div>
+                <div class="form-group">
+                  <label for="description">Description</label>
+                  <textarea id="description" name="description" rows="3" placeholder="Describe the property..."></textarea>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="property_type">Property Type <span class="required">*</span></label>
+                    <select id="property_type" name="property_type" required>
+                      <option value="">Select Type</option>
+                      <!-- Options will be loaded dynamically -->
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label for="region">Region <span class="required">*</span></label>
+                    <select id="region" name="region" required>
+                      <option value="">Select Region</option>
+                      <!-- Options will be loaded dynamically -->
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Location -->
+              <div class="form-section">
+                <h3>Location</h3>
+                <div class="form-group">
+                  <label for="address">Address <span class="required">*</span></label>
+                  <textarea id="address" name="address" rows="2" required placeholder="Enter full address"></textarea>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="latitude">Latitude</label>
+                    <input type="number" id="latitude" name="latitude" step="any" placeholder="0.0">
+                  </div>
+                  <div class="form-group">
+                    <label for="longitude">Longitude</label>
+                    <input type="number" id="longitude" name="longitude" step="any" placeholder="0.0">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Property Details -->
+              <div class="form-section">
+                <h3>Property Details</h3>
+                <div class="form-row form-row-3">
+                  <div class="form-group">
+                    <label for="bedrooms">Bedrooms <span class="required">*</span></label>
+                    <input type="number" id="bedrooms" name="bedrooms" min="0" required value="0">
+                  </div>
+                  <div class="form-group">
+                    <label for="bathrooms">Bathrooms <span class="required">*</span></label>
+                    <input type="number" id="bathrooms" name="bathrooms" min="0" step="0.5" required value="0">
+                  </div>
+                  <div class="form-group">
+                    <label for="floor_number">Floor</label>
+                    <input type="number" id="floor_number" name="floor_number" min="0" placeholder="0">
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="size">Size (sq ft)</label>
+                    <input type="number" id="size" name="size" min="0" step="0.01" placeholder="0">
+                  </div>
+                  <div class="form-group">
+                    <label for="parking_spaces">Parking Spaces</label>
+                    <input type="number" id="parking_spaces" name="parking_spaces" min="0" value="0">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Pricing -->
+              <div class="form-section">
+                <h3>Pricing</h3>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="price">Rent/Price (Tsh) <span class="required">*</span></label>
+                    <input type="number" id="price" name="price" min="0" step="0.01" required placeholder="0.00">
+                  </div>
+                  <div class="form-group">
+                    <label for="deposit">Security Deposit (Tsh)</label>
+                    <input type="number" id="deposit" name="deposit" min="0" step="0.01" placeholder="0.00">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Column (Sidebar) -->
+            <div class="modal-form-sidebar">
+              <!-- Status & Availability -->
+              <div class="form-section">
+                <h3>Status & Availability</h3>
+                <div class="form-group">
+                  <label for="status">Status <span class="required">*</span></label>
+                  <select id="status" name="status" required>
+                    <option value="available">Available</option>
+                    <option value="rented">Rented</option>
+                    <option value="under_maintenance">Under Maintenance</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="available_from">Available From</label>
+                  <input type="date" id="available_from" name="available_from">
+                </div>
+              </div>
+
+              <!-- Property Image -->
+              <div class="form-section">
+                <h3>Property Images</h3>
+                <div class="form-group">
+                  <label for="images">Property Images</label>
+                  <input type="file" id="images" name="images" accept="image/*" multiple>
+                  <small class="help-text">Upload multiple images (Recommended: 1200x800px, max 5MB each)</small>
+                </div>
+                <div id="image-preview-container" class="image-preview-grid"></div>
+              </div>
+
+              <!-- Tips -->
+              <div class="tips-box">
+                <h4>Tips</h4>
+                <ul>
+                  <li>Add detailed descriptions to attract more tenants</li>
+                  <li>Upload high-quality images</li>
+                  <li>Set competitive pricing</li>
+                  <li>Keep information up to date</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary-cancel" id="cancelPropertyModalBtn">Cancel</button>
+          <button type="submit" class="btn btn-primary-submit">Create Property</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% block extra_js %}
+<script>
+// Enhanced Interactive JavaScript for Houses List
+
+// Global state management
+let currentView = 'table';
+let isLoading = false;
+
+// Initialize everything when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+  // Move modal to body to escape container constraints
+  const addPropertyModal = document.getElementById('addPropertyModal');
+  
+  if (addPropertyModal && addPropertyModal.parentElement) {
+    document.body.appendChild(addPropertyModal);
+    console.log('Moved add property modal to body');
+  }
+
+  // Initialize modal functionality
+  initializeAddPropertyModal();
+  
+  initializeInteractivity();
+  initializeSearch();
+  initializeBulkActions();
+  initializeAnimations();
+});
+
+// Add Property Modal Functionality
+function initializeAddPropertyModal() {
+  const modal = document.getElementById('addPropertyModal');
+  const openModalBtn = document.getElementById('openAddPropertyModal');
+  const closeModalBtn = document.getElementById('closePropertyModalBtn');
+  const cancelModalBtn = document.getElementById('cancelPropertyModalBtn');
+  const addPropertyForm = document.getElementById('addPropertyForm');
+
+  if (!modal || !openModalBtn) {
+    console.error('Modal elements not found!');
+    return;
+  }
+
+  // Open modal
+  function openModal() {
+    modal.classList.add('show');
+    document.body.style.overflow = 'hidden';
+    loadFormOptions();
+    setTimeout(() => {
+      document.getElementById('title').focus();
+    }, 100);
+  }
+
+  // Close modal
+  function closeModal() {
+    modal.classList.remove('show');
+    document.body.style.overflow = '';
+    addPropertyForm.reset();
+    clearImagePreviews();
+  }
+
+  // Image preview functionality
+  const imageInput = modal.querySelector('#images');
+  const previewContainer = modal.querySelector('#image-preview-container');
+  let selectedFiles = [];
+
+  if (imageInput) {
+    imageInput.addEventListener('change', function(e) {
+      const files = Array.from(e.target.files);
+      selectedFiles = files;
+      displayImagePreviews(files);
+    });
+  }
+
+  function displayImagePreviews(files) {
+    previewContainer.innerHTML = '';
+    
+    files.forEach((file, index) => {
+      const reader = new FileReader();
+      
+      reader.onload = function(e) {
+        const previewItem = document.createElement('div');
+        previewItem.className = 'image-preview-item';
+        previewItem.innerHTML = `
+          <img src="${e.target.result}" alt="Preview ${index + 1}">
+          <button type="button" class="image-preview-remove" data-index="${index}">×</button>
+          ${index === 0 ? '<span class="image-preview-primary">Primary</span>' : ''}
+        `;
+        
+        // Add remove functionality
+        const removeBtn = previewItem.querySelector('.image-preview-remove');
+        removeBtn.addEventListener('click', function() {
+          removeImage(parseInt(this.dataset.index));
+        });
+        
+        previewContainer.appendChild(previewItem);
+      };
+      
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function removeImage(index) {
+    selectedFiles.splice(index, 1);
+    
+    // Update the file input
+    const dataTransfer = new DataTransfer();
+    selectedFiles.forEach(file => dataTransfer.items.add(file));
+    imageInput.files = dataTransfer.files;
+    
+    displayImagePreviews(selectedFiles);
+  }
+
+  function clearImagePreviews() {
+    previewContainer.innerHTML = '';
+    selectedFiles = [];
+  }
+
+  // Load property types and regions
+  function loadFormOptions() {
+    // Load property types
+    fetch('{% url "accounts:house_manage_metadata" %}')
+      .then(response => response.text())
+      .then(html => {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        
+        // Extract property types
+        const propertyTypeSelect = modal.querySelector('#property_type');
+        const metadataPropertyTypes = doc.querySelectorAll('[data-property-types] option');
+        if (metadataPropertyTypes.length > 0 && propertyTypeSelect) {
+          propertyTypeSelect.innerHTML = '<option value="">Select Type</option>';
+          metadataPropertyTypes.forEach(option => {
+            if (option.value) {
+              propertyTypeSelect.innerHTML += `<option value="${option.value}">${option.textContent}</option>`;
+            }
+          });
+        }
+        
+        // Extract regions
+        const regionSelect = modal.querySelector('#region');
+        const metadataRegions = doc.querySelectorAll('[data-regions] option');
+        if (metadataRegions.length > 0 && regionSelect) {
+          regionSelect.innerHTML = '<option value="">Select Region</option>';
+          metadataRegions.forEach(option => {
+            if (option.value) {
+              regionSelect.innerHTML += `<option value="${option.value}">${option.textContent}</option>`;
+            }
+          });
+        }
+      })
+      .catch(error => {
+        console.error('Error loading form options:', error);
+      });
+  }
+
+  // Event listeners
+  openModalBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+    console.log('Add Property button clicked');
+    openModal();
+  });
+
+  if (closeModalBtn) {
+    closeModalBtn.addEventListener('click', closeModal);
+  }
+
+  if (cancelModalBtn) {
+    cancelModalBtn.addEventListener('click', closeModal);
+  }
+
+  // Close modal when clicking outside
+  modal.addEventListener('click', function(e) {
+    if (e.target === modal) {
+      closeModal();
+    }
+  });
+
+  // Close modal with Escape key
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && modal.classList.contains('show')) {
+      closeModal();
+    }
+  });
+
+  // Handle form submission
+  addPropertyForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(addPropertyForm);
+    const submitBtn = addPropertyForm.querySelector('.btn btn-primary-submit');
+    
+    // Remove the single image field and add multiple images
+    formData.delete('images');
+    const imageFiles = imageInput.files;
+    for (let i = 0; i < imageFiles.length; i++) {
+      formData.append('images', imageFiles[i]);
+    }
+    
+    // Disable submit button
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Creating Property...';
+    
+    fetch('{% url "accounts:house_create" %}', {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+      }
+    })
+    .then(response => {
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      return response.json();
+    })
+    .then(data => {
+      if (data.success) {
+        // Show success message and reload page
+        closeModal();
+        
+        // Show success notification
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          background: linear-gradient(135deg, #10b981, #059669);
+          color: white;
+          padding: 16px 24px;
+          border-radius: 12px;
+          box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+          z-index: 10001;
+          animation: slideInRight 0.3s ease;
+          font-weight: 600;
+        `;
+        notification.textContent = '✓ Property created successfully!';
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+          notification.style.animation = 'slideOutRight 0.3s ease';
+          setTimeout(() => {
+            location.reload();
+          }, 300);
+        }, 2000);
+      } else {
+        // Show error messages
+        alert('Error: ' + (data.message || 'Failed to create property'));
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Create Property';
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      alert('An error occurred. Please try again.');
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Create Property';
+    });
+  });
+}
+
+// Main initialization function
+function initializeInteractivity() {
+  // Enhanced delete functionality
+  document.addEventListener('click', function(e) {
+    if (e.target.closest('.delete-house-btn btn-primary')) {
+      handleDeleteHouse(e.target.closest('.delete-house-btn btn-primary'));
+    }
+    
+    // Handle pagination pagination-sm clicks with AJAX
+    if (e.target.closest('.pagination pagination-sm-btn btn-primary')) {
+      e.preventDefault();
+      const link = e.target.closest('.pagination pagination-sm-btn btn-primary');
+      const url = link.href;
+      
+      if (url && !link.classList.contains('pagination pagination-sm-current')) {
+        loadPage(url);
+      }
+    }
+  });
+  
+  // Handle per-page changes with AJAX
+  const perPageSelect = document.getElementById('per_page');
+  if (perPageSelect) {
+    perPageSelect.addEventListener('change', function() {
+      const url = new URL(window.location);
+      url.searchParams.set('per_page', this.value);
+      url.searchParams.delete('page');
+      loadPage(url.toString());
+    });
+  }
+}
+
+// Load page with AJAX
+function loadPage(url) {
+  const searchStatus = document.getElementById('search-status');
+  
+  // Show loading state
+  searchStatus.style.display = 'block';
+  searchStatus.textContent = 'Loading...';
+  
+  fetch(url, {
+    method: 'GET',
+    headers: {
+      'X-Requested-With': 'XMLHttpRequest',
+    }
+  })
+  .then(response => response.text())
+  .then(html => {
+    // Parse the response HTML
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    
+    // Update table content
+    const newTableContainer = doc.querySelector('div[style*="overflow-x: auto"]');
+    const currentTableContainer = document.querySelector('div[style*="overflow-x: auto"]');
+    
+    if (newTableContainer && currentTableContainer) {
+      currentTableContainer.innerHTML = newTableContainer.innerHTML;
+    }
+    
+    // Update pagination pagination-sm
+    const newPagination = doc.querySelector('div[style*="background: white"][style*="border-radius: 12px"][style*="margin-top: 24px"]');
+    const currentPagination = document.querySelector('div[style*="background: white"][style*="border-radius: 12px"][style*="margin-top: 24px"]');
+    
+    if (newPagination && currentPagination) {
+      currentPagination.innerHTML = newPagination.innerHTML;
+    }
+    
+    // Update total count in header
+    const newCount = doc.querySelector('#total-houses-count');
+    const currentCount = document.getElementById('total-houses-count');
+    
+    if (newCount && currentCount) {
+      currentCount.textContent = newCount.textContent;
+    }
+    
+    // Hide loading state
+    searchStatus.style.display = 'none';
+    
+    // Update URL
+    window.history.pushState({}, '', url);
+    
+    // Re-initialize bulk actions
+    updateBulkActions();
+    
+    // Scroll to top of table
+    document.querySelector('.houses-container').scrollIntoView({ behavior: 'smooth' });
+    
+  })
+  .catch(error => {
+    console.error('Page load error:', error);
+    searchStatus.textContent = 'Loading error occurred';
+    setTimeout(() => {
+      searchStatus.style.display = 'none';
+    }, 3000);
+  });
+}
+
+// Advanced search initialization with AJAX
+function initializeSearch() {
+  const filterForm = document.querySelector('.filter-grid').closest('form');
+  const filterInputs = document.querySelectorAll('.filter-field select, .filter-field input');
+  let searchTimeout;
+  
+  filterInputs.forEach(input => {
+    // Add loading states and visual feedback
+    input.addEventListener('focus', function() {
+      this.parentElement.classList.add('focused');
+    });
+    
+    input.addEventListener('blur', function() {
+      this.parentElement.classList.remove('focused');
+    });
+    
+    // Auto-search with AJAX
+    input.addEventListener('input', function() {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        performAjaxSearch();
+      }, 500); // 500ms debounce
+    });
+    
+    input.addEventListener('change', function() {
+      clearTimeout(searchTimeout);
+      performAjaxSearch();
+    });
+    
+    // Auto-clear functionality
+    if (input.type === 'text') {
+      const clearBtn = createClearButton(input);
+      input.parentElement.appendChild(clearBtn);
+    }
+  });
+  
+  // Prevent form submission
+  if (filterForm) {
+    filterForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      performAjaxSearch();
+    });
+  }
+}
+
+// AJAX search function
+function performAjaxSearch() {
+  const form = document.querySelector('.filter-grid').closest('form');
+  const formData = new FormData(form);
+  const searchParams = new URLSearchParams(formData);
+  const searchStatus = document.getElementById('search-status');
+  
+  // Show loading state
+  searchStatus.style.display = 'block';
+  searchStatus.textContent = 'Searching...';
+  
+  // Add AJAX header to request
+  searchParams.append('ajax', '1');
+  
+  fetch(window.location.pathname + '?' + searchParams.toString(), {
+    method: 'GET',
+    headers: {
+      'X-Requested-With': 'XMLHttpRequest',
+    }
+  })
+  .then(response => response.text())
+  .then(html => {
+    // Parse the response HTML
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    
+    // Update table content
+    const newTableContainer = doc.querySelector('div[style*="overflow-x: auto"]');
+    const currentTableContainer = document.querySelector('div[style*="overflow-x: auto"]');
+    
+    if (newTableContainer && currentTableContainer) {
+      currentTableContainer.innerHTML = newTableContainer.innerHTML;
+    }
+    
+    // Update pagination pagination-sm
+    const newPagination = doc.querySelector('div[style*="background: white"][style*="border-radius: 12px"][style*="margin-top: 24px"]');
+    const currentPagination = document.querySelector('div[style*="background: white"][style*="border-radius: 12px"][style*="margin-top: 24px"]');
+    
+    if (newPagination && currentPagination) {
+      currentPagination.innerHTML = newPagination.innerHTML;
+    }
+    
+    // Update total count in header
+    const newCount = doc.querySelector('#total-houses-count');
+    const currentCount = document.getElementById('total-houses-count');
+    
+    if (newCount && currentCount) {
+      currentCount.textContent = newCount.textContent;
+    }
+    
+    // Update statistics cards
+    const newStatsCards = doc.querySelectorAll('.stat-card-modern');
+    const currentStatsCards = document.querySelectorAll('.stat-card-modern');
+    
+    newStatsCards.forEach((newCard, index) => {
+      if (currentStatsCards[index]) {
+        currentStatsCards[index].innerHTML = newCard.innerHTML;
+      }
+    });
+    
+    // Update empty state if needed
+    const newEmpty = doc.querySelector('div[style*="text-align: center"][style*="padding: 48px"]');
+    const tableWrapper = document.querySelector('div[style*="background: white"][style*="border-radius: 12px"][style*="margin-bottom: 32px"]');
+    
+    if (newEmpty && !newTableContainer) {
+      // Replace table with empty state
+      if (tableWrapper) {
+        tableWrapper.innerHTML = newEmpty.outerHTML;
+      }
+    }
+    
+    // Hide loading state
+    searchStatus.style.display = 'none';
+    
+    // Update URL without page refresh
+    const newUrl = window.location.pathname + '?' + searchParams.toString().replace('ajax=1&', '').replace('&ajax=1', '').replace('ajax=1', '');
+    window.history.pushState({}, '', newUrl || window.location.pathname);
+    
+    // Re-initialize bulk actions for new content
+    updateBulkActions();
+    
+    // Add fade-in animation to new content
+    const tableRows = document.querySelectorAll('tbody tr');
+    tableRows.forEach((row, index) => {
+      row.style.opacity = '0';
+      row.style.transform = 'translateY(10px)';
+      setTimeout(() => {
+        row.style.transition = 'all 0.3s ease';
+        row.style.opacity = '1';
+        row.style.transform = 'translateY(0)';
+      }, index * 50);
+    });
+    
+  })
+  .catch(error => {
+    console.error('Search error:', error);
+    searchStatus.textContent = 'Search error occurred';
+    setTimeout(() => {
+      searchStatus.style.display = 'none';
+    }, 3000);
+  });
+}
+
+// Create clear button for text inputs
+function createClearButton(input) {
+  const clearBtn = document.createElement('button');
+  clearBtn.type = 'button';
+  clearBtn.innerHTML = '×';
+  clearBtn.className = 'btn btn-outline-secondary btn btn-primary-primary';
+  clearBtn.style.cssText = `
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    font-size: 18px;
+    color: #9ca3af;
+    cursor: pointer;
+    padding: 0;
+    width: 20px;
+    height: 20px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  `;
+  
+  clearBtn.addEventListener('click', function() {
+    input.value = '';
+    input.focus();
+    this.style.display = 'none';
+  });
+  
+  input.addEventListener('input', function() {
+    clearBtn.style.display = this.value ? 'flex' : 'none';
+  });
+  
+  return clearBtn;
+}
+
+// Bulk actions initialization
+function initializeBulkActions() {
+  document.addEventListener('change', function(e) {
+    if (e.target.classList.contains('house-checkbox')) {
+      updateBulkActions();
+      animateRowSelection(e.target.closest('tr'));
+    }
+    
+    if (e.target.id === 'selectAll') {
+      toggleAllCheckboxes();
+    }
+  });
+}
+
+// Animation initialization
+function initializeAnimations() {
+  // Intersection Observer for scroll animations
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('animate-in');
+      }
+    });
+  }, { threshold: 0.1 });
+  
+  // Observe cards and rows
+  document.querySelectorAll('.stat-card-modern, tbody tr').forEach(el => {
+    observer.observe(el);
+  });
+  
+  // Add hover effects to interactive elements
+  addHoverEffects();
+}
+
+// Enhanced hover effects
+function addHoverEffects() {
+  const interactiveElements = document.querySelectorAll('.btn btn-primary-modern, .stat-card-modern, .search-card mb-6');
+  
+  interactiveElements.forEach(el => {
+    el.addEventListener('mouseenter', function() {
+      this.style.transform = 'translateY(-2px)';
+      this.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+    });
+    
+    el.addEventListener('mouseleave', function() {
+      this.style.transform = 'translateY(0)';
+    });
+  });
+}
+
+// View switching functionality
+function switchView(viewType) {
+  currentView = viewType;
+  
+  // Update button states
+  document.querySelectorAll('.view-toggle-btn btn-primary').forEach(btn btn-primary => {
+    btn btn-primary.classList.remove('active');
+  });
+  
+  if (viewType === 'table') {
+    document.getElementById('tableViewBtn').classList.add('active');
+    showTableView();
+  } else {
+    document.getElementById('gridViewBtn').classList.add('active');
+    showGridView();
+  }
+  
+  // Save preference
+  localStorage.setItem('housesViewPreference', viewType);
+}
+
+// Show table view
+function showTableView() {
+  const tableContainer = document.querySelector('div[style*="overflow-x: auto"]');
+  const gridContainer = document.getElementById('gridView');
+  
+  if (tableContainer) {
+    tableContainer.style.display = 'block';
+    fadeIn(tableContainer);
+  }
+  
+  if (gridContainer) {
+    fadeOut(gridContainer, () => {
+      gridContainer.style.display = 'none';
+    });
+  }
+}
+
+// Show grid view (create if doesn't exist)
+function showGridView() {
+  let gridContainer = document.getElementById('gridView');
+  
+  if (!gridContainer) {
+    gridContainer = createGridView();
+    document.querySelector('.houses-container').appendChild(gridContainer);
+  }
+  
+  const tableContainer = document.querySelector('div[style*="overflow-x: auto"]');
+  
+  if (tableContainer) {
+    fadeOut(tableContainer, () => {
+      tableContainer.style.display = 'none';
+    });
+  }
+  
+  gridContainer.style.display = 'grid';
+  fadeIn(gridContainer);
+}
+
+// Create grid view HTML
+function createGridView() {
+  const gridContainer = document.createElement('div');
+  gridContainer.id = 'gridView';
+  gridContainer.style.cssText = `
+    display: none;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  `;
+  
+  // Convert table rows to cards
+  const rows = document.querySelectorAll('tbody tr');
+  rows.forEach(row => {
+    const card = createPropertyCard(row);
+    if (card) gridContainer.appendChild(card);
+  });
+  
+  return gridContainer;
+}
+
+// Create property card from table row
+function createPropertyCard(row) {
+  const cells = row.querySelectorAll('td');
+  if (cells.length === 0) return null;
+  
+  const card = document.createElement('div');
+  card.className = 'property-card-grid';
+  card.style.cssText = `
+    background: white;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    border: 1px solid #e2e8f0;
+    transition: all 0.3s ease;
+    cursor: pointer;
+  `;
+  
+  // Extract data from table cells
+  const image = cells[2].querySelector('img');
+  const title = cells[2].querySelector('h6 a');
+  const type = cells[3].textContent.trim();
+  const location = cells[4].querySelector('span').textContent;
+  const price = cells[6].querySelector('.amount-display') ? cells[6].querySelector('.amount-display').textContent : cells[6].textContent.trim();
+  const status = cells[7].querySelector('.badge');
+  
+  card.innerHTML = `
+    <div style="position: relative; height: 200px; overflow: hidden;">
+      ${image ? `<img src="${image.src}" alt="${image.alt}">` : 
+        `<div>
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="white">
+            <path d="M12 3l10 9h-3v9h-6v-6H11v6H5v-9H2z"/>
+          </svg>
+        </div>`}
+      <div>
+        ${status ? status.outerHTML : ''}
+      </div>
+      <div>
+        ${type}
+      </div>
+    </div>
+    <div>
+      <h3>
+        ${title ? title.textContent : 'Property'}
+      </h3>
+      <p>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+        </svg>
+        ${location}
+      </p>
+      <div>
+        <div>
+          ${price}
+        </div>
+        <div>
+          ${cells[9].innerHTML}
+        </div>
+      </div>
+    </div>
+  `;
+  
+  // Add hover effects
+  card.addEventListener('mouseenter', function() {
+    this.style.transform = 'translateY(-8px)';
+    this.style.boxShadow = '0 12px 40px rgba(255, 107, 53, 0.15)';
+  });
+  
+  card.addEventListener('mouseleave', function() {
+    this.style.transform = 'translateY(0)';
+    this.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.08)';
+  });
+  
+  return card;
+}
+
+// Enhanced delete functionality
+function handleDeleteHouse(button) {
+  const houseId = button.dataset.houseId;
+  const houseTitle = button.dataset.houseTitle;
+  
+  // Create modern confirmation modal
+  showConfirmationModal({
+    title: 'Delete Property',
+    message: `Are you sure you want to delete "${houseTitle}"?`,
+    subMessage: 'This action cannot be undone and will permanently remove the property from the system.',
+    confirmText: 'Delete Property',
+    cancelText: 'Cancel',
+    type: 'danger',
+    onConfirm: () => {
+      // Show loading state
+      button.innerHTML = `
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="animate-spin">
+          <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+        </svg>
+        Deleting...
+      `;
+      button.disabled = true;
+      
+      // Submit delete form
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = `/accounts/houses/${houseId}/delete/`;
+      
+      const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+      const csrfInput = document.createElement('input');
+      csrfInput.type = 'hidden';
+      csrfInput.name = 'csrfmiddlewaretoken';
+      csrfInput.value = csrfToken;
+      form.appendChild(csrfInput);
+      
+      const redirectInput = document.createElement('input');
+      redirectInput.type = 'hidden';
+      redirectInput.name = 'redirect_to';
+      redirectInput.value = 'houses_list';
+      form.appendChild(redirectInput);
+      
+      const confirmInput = document.createElement('input');
+      confirmInput.type = 'hidden';
+      confirmInput.name = 'confirm_title';
+      confirmInput.value = houseTitle;
+      form.appendChild(confirmInput);
+      
+      document.body.appendChild(form);
+      form.submit();
+    }
+  });
+}
+
+// Modern confirmation modal
+function showConfirmationModal({ title, message, subMessage, confirmText, cancelText, type, onConfirm }) {
+  // Create modal overlay
+  const overlay = document.createElement('div');
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+  `;
+  
+  // Create modal
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    background: white;
+    border-radius: 16px;
+    padding: 2rem;
+    max-width: 400px;
+    width: 90%;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+    transform: scale(0.9);
+    transition: transform 0.3s ease;
+  `;
+  
+  const iconColor = type === 'danger' ? '#ef4444' : '#ff6b35';
+  const confirmColor = type === 'danger' ? '#ef4444' : '#ff6b35';
+  
+  modal.innerHTML = `
+    <div>
+      <div>
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="${iconColor}">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15h2v2h-2zm0-8h2v6h-2z"/>
+        </svg>
+      </div>
+      <h3>${title}</h3>
+      <p>${message}</p>
+      <p>${subMessage}</p>
+    </div>
+    <div>
+      <button id="cancelBtn">${cancelText}</button>
+      <button id="confirmBtn">${confirmText}</button>
+    </div>
+  `;
+  
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  
+  // Animate in
+  setTimeout(() => {
+    modal.style.transform = 'scale(1)';
+  }, 10);
+  
+  // Event listeners
+  modal.querySelector('#cancelBtn').addEventListener('click', () => {
+    fadeOut(overlay, () => document.body.removeChild(overlay));
+  });
+  
+  modal.querySelector('#confirmBtn').addEventListener('click', () => {
+    fadeOut(overlay, () => document.body.removeChild(overlay));
+    onConfirm();
+  });
+  
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) {
+      fadeOut(overlay, () => document.body.removeChild(overlay));
+    }
+  });
+}
+
+// Utility functions
+function showLoadingState() {
+  if (isLoading) return;
+  isLoading = true;
+  
+  // Create loading overlay
+  const overlay = document.createElement('div');
+  overlay.id = 'loadingOverlay';
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+    backdrop-filter: blur(2px);
+  `;
+  
+  overlay.innerHTML = `
+    <div>
+      <div></div>
+      <p>Loading properties...</p>
+    </div>
+  `;
+  
+  document.body.appendChild(overlay);
+}
+
+function fadeIn(element, callback) {
+  element.style.opacity = '0';
+  element.style.transition = 'opacity 0.3s ease';
+  
+  setTimeout(() => {
+    element.style.opacity = '1';
+    if (callback) callback();
+  }, 10);
+}
+
+function fadeOut(element, callback) {
+  element.style.opacity = '1';
+  element.style.transition = 'opacity 0.3s ease';
+  
+  setTimeout(() => {
+    element.style.opacity = '0';
+    setTimeout(() => {
+      if (callback) callback();
+    }, 300);
+  }, 10);
+}
+
+function animateRowSelection(row) {
+  if (!row) return;
+  
+  row.style.transition = 'all 0.3s ease';
+  if (row.querySelector('.house-checkbox:checked')) {
+    row.style.background = 'rgba(255, 107, 53, 0.1)';
+    row.style.borderLeft = '4px solid #ff6b35';
+  } else {
+    row.style.background = '';
+    row.style.borderLeft = '';
+  }
+}
+
+// Enhanced bulk operations
+function toggleAllCheckboxes() {
+  const selectAllCheckbox = document.getElementById('selectAll');
+  const checkboxes = document.querySelectorAll('.house-checkbox');
+  
+  checkboxes.forEach(checkbox => {
+    checkbox.checked = selectAllCheckbox.checked;
+    animateRowSelection(checkbox.closest('tr'));
+  });
+  
+  updateBulkActions();
+}
+
+function updateBulkActions() {
+  const checkboxes = document.querySelectorAll('.house-checkbox');
+  const checkedBoxes = document.querySelectorAll('.house-checkbox:checked');
+  const toolbar = document.getElementById('bulk-actions-toolbar');
+  const countSpan = document.getElementById('selected-count');
+  const selectAllCheckbox = document.getElementById('selectAll');
+  
+  if (selectAllCheckbox) {
+    if (checkedBoxes.length === 0) {
+      selectAllCheckbox.checked = false;
+      selectAllCheckbox.indeterminate = false;
+    } else if (checkedBoxes.length === checkboxes.length) {
+      selectAllCheckbox.checked = true;
+      selectAllCheckbox.indeterminate = false;
+    } else {
+      selectAllCheckbox.checked = false;
+      selectAllCheckbox.indeterminate = true;
+    }
+  }
+  
+  if (checkedBoxes.length > 0) {
+    if (toolbar) {
+      toolbar.style.display = 'block';
+      countSpan.textContent = `${checkedBoxes.length} house${checkedBoxes.length === 1 ? '' : 's'} selected`;
+    }
+  } else {
+    if (toolbar) {
+      toolbar.style.display = 'none';
+    }
+  }
+}
+
+function selectAllHouses() {
+  const checkboxes = document.querySelectorAll('.house-checkbox');
+  checkboxes.forEach(checkbox => {
+    checkbox.checked = true;
+    animateRowSelection(checkbox.closest('tr'));
+  });
+  updateBulkActions();
+}
+
+function clearSelection() {
+  const checkboxes = document.querySelectorAll('.house-checkbox');
+  checkboxes.forEach(checkbox => {
+    checkbox.checked = false;
+    animateRowSelection(checkbox.closest('tr'));
+  });
+  updateBulkActions();
+}
+
+function bulkDeleteHouses() {
+  const checkedBoxes = document.querySelectorAll('.house-checkbox:checked');
+  
+  if (checkedBoxes.length === 0) {
+    showNotification('Please select houses to delete.', 'warning');
+    return;
+  }
+  
+  const houseCount = checkedBoxes.length;
+  const houseTitles = Array.from(checkedBoxes).map(cb => cb.dataset.houseTitle).slice(0, 3);
+  let message = `Delete ${houseCount} house${houseCount === 1 ? '' : 's'}?`;
+  let subMessage = `This will permanently remove ${houseCount} propert${houseCount === 1 ? 'y' : 'ies'} from the system.`;
+  
+  showConfirmationModal({
+    title: 'Bulk Delete Properties',
+    message: message,
+    subMessage: subMessage,
+    confirmText: `Delete ${houseCount} Properties`,
+    cancelText: 'Cancel',
+    type: 'danger',
+    onConfirm: () => {
+      // Submit bulk delete form
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = '{{ "accounts:bulk_delete_houses"|add:"" }}';
+      
+      const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+      const csrfInput = document.createElement('input');
+      csrfInput.type = 'hidden';
+      csrfInput.name = 'csrfmiddlewaretoken';
+      csrfInput.value = csrfToken;
+      form.appendChild(csrfInput);
+      
+      const actionInput = document.createElement('input');
+      actionInput.type = 'hidden';
+      actionInput.name = 'action';
+      actionInput.value = 'delete';
+      form.appendChild(actionInput);
+      
+      checkedBoxes.forEach(checkbox => {
+        const houseIdInput = document.createElement('input');
+        houseIdInput.type = 'hidden';
+        houseIdInput.name = 'house_ids';
+        houseIdInput.value = checkbox.dataset.houseId;
+        form.appendChild(houseIdInput);
+      });
+      
+      document.body.appendChild(form);
+      form.submit();
+    }
+  });
+}
+
+function changePerPage(perPage) {
+  const url = new URL(window.location);
+  url.searchParams.set('per_page', perPage);
+  url.searchParams.delete('page');
+  loadPage(url.toString());
+}
+
+// Show notification
+function showNotification(message, type = 'info') {
+  const notification = document.createElement('div');
+  notification.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: ${type === 'warning' ? '#f59e0b' : type === 'error' ? '#ef4444' : '#10b981'};
+    color: white;
+    padding: 1rem 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+    z-index: 1001;
+    font-weight: 500;
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+  `;
+  
+  notification.textContent = message;
+  document.body.appendChild(notification);
+  
+  setTimeout(() => {
+    notification.style.transform = 'translateX(0)';
+  }, 10);
+  
+  setTimeout(() => {
+    notification.style.transform = 'translateX(100%)';
+    setTimeout(() => {
+      document.body.removeChild(notification);
+    }, 300);
+  }, 3000);
+}
+
+// Add CSS animations
+const style = document.createElement('style');
+style.textContent = `
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  @keyframes dropdownSlide {
+    from { 
+      opacity: 0; 
+      transform: translateY(-10px) scale(0.95); 
+    }
+    to { 
+      opacity: 1; 
+      transform: translateY(0) scale(1); 
+    }
+  }
+  
+  .animate-in {
+    animation: slideIn 0.6s ease-out forwards;
+  }
+  
+  .filter-field.focused label {
+    color: #ff6b35 !important;
+  }
+  
+  .btn btn-outline-secondary btn btn-primary-primary:hover {
+    color: #ef4444 !important;
+    background: rgba(239, 68, 68, 0.1) !important;
+    border-radius: 50% !important;
+  }
+  
+  .dropdown-menu {
+    animation: dropdownSlide 0.2s ease-out;
+  }
+  
+  .dropdown-menu:last-child {
+    border-bottom: none !important;
+  }
+  
+  /* Table styling improvements */
+  table {
+    font-size: 13px;
+    position: relative;
+  }
+  
+  table td {
+    vertical-align: middle;
+  }
+  
+  /* Improved dropdown positioning */
+  .dropdown {
+    position: relative;
+  }
+  
+  .dropdown-menu {
+    transform-origin: top right;
+    animation: dropdownSlide 0.2s ease-out;
+  }
+  
+  .dropdown-menu.show {
+    display: block !important;
+  }
+  
+  /* Prevent overflow issues */
+  .houses-container {
+    position: relative;
+    z-index: 1;
+  }
+  
+  /* Serial number styling */
+  .serial-number {
+    background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
+    color: white;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 12px;
+    margin: 0 auto;
+    box-shadow: 0 2px 4px rgba(255, 107, 53, 0.2);
+  }
+  
+  /* Enhanced action button */
+  .btn btn-link text-600 btn btn-primary-sm dropdown-toggle dropdown-caret-none btn btn-primary-primary:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 12px rgba(255,107,53,0.3) !important;
+  }
+  
+  .btn btn-link text-600 btn btn-primary-sm dropdown-toggle dropdown-caret-none btn btn-primary-primary:active {
+    transform: translateY(0) !important;
+  }
+  
+  /* Responsive table */
+  @media (max-width: 1024px) {
+    table {
+      font-size: 12px;
+    }
+    
+    .dropdown-menu {
+      min-width: 120px;
+    }
+    
+    .serial-number {
+      width: 26px;
+      height: 26px;
+      font-size: 11px;
+    }
+  }
+  
+  @media (max-width: 768px) {
+    table {
+      font-size: 11px;
+    }
+    
+    table td {
+      padding: 8px 6px !important;
+    }
+    
+    table th {
+      padding: 10px 6px !important;
+    }
+    
+    .btn btn-link text-600 btn btn-primary-sm dropdown-toggle dropdown-caret-none btn btn-primary-primary {
+      padding: 4px 8px !important;
+      font-size: 11px !important;
+    }
+    
+    .dropdown-menu {
+      right: -10px;
+      min-width: 130px;
+      font-size: 11px;
+    }
+    
+    .serial-number {
+      width: 24px;
+      height: 24px;
+      font-size: 10px;
+    }
+  }
+  
+  /* Fix table overflow for dropdowns */
+  .table-container {
+    position: relative;
+    overflow: visible;
+  }
+  
+  tbody tr:last-child .dropdown-menu {
+    top: auto;
+    bottom: 100%;
+    margin-bottom: 5px;
+    margin-top: 0;
+  }
+`;
+document.head.appendChild(style);
+
+// View modal: lazy-create, fetch detail page and inject fragment + scripts
+function ensureViewModal() {
+  let modal = document.getElementById('viewPropertyModal');
+  if (modal) return modal;
+
+  modal = document.createElement('div');
+  modal.id = 'viewPropertyModal';
+  modal.className = 'modal';
+  modal.innerHTML = `
+    <div class="modal-container">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div class="modal-header-content">
+            <div class="modal-icon-wrapper">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M12 3l10 9h-3v9h-6v-6H11v6H5v-9H2z"/></svg>
+            </div>
+            <div class="modal-title-section">
+              <h2>Property Details</h2>
+              <p>Viewing property details</p>
+            </div>
+          </div>
+          <button class="close-btn btn-primary" id="closeViewPropertyModalBtn">✕</button>
+        </div>
+        <div class="modal-body" id="viewPropertyModalBody">
+          <div class="modal-skeleton">
+            <div>
+              <div>
+                <div class="skeleton-hero"></div>
+                <div class="skeleton-line"></div>
+                <div class="skeleton-line"></div>
+              </div>
+              <div>
+                <div class="skeleton-line"></div>
+                <div class="skeleton-line"></div>
+                <div class="skeleton-line"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer" id="viewPropertyModalFooter"></div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  // Close handlers
+  modal.addEventListener('click', function(e) {
+    if (e.target === modal) closeViewModal();
+  });
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && modal.classList.contains('show')) {
+      closeViewModal();
+    }
+  });
+
+  modal.querySelector('#closeViewPropertyModalBtn').addEventListener('click', closeViewModal);
+
+  return modal;
+}
+
+function showModalError(modal, message, retryCallback, fullUrl) {
+  const body = modal.querySelector('.modal-body');
+  body.innerHTML = `
+    <div class="modal-error-card">
+      <h3>Couldn't load details</h3>
+      <p>${message}</p>
+      <div>
+        <button class="btn btn-primary-cancel" id="viewRetryBtn">Retry</button>
+        <a class="btn btn-primary-primary-modern" href="${fullUrl}" target="_blank" rel="noopener">Open full page</a>
+      </div>
+    </div>
+  `;
+
+  const retry = modal.querySelector('#viewRetryBtn');
+  if (retry) retry.addEventListener('click', function() { if (typeof retryCallback === 'function') retryCallback(); });
+}
+
+function closeViewModal() {
+  const modal = document.getElementById('viewPropertyModal');
+  if (!modal) return;
+  modal.classList.remove('show');
+  document.body.style.overflow = '';
+}
+
+async function openViewModalContent(url) {
+  const modal = ensureViewModal();
+  const body = modal.querySelector('.modal-body');
+
+  // show skeleton
+  modal.classList.add('show');
+  document.body.style.overflow = 'hidden';
+
+  // fetch the page
+  try {
+    const resp = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    if (!resp.ok) throw new Error('Network response not ok');
+
+    const html = await resp.text();
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+
+    // preferred fragments
+    const selectors = ['.property-detail-container', '.property-hero', 'main', 'body'];
+    let fragment = null;
+    for (const sel of selectors) {
+      const el = doc.querySelector(sel);
+      if (el) { fragment = el; break; }
+    }
+
+    if (!fragment) {
+      // fallback: use entire body
+      fragment = doc.body;
+    }
+
+    // inject the fragment
+    body.innerHTML = fragment.innerHTML || '<div>No content found</div>';
+
+    // Inject style and link tags from fetched page into head (avoid duplicates)
+    const headStyles = Array.from(doc.querySelectorAll('style'));
+    for (const st of headStyles) {
+      try {
+        const exists = Array.from(document.head.querySelectorAll('style')).some(hs => hs.textContent === st.textContent);
+        if (!exists) {
+          const newStyle = document.createElement('style');
+          newStyle.textContent = st.textContent;
+          document.head.appendChild(newStyle);
+        }
+      } catch (err) { /* ignore */ }
+    }
+
+    const headLinks = Array.from(doc.querySelectorAll('link[rel="stylesheet"]'));
+    for (const l of headLinks) {
+      try {
+        if (l.href) {
+          const exists = Array.from(document.head.querySelectorAll('link[rel="stylesheet"]')).some(h => h.href === l.href);
+          if (!exists) {
+            const newLink = document.createElement('link');
+            newLink.rel = 'stylesheet';
+            newLink.href = l.href;
+            document.head.appendChild(newLink);
+            // don't await stylesheets
+          }
+        }
+      } catch (err) { /* ignore */ }
+    }
+
+    // Execute scripts from fetched page (inline and external)
+    const scripts = Array.from(doc.querySelectorAll('script'));
+    for (const s of scripts) {
+      try {
+        if (s.src) {
+          const newScript = document.createElement('script');
+          newScript.src = s.src;
+          newScript.async = false;
+          document.body.appendChild(newScript);
+          // wait for load
+          await new Promise((resolve) => { newScript.onload = newScript.onerror = resolve; });
+        } else if (s.textContent && s.textContent.trim()) {
+          const newScript = document.createElement('script');
+          newScript.textContent = s.textContent;
+          document.body.appendChild(newScript);
+        }
+      } catch (err) {
+        console.error('Error injecting script:', err);
+      }
+    }
+
+    // Call known initializers if present
+    try { if (typeof initializeImageGallery === 'function') initializeImageGallery(); } catch(e) { /* ignore */ }
+    try { if (typeof initializeAnimations === 'function') initializeAnimations(); } catch(e) { /* ignore */ }
+    try { if (typeof initializeInteractiveElements === 'function') initializeInteractiveElements(); } catch(e) { /* ignore */ }
+
+  } catch (err) {
+    console.error('View fetch error', err);
+    showModalError(modal, 'An error occurred while loading property details. Please check your connection and try again.', function() { openViewModalContent(url); }, url);
+  }
+}
+
+// Delegate clicks on .view-btn btn-primary to open modal
+document.addEventListener('click', function(e) {
+  const a = e.target.closest && e.target.closest('.view-btn btn-primary');
+  if (a && a.tagName === 'A') {
+    e.preventDefault();
+    const url = a.href;
+    if (url) openViewModalContent(url);
+  }
+});
+
+// --- Edit modal: fetch house_form.html and submit via AJAX ---
+function ensureEditModal() {
+  let modal = document.getElementById('editPropertyModal');
+  if (modal) return modal;
+
+  modal = document.createElement('div');
+  modal.id = 'editPropertyModal';
+  modal.className = 'modal';
+  modal.innerHTML = `
+    <div class="modal-container">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div class="modal-header-content">
+            <div class="modal-icon-wrapper">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M12 3l10 9h-3v9h-6v-6H11v6H5v-9H2z"/></svg>
+            </div>
+            <div class="modal-title-section">
+              <h2>Edit Property</h2>
+              <p>Edit property details</p>
+            </div>
+          </div>
+          <button class="close-btn btn-primary" id="closeEditPropertyModalBtn">✕</button>
+        </div>
+        <div class="modal-body" id="editPropertyModalBody">
+          <div class="modal-skeleton"><div class="skeleton-line"></div></div>
+        </div>
+        <div class="modal-footer" id="editPropertyModalFooter"></div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  modal.addEventListener('click', function(e) { if (e.target === modal) closeEditModal(); });
+  modal.querySelector('#closeEditPropertyModalBtn').addEventListener('click', closeEditModal);
+  document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && modal.classList.contains('show')) closeEditModal(); });
+
+  return modal;
+}
+
+function closeEditModal() {
+  const modal = document.getElementById('editPropertyModal');
+  if (!modal) return;
+  modal.classList.remove('show');
+  document.body.style.overflow = '';
+}
+
+// helper to read cookie (used for CSRF token)
+function getCookie(name) {
+  const match = document.cookie.match(new RegExp('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)'));
+  return match ? decodeURIComponent(match[2]) : null;
+}
+
+async function openEditModalContent(url) {
+  const modal = ensureEditModal();
+  const body = modal.querySelector('.modal-body');
+
+  modal.classList.add('show');
+  document.body.style.overflow = 'hidden';
+
+  try {
+    const resp = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    if (!resp.ok) throw new Error('Network response not ok');
+    const html = await resp.text();
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+
+    // Try to find the form in the fetched page
+    const form = doc.querySelector('form');
+    if (!form) {
+      body.innerHTML = '<div>Form not found in response.</div>';
+      return;
+    }
+
+    // Inject form HTML and mark it so it uses the modal's layout
+    body.innerHTML = form.outerHTML;
+    const injectedForm = modal.querySelector('form');
+    if (injectedForm) {
+      injectedForm.classList.add('modal-injected-form');
+      // make sure modal sizing matches Add modal
+      const container = modal.querySelector('.modal-container');
+      const content = modal.querySelector('.modal-content');
+      const mbody = modal.querySelector('.modal-body');
+      if (container) {
+        container.style.maxWidth = '1100px';
+        container.style.width = '100%';
+        container.style.maxHeight = '90vh';
+      }
+      if (content) {
+        content.style.maxHeight = '90vh';
+      }
+      if (mbody) {
+        mbody.style.padding = '32px';
+        mbody.style.overflowY = 'auto';
+      }
+    }
+
+    // Rewire any scripts/styles from the fetched doc that the form needs
+    const headStyles = Array.from(doc.querySelectorAll('style'));
+    headStyles.forEach(st => {
+      const exists = Array.from(document.head.querySelectorAll('style')).some(hs => hs.textContent === st.textContent);
+      if (!exists) {
+        const newStyle = document.createElement('style');
+        newStyle.textContent = st.textContent;
+        document.head.appendChild(newStyle);
+      }
+    });
+
+    // Attach submit handler to the injected form
+    const injectedFormSubmit = modal.querySelector('form');
+    if (injectedFormSubmit) {
+      injectedForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const submitBtn = this.querySelector('button[type="submit"]') || this.querySelector('input[type="submit"]');
+        if (submitBtn) { submitBtn.disabled = true; }
+
+        const fd = new FormData(this);
+        // collect file inputs (form likely already has them)
+
+        try {
+          const headers = { 'X-Requested-With': 'XMLHttpRequest' };
+          const csrftoken = getCookie('csrftoken');
+          if (csrftoken) { headers['X-CSRFToken'] = csrftoken; }
+          const postResp = await fetch(this.action, { method: this.method || 'POST', body: fd, headers });
+          if (!postResp.ok) throw new Error('Network error during submit');
+
+          // If server returns JSON (success or error)
+          const contentType = postResp.headers.get('Content-Type') || '';
+          if (contentType.includes('application/json')) {
+            const data = await postResp.json();
+            if (data.success) {
+              closeEditModal();
+              showNotification('Property updated successfully', 'info');
+              setTimeout(() => location.reload(), 800);
+            } else {
+              // Show message or replace body with returned message
+              body.innerHTML = `<div>${data.message || 'Validation error'}</div>`;
+            }
+          } else {
+            // If HTML returned (likely the form with errors), replace form content
+            const resHtml = await postResp.text();
+            const resDoc = parser.parseFromString(resHtml, 'text/html');
+            const newForm = resDoc.querySelector('form');
+            if (newForm) {
+              body.innerHTML = newForm.outerHTML;
+            } else {
+              // fallback: close and reload
+              closeEditModal();
+              setTimeout(() => location.reload(), 200);
+            }
+          }
+        } catch (err) {
+          console.error('Submit error', err);
+          body.innerHTML = '<div>An error occurred submitting the form. Please try again.</div>';
+        } finally {
+          if (submitBtn) { submitBtn.disabled = false; }
+        }
+      });
+    }
+
+  } catch (err) {
+    console.error('Edit fetch error', err);
+    body.innerHTML = '<div>Failed to load the edit form.</div>';
+  }
+}
+
+// Delegate clicks on .edit-btn btn-primary to open edit modal
+document.addEventListener('click', function(e) {
+  const a = e.target.closest && e.target.closest('.edit-btn btn-primary');
+  if (a && a.tagName === 'A') {
+    e.preventDefault();
+    const url = a.href;
+    if (url) openEditModalContent(url);
+  }
+});
+</script>
+{% endblock %}
+{% endblock %}

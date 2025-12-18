@@ -1,0 +1,101 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}Activate Owner{% endblock %}
+
+{% block page_title %}Activate Owner{% endblock %}
+
+{% block page_actions %}
+<div class="d-flex align-items-center">
+  <a href="{% url 'accounts:owner_list' %}" class="btn btn-outline-secondary btn-sm me-2">
+    <span class="me-2" data-feather="arrow-left"></span>Back to Owners
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header bg-success">
+        <h5 class="card-title mb-0 text-white">
+          <i class="fas fa-check-circle me-2"></i>Confirm Owner Activation
+        </h5>
+      </div>
+      <div class="card-body">
+        <div class="alert alert-info" role="alert">
+          <h6 class="alert-heading"><i class="fas fa-info-circle me-2"></i>Activation</h6>
+          <p class="mb-0">You are about to activate the owner account for <strong>{{ owner.get_full_name|default:owner.username }}</strong>. This will restore their access to the system.</p>
+        </div>
+
+        <div class="mb-4">
+          <h6>Owner Information:</h6>
+          <table class="table table-bordered">
+            <tbody>
+              <tr>
+                <th width="30%">Username:</th>
+                <td>{{ owner.username }}</td>
+              </tr>
+              <tr>
+                <th>Full Name:</th>
+                <td>{{ owner.get_full_name|default:"Not provided" }}</td>
+              </tr>
+              <tr>
+                <th>Email:</th>
+                <td>{{ owner.email }}</td>
+              </tr>
+              <tr>
+                <th>Phone:</th>
+                <td>{{ profile.phone|default:"Not provided" }}</td>
+              </tr>
+              <tr>
+                <th>Date Joined:</th>
+                <td>{{ owner.date_joined|date:"F d, Y" }}</td>
+              </tr>
+              <tr>
+                <th>Current Status:</th>
+                <td>
+                  {% if profile.is_deactivated %}
+                    <span class="badge bg-danger">Deactivated</span>
+                    {% if profile.deactivation_reason %}
+                      <br><small class="text-muted">Reason: {{ profile.deactivation_reason }}</small>
+                    {% endif %}
+                    {% if profile.deactivated_at %}
+                      <br><small class="text-muted">Deactivated on: {{ profile.deactivated_at|date:"F d, Y" }}</small>
+                    {% endif %}
+                  {% else %}
+                    <span class="badge bg-success">Active</span>
+                  {% endif %}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <form method="post">
+          {% csrf_token %}
+
+          {% if messages %}
+            {% for message in messages %}
+              <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              </div>
+            {% endfor %}
+          {% endif %}
+
+          <div class="d-flex justify-content-between mt-4">
+            <a href="{% url 'accounts:owner_list' %}" class="btn btn-secondary">
+              <i class="fas fa-times me-2"></i>Cancel
+            </a>
+            <button type="submit" class="btn btn-success">
+              <i class="fas fa-check me-2"></i>Confirm Activation
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

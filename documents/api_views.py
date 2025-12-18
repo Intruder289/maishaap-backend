@@ -1,0 +1,347 @@
+from rest_framework import viewsets, status, filters
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser
+from django_filters.rest_framework import DjangoFilterBackend
+from django.db import models
+from documents.models import Lease, Booking, Document
+from documents.serializers import (
+    LeaseSerializer, BookingSerializer, DocumentSerializer,
+    LeaseCreateSerializer, BookingCreateSerializer
+)
+
+
+class LeaseViewSet(viewsets.ModelViewSet):
+    """
+    API ViewSet for Lease management
+    
+    list: Get all leases (filtered by user role)
+    retrieve: Get a specific lease
+    create: Create a new lease
+    update: Update a lease
+    partial_update: Partially update a lease
+    destroy: Delete a lease
+    """
+    queryset = Lease.objects.select_related('property_ref', 'tenant').all()
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['status', 'property_ref', 'tenant']
+    search_fields = ['property_ref__name', 'tenant__username', 'tenant__email']
+    ordering_fields = ['created_at', 'start_date', 'end_date']
+    
+    def get_serializer_class(self):
+        """Use different serializers for different actions"""
+        if self.action in ['create', 'update', 'partial_update']:
+            return LeaseCreateSerializer
+        return LeaseSerializer
+    
+    def get_queryset(self):
+        """
+        MULTI-TENANCY: Filter queryset based on user role for data isolation
+        - Property owners see leases for their properties
+        - Tenants see only their own leases
+        - Admins/staff see all leases
+        """
+        # Handle schema generation (swagger_fake_view)
+        if getattr(self, 'swagger_fake_view', False):
+            return self.queryset.none()
+            
+        user = self.request.user
+        if user.is_staff or user.is_superuser:
+            return self.queryset
+        
+        # Check if user is a property owner
+        from accounts.models import Profile
+        try:
+            profile = user.profile
+            if profile.role == 'owner':
+                # Property owners see leases for their properties
+                return self.queryset.filter(property_ref__owner=user)
+        except Profile.DoesNotExist:
+            pass
+        
+        # Tenants see only their own leases
+        return self.queryset.filter(tenant=user)
+    
+    @action(detail=False, methods=['get'])
+    def my_leases(self, request):
+        """Get current user's leases"""
+        leases = self.queryset.filter(tenant=request.user)
+        serializer = self.get_serializer(leases, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def active_leases(self, request):
+        """Get all active leases"""
+        leases = self.get_queryset().filter(status='active')
+        serializer = self.get_serializer(leases, many=True)
+        return Response(serializer.data)
+    
+    def perform_create(self, serializer):
+        """
+        Set tenant to current user and auto-confirm leases created via mobile app.
+        Mobile app users (non-staff) get 'active' status automatically.
+        Staff/admin can still set custom status.
+        """
+        user = self.request.user
+        # Ensure non-staff users can only create leases for themselves
+        if not (user.is_staff or user.is_superuser):
+            # Force tenant to current user and auto-confirm
+            serializer.save(tenant=user, status='active')
+        else:
+            # Staff can set custom tenant and status
+            tenant = serializer.validated_data.get('tenant', user)
+            serializer.save(tenant=tenant)
+    
+    @action(detail=False, methods=['get'])
+    def pending_leases(self, request):
+        """Get all pending lease requests (admin only)"""
+        if not request.user.is_staff:
+            return Response(
+                {'error': 'Permission denied. Only staff can view pending leases.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        leases = self.get_queryset().filter(status='pending')
+        serializer = self.get_serializer(leases, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def approve(self, request, pk=None):
+        """Approve a pending lease request (admin only)"""
+        if not request.user.is_staff:
+            return Response(
+                {'error': 'Permission denied. Only staff can approve leases.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        lease = self.get_object()
+        if lease.status != 'pending':
+            return Response(
+                {'error': f'Lease is not pending. Current status: {lease.status}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        lease.status = 'active'
+        lease.save()
+        serializer = self.get_serializer(lease)
+        return Response({
+            'message': 'Lease approved successfully',
+            'lease': serializer.data
+        })
+    
+    @action(detail=True, methods=['post'])
+    def reject(self, request, pk=None):
+        """Reject a pending lease request (admin only)"""
+        if not request.user.is_staff:
+            return Response(
+                {'error': 'Permission denied. Only staff can reject leases.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        lease = self.get_object()
+        if lease.status != 'pending':
+            return Response(
+                {'error': f'Lease is not pending. Current status: {lease.status}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        rejection_reason = request.data.get('reason', 'No reason provided')
+        lease.status = 'rejected'
+        lease.save()
+        serializer = self.get_serializer(lease)
+        return Response({
+            'message': 'Lease rejected',
+            'reason': rejection_reason,
+            'lease': serializer.data
+        })
+    
+    @action(detail=True, methods=['post'])
+    def terminate(self, request, pk=None):
+        """Terminate a lease"""
+        lease = self.get_object()
+        lease.status = 'terminated'
+        lease.save()
+        serializer = self.get_serializer(lease)
+        return Response(serializer.data)
+
+
+class BookingViewSet(viewsets.ModelViewSet):
+    """
+    API ViewSet for Booking management
+    
+    list: Get all bookings (filtered by user role)
+    retrieve: Get a specific booking
+    create: Create a new booking
+    update: Update a booking
+    partial_update: Partially update a booking
+    destroy: Delete a booking
+    """
+    queryset = Booking.objects.select_related('property_ref', 'tenant').all()
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['status', 'property_ref', 'tenant']
+    search_fields = ['property_ref__name', 'tenant__username', 'tenant__email']
+    ordering_fields = ['created_at', 'check_in', 'check_out']
+    
+    def get_serializer_class(self):
+        """Use different serializers for different actions"""
+        if self.action in ['create', 'update', 'partial_update']:
+            return BookingCreateSerializer
+        return BookingSerializer
+    
+    def get_queryset(self):
+        """
+        MULTI-TENANCY: Filter queryset based on user role for data isolation
+        - Property owners see bookings for their properties
+        - Tenants see only their own bookings
+        - Admins/staff see all bookings
+        """
+        # Handle schema generation (swagger_fake_view)
+        if getattr(self, 'swagger_fake_view', False):
+            return self.queryset.none()
+            
+        user = self.request.user
+        if user.is_staff or user.is_superuser:
+            return self.queryset
+        
+        # Check if user is a property owner
+        from accounts.models import Profile
+        try:
+            profile = user.profile
+            if profile.role == 'owner':
+                # Property owners see bookings for their properties
+                return self.queryset.filter(property_ref__owner=user)
+        except Profile.DoesNotExist:
+            pass
+        
+        # Tenants see only their own bookings
+        return self.queryset.filter(tenant=user)
+    
+    @action(detail=False, methods=['get'])
+    def my_bookings(self, request):
+        """Get current user's bookings"""
+        bookings = self.queryset.filter(tenant=request.user)
+        serializer = self.get_serializer(bookings, many=True)
+        return Response(serializer.data)
+    
+    def perform_create(self, serializer):
+        """
+        Auto-confirm bookings created via mobile app.
+        Mobile app users (non-staff) get 'confirmed' status automatically.
+        Staff/admin can still set custom status.
+        """
+        user = self.request.user
+        
+        # Get property and dates from validated data
+        property_ref = serializer.validated_data.get('property_ref')
+        check_in = serializer.validated_data.get('check_in')
+        check_out = serializer.validated_data.get('check_out')
+        
+        # Check property availability before creating booking
+        if property_ref and check_in and check_out:
+            if not property_ref.is_available_for_booking(check_in, check_out):
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({
+                    'property_ref': 'Property is not available for the selected dates. Please choose different dates.'
+                })
+        
+        # Ensure non-staff users can only create bookings for themselves
+        if not (user.is_staff or user.is_superuser):
+            # Force tenant to current user and auto-confirm
+            serializer.save(tenant=user, status='confirmed')
+        else:
+            # Staff can set custom tenant and status
+            tenant = serializer.validated_data.get('tenant', user)
+            serializer.save(tenant=tenant)
+    
+    @action(detail=False, methods=['get'])
+    def pending_bookings(self, request):
+        """Get all pending bookings"""
+        bookings = self.get_queryset().filter(status='pending')
+        serializer = self.get_serializer(bookings, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def confirm(self, request, pk=None):
+        """Confirm a booking"""
+        booking = self.get_object()
+        booking.status = 'confirmed'
+        booking.save()
+        serializer = self.get_serializer(booking)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def cancel(self, request, pk=None):
+        """Cancel a booking"""
+        booking = self.get_object()
+        booking.status = 'cancelled'
+        booking.save()
+        serializer = self.get_serializer(booking)
+        return Response(serializer.data)
+
+
+class DocumentViewSet(viewsets.ModelViewSet):
+    """
+    API ViewSet for Document management
+    
+    list: Get all documents (filtered by user role)
+    retrieve: Get a specific document
+    create: Upload a new document
+    update: Update a document
+    partial_update: Partially update a document
+    destroy: Delete a document
+    """
+    queryset = Document.objects.select_related('lease', 'booking', 'property_ref', 'user').all()
+    serializer_class = DocumentSerializer
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['lease', 'booking', 'property_ref', 'user']
+    search_fields = ['file_name']
+    ordering_fields = ['uploaded_at']
+    
+    def get_queryset(self):
+        """Filter queryset based on user role"""
+        # Handle schema generation (swagger_fake_view)
+        if getattr(self, 'swagger_fake_view', False):
+            return self.queryset.none()
+            
+        user = self.request.user
+        if user.is_staff:
+            return self.queryset
+        # Users see only their own documents and documents related to their leases/bookings
+        return self.queryset.filter(
+            models.Q(user=user) | 
+            models.Q(lease__tenant=user) | 
+            models.Q(booking__tenant=user)
+        ).distinct()
+    
+    @action(detail=False, methods=['get'])
+    def my_documents(self, request):
+        """Get current user's documents"""
+        documents = self.queryset.filter(user=request.user)
+        serializer = self.get_serializer(documents, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def lease_documents(self, request):
+        """Get documents for a specific lease"""
+        lease_id = request.query_params.get('lease_id')
+        if not lease_id:
+            return Response(
+                {'error': 'lease_id parameter is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        documents = self.get_queryset().filter(lease_id=lease_id)
+        serializer = self.get_serializer(documents, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def booking_documents(self, request):
+        """Get documents for a specific booking"""
+        booking_id = request.query_params.get('booking_id')
+        if not booking_id:
+            return Response(
+                {'error': 'booking_id parameter is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        documents = self.get_queryset().filter(booking_id=booking_id)
+        serializer = self.get_serializer(documents, many=True)
+        return Response(serializer.data)

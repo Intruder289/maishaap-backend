@@ -1,0 +1,467 @@
+{% extends "accounts/base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Property Owners - Maisha{% endblock %}
+
+{% block content %}
+<!-- Hidden CSRF Token for AJAX requests -->
+{% csrf_token %}
+<!-- Owner Stats Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between">
+          <div>
+            <h6 class="mb-2 text-500">Total Owners</h6>
+            <h4 class="mb-0">{{ total_owners }}</h4>
+            <p class="fs--1 mb-0 text-primary">
+              <span class="me-1 fas fa-users"></span>
+              All owners
+            </p>
+          </div>
+          <div class="d-flex align-items-center">
+            <div class="avatar avatar-lg">
+              <div class="avatar-name rounded-circle bg-primary-subtle text-primary">
+                <span data-feather="users"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+        
+  <div class="col-6 col-lg-3">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between">
+          <div>
+            <h6 class="mb-2 text-500">Active Owners</h6>
+            <h4 class="mb-0">{{ active_owners }}</h4>
+            <p class="fs--1 mb-0 text-success">
+              <span class="me-1 fas fa-check-circle"></span>
+              Active & approved
+            </p>
+          </div>
+          <div class="d-flex align-items-center">
+            <div class="avatar avatar-lg">
+              <div class="avatar-name rounded-circle bg-success-subtle text-success">
+                <span data-feather="user-check"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-lg-3">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between">
+          <div>
+            <h6 class="mb-2 text-500">Deactivated</h6>
+            <h4 class="mb-0">{{ deactivated_owners }}</h4>
+            <p class="fs--1 mb-0 text-danger">
+              <span class="me-1 fas fa-ban"></span>
+              Deactivated
+            </p>
+          </div>
+          <div class="d-flex align-items-center">
+            <div class="avatar avatar-lg">
+              <div class="avatar-name rounded-circle bg-danger-subtle text-danger">
+                <span data-feather="user-x"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-lg-3">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between">
+          <div>
+            <h6 class="mb-2 text-500">Pending Approval</h6>
+            <h4 class="mb-0">{{ pending_owners }}</h4>
+            <p class="fs--1 mb-0 {% if pending_owners > 0 %}text-warning{% else %}text-500{% endif %}">
+              <span class="me-1 {% if pending_owners > 0 %}fas fa-clock{% endif %}"></span>
+              {% if pending_owners > 0 %}Awaiting approval{% else %}All approved{% endif %}
+            </p>
+          </div>
+          <div class="d-flex align-items-center">
+            <div class="avatar avatar-lg">
+              <div class="avatar-name rounded-circle bg-warning-subtle text-warning">
+                <span data-feather="clock"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Owners Table -->
+<div class="card">
+  <div class="card-header">
+    <div class="row flex-between-center">
+      <div class="col">
+        <h6 class="mb-2">Property Owners Management</h6>
+        <h5 class="mb-0">Monitor and manage all property owners</h5>
+      </div>
+      <div class="col-auto">
+        <a href="{% url 'accounts:register_owner' %}" class="btn btn-primary">
+          <span class="fas fa-plus me-2"></span>Register Owner
+        </a>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Search and Filters -->
+  <div class="card-body">
+    <form method="get" action="{% url 'accounts:owner_list' %}">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Search</label>
+          <div class="position-relative">
+            <input class="form-control pe-5" 
+                   type="search" 
+                   name="search"
+                   value="{{ search_query }}"
+                   placeholder="Search owners...">
+            <span class="position-absolute top-50 end-0 translate-middle-y me-3">
+              <i class="fas fa-search"></i>
+            </span>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Status</label>
+          <select class="form-select" name="status">
+            <option value="">All Status</option>
+            <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
+            <option value="deactivated" {% if status_filter == 'deactivated' %}selected{% endif %}>Deactivated</option>
+            <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending Approval</option>
+          </select>
+        </div>
+        <div class="col-md-5">
+          <label class="form-label">&nbsp;</label>
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">
+              <i class="fas fa-search me-1"></i>Search
+            </button>
+            <a href="{% url 'accounts:owner_list' %}" class="btn btn-outline-secondary">
+              <i class="fas fa-times me-1"></i>Clear
+            </a>
+          </div>
+        </div>
+      </div>
+    </form>
+  </div>
+  
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Owner</th>
+            <th>Email</th>
+            <th>Properties</th>
+            <th>Status</th>
+            <th>Approval</th>
+            <th>Joined</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for owner_data in owners_data %}
+          {% with owner=owner_data.user profile=owner_data.profile %}
+          <tr>
+            <td>
+              <div class="d-flex align-items-center">
+                {% if profile.image %}
+                  <img src="{{ profile.image.url }}" alt="{{ owner.get_full_name|default:owner.username }}" class="avatar-sm rounded-circle me-3">
+                {% else %}
+                  <div class="avatar-sm bg-info text-white rounded-circle me-3 d-flex align-items-center justify-content-center fw-bold">
+                    {% if owner.first_name and owner.last_name %}
+                      {{ owner.first_name|first }}{{ owner.last_name|first }}
+                    {% else %}
+                      {{ owner.username|first|upper }}
+                    {% endif %}
+                  </div>
+                {% endif %}
+                <div>
+                  <strong>
+                    {% if owner.first_name and owner.last_name %}
+                      {{ owner.get_full_name }}
+                    {% else %}
+                      {{ owner.username|title }}
+                    {% endif %}
+                  </strong><br>
+                  <small class="text-muted">@{{ owner.username }}</small>
+                </div>
+              </div>
+            </td>
+            <td>
+              <span class="text-muted">{{ owner.email }}</span>
+            </td>
+            <td>
+              <span class="badge bg-info">
+                <i class="fas fa-home me-1"></i>
+                {{ owner_data.properties_count }} {% if owner_data.properties_count == 1 %}property{% else %}properties{% endif %}
+              </span>
+            </td>
+            <td>
+              {% if owner_data.is_deactivated %}
+                <span class="badge bg-danger">
+                  <i class="fas fa-ban me-1"></i>
+                  Deactivated
+                </span>
+                {% if owner_data.deactivation_reason %}
+                  <br><small class="text-muted" title="{{ owner_data.deactivation_reason }}">{{ owner_data.deactivation_reason|truncatewords:5 }}</small>
+                {% endif %}
+              {% elif profile.is_approved %}
+                <span class="badge bg-success">
+                  <i class="fas fa-check-circle me-1"></i>
+                  Active
+                </span>
+              {% else %}
+                <span class="badge bg-warning text-dark">
+                  <i class="fas fa-clock me-1"></i>
+                  Pending
+                </span>
+              {% endif %}
+            </td>
+            <td>
+              {% if profile.is_approved %}
+                <span class="badge bg-success">
+                  <i class="fas fa-check me-1"></i>
+                  Approved
+                </span>
+              {% else %}
+                <span class="badge bg-warning text-dark">
+                  <i class="fas fa-clock me-1"></i>
+                  Pending
+                </span>
+              {% endif %}
+            </td>
+            <td>
+              <div>
+                <strong>{{ owner.date_joined|date:"M j, Y" }}</strong><br>
+                <small class="text-muted">{{ owner.date_joined|date:"g:i A" }}</small>
+              </div>
+            </td>
+            <td>
+              <div class="dropdown">
+                <button class="btn btn-link btn btn-primary-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                  <span class="fas fa-ellipsis-h"></span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                  <li><a class="dropdown-item" href="{% url 'accounts:user_profile' owner.id %}"><i class="fas fa-eye me-2 text-primary"></i>View Profile</a></li>
+                  <li><a class="dropdown-item" href="{% url 'accounts:edit_user' owner.id %}"><i class="fas fa-edit me-2 text-warning"></i>Edit Profile</a></li>
+                  <li><hr class="dropdown-divider"></li>
+                  <li>
+                    <a class="dropdown-item reset-password-action" 
+                       href="#" 
+                       data-url="/api/v1/users/{{ owner.id }}/reset-password/"
+                       data-item-id="{{ owner.id }}">
+                      <i class="fas fa-key me-2 text-info"></i>Reset Password
+                    </a>
+                  </li>
+                  <li><hr class="dropdown-divider"></li>
+                  {% if owner_data.is_deactivated %}
+                    <li><a class="dropdown-item text-success" href="{% url 'accounts:activate_owner' owner.id %}"><i class="fas fa-check me-2"></i>Activate Owner</a></li>
+                  {% else %}
+                    <li><a class="dropdown-item text-danger" href="{% url 'accounts:deactivate_owner' owner.id %}"><i class="fas fa-ban me-2"></i>Deactivate Owner</a></li>
+                  {% endif %}
+                </ul>
+              </div>
+            </td>
+          </tr>
+          {% endwith %}
+          {% empty %}
+          <tr>
+            <td colspan="7" class="text-center py-5">
+              <div class="text-muted">
+                <i class="fas fa-users fs-1 mb-3 d-block"></i>
+                <p class="mb-0">No owners found</p>
+                {% if search_query or status_filter %}
+                  <a href="{% url 'accounts:owner_list' %}" class="btn btn-sm btn-outline-primary mt-2">Clear filters</a>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  
+  <!-- Pagination -->
+  {% if page_obj.has_other_pages %}
+  <div class="card-footer bg-white border-0 py-3">
+    <div class="row align-items-center">
+      <div class="col-md-6">
+        <div class="text-muted">
+          Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} owners
+        </div>
+      </div>
+      <div class="col-md-6">
+        <nav aria-label="Pagination">
+          <ul class="pagination pagination-sm mb-0 justify-content-end">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+              <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">
+                <span data-feather="chevron-left"></span>
+              </a>
+            </li>
+            {% else %}
+            <li class="page-item disabled">
+              <span class="page-link">
+                <span data-feather="chevron-left"></span>
+              </span>
+            </li>
+            {% endif %}
+
+            {% for num in page_obj.paginator.page_range %}
+              {% if page_obj.number == num %}
+              <li class="page-item active">
+                <span class="page-link">{{ num }}</span>
+              </li>
+              {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ num }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">{{ num }}</a>
+              </li>
+              {% endif %}
+            {% endfor %}
+
+            {% if page_obj.has_next %}
+            <li class="page-item">
+              <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">
+                <span data-feather="chevron-right"></span>
+              </a>
+            </li>
+            {% else %}
+            <li class="page-item disabled">
+              <span class="page-link">
+                <span data-feather="chevron-right"></span>
+              </span>
+            </li>
+            {% endif %}
+          </ul>
+        </nav>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.avatar-sm {
+  width: 48px;
+  height: 48px;
+  font-size: 14px;
+  font-weight: 600;
+  object-fit: cover;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Handle Reset Password action
+    $(document).on('click', '.reset-password-action', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const link = $(this);
+        const url = link.attr('data-url');
+        const itemId = link.attr('data-item-id');
+        
+        if (!url || !itemId) {
+            alert('Invalid action configuration. Please refresh the page.');
+            return;
+        }
+        
+        if (confirm('Are you sure you want to reset this owner\'s password to the default? The new password will be: DefaultPass@12')) {
+            // Get CSRF token from multiple sources
+            function getCookie(name) {
+                let cookieValue = null;
+                if (document.cookie && document.cookie !== '') {
+                    const cookies = document.cookie.split(';');
+                    for (let i = 0; i < cookies.length; i++) {
+                        const cookie = cookies[i].trim();
+                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                            break;
+                        }
+                    }
+                }
+                return cookieValue;
+            }
+            
+            const csrfToken = $('[name=csrfmiddlewaretoken]').first().val() || 
+                             $('meta[name=csrf-token]').attr('content') || 
+                             getCookie('csrftoken') || '';
+            
+            if (!csrfToken) {
+                alert('Security token not found. Please refresh the page.');
+                console.error('CSRF token not found. Available sources:', {
+                    'input[name=csrfmiddlewaretoken]': $('[name=csrfmiddlewaretoken]').first().val(),
+                    'meta[name=csrf-token]': $('meta[name=csrf-token]').attr('content'),
+                    'cookie csrftoken': getCookie('csrftoken')
+                });
+                return;
+            }
+            
+            $.ajax({
+                url: url,
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrfToken,
+                    'Content-Type': 'application/json',
+                },
+                success: function(data) {
+                    if (data.success) {
+                        const message = 'Password reset successfully! New password: ' + (data.default_password || 'DefaultPass@12');
+                        alert(message);
+                        
+                        // Try to copy to clipboard
+                        if (navigator.clipboard) {
+                            navigator.clipboard.writeText(data.default_password || 'DefaultPass@12').then(() => {
+                                console.log('Password copied to clipboard');
+                            }).catch(err => {
+                                console.error('Failed to copy to clipboard:', err);
+                            });
+                        }
+                    } else {
+                        alert(data.message || 'Failed to reset password');
+                    }
+                },
+                error: function(xhr) {
+                    let errorMsg = 'An error occurred while resetting password';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMsg = xhr.responseJSON.message;
+                    } else if (xhr.status === 403) {
+                        errorMsg = 'Permission denied. Please check your login status.';
+                    } else if (xhr.status === 404) {
+                        errorMsg = 'Owner not found.';
+                    } else if (xhr.status === 500) {
+                        errorMsg = 'Server error. Please try again later.';
+                    }
+                    alert(errorMsg);
+                }
+            });
+        }
+    });
+});
+</script>
+{% endblock %}
+

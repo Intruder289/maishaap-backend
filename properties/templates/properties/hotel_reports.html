@@ -1,0 +1,396 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}Hotel Reports{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <!-- Page Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="mb-1">
+                        <i class="fas fa-chart-bar text-primary me-2"></i>Hotel Reports & Analytics
+                    </h2>
+                    <p class="text-muted mb-0">Generate reports and analyze hotel performance</p>
+                </div>
+                <div>
+                    <button class="btn btn-primary" onclick="generateReport()">
+                        <i class="fas fa-download me-2"></i>Generate Report
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Report Filters -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Report Filters</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Report Type</label>
+                            <select class="form-select" id="reportType">
+                                <option value="daily">Daily Report</option>
+                                <option value="weekly">Weekly Report</option>
+                                <option value="monthly">Monthly Report</option>
+                                <option value="custom">Custom Period</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Start Date</label>
+                            <input type="date" class="form-control" id="startDate">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">End Date</label>
+                            <input type="date" class="form-control" id="endDate">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">&nbsp;</label>
+                            <button class="btn btn-outline-primary w-100" onclick="applyFilters()">
+                                <i class="fas fa-filter me-1"></i>Apply Filters
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Key Metrics -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-0">85%</h4>
+                                    <p class="mb-0">Occupancy Rate</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-bed fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-0">Tsh2,450</h4>
+                                    <p class="mb-0">Daily Revenue</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-dollar-sign fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-0">4.8</h4>
+                                    <p class="mb-0">Average Rating</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-star fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-0">156</h4>
+                                    <p class="mb-0">Total Customers</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-users fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Charts Section -->
+            <div class="row mb-4">
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Revenue Trend</h5>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="revenueChart" height="100"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Room Type Distribution</h5>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="roomTypeChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Detailed Reports -->
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Top Customers</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Customer</th>
+                                            <th>Bookings</th>
+                                            <th>Total Spent</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>
+                                                <div>
+                                                    <strong>Jane Smith</strong><br>
+                                                    <small class="text-muted">VIP Customer</small>
+                                                </div>
+                                            </td>
+                                            <td>12</td>
+                                            <td>Tsh1,200.00</td>
+                                        </tr>
+                                        <tr>
+                                            <td>
+                                                <div>
+                                                    <strong>John Doe</strong><br>
+                                                    <small class="text-muted">Business</small>
+                                                </div>
+                                            </td>
+                                            <td>8</td>
+                                            <td>Tsh800.00</td>
+                                        </tr>
+                                        <tr>
+                                            <td>
+                                                <div>
+                                                    <strong>Mike Johnson</strong><br>
+                                                    <small class="text-muted">Group</small>
+                                                </div>
+                                            </td>
+                                            <td>5</td>
+                                            <td>Tsh750.00</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Payment Methods</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Method</th>
+                                            <th>Count</th>
+                                            <th>Amount</th>
+                                            <th>%</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><span class="badge bg-info">Card</span></td>
+                                            <td>45</td>
+                                            <td>Tsh2,250.00</td>
+                                            <td>45%</td>
+                                        </tr>
+                                        <tr>
+                                            <td><span class="badge bg-warning">Mobile Money</span></td>
+                                            <td>30</td>
+                                            <td>Tsh1,500.00</td>
+                                            <td>30%</td>
+                                        </tr>
+                                        <tr>
+                                            <td><span class="badge bg-success">Cash</span></td>
+                                            <td>20</td>
+                                            <td>Tsh1,000.00</td>
+                                            <td>20%</td>
+                                        </tr>
+                                        <tr>
+                                            <td><span class="badge bg-secondary">Bank Transfer</span></td>
+                                            <td>5</td>
+                                            <td>Tsh250.00</td>
+                                            <td>5%</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Quick Reports -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Quick Reports</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-3">
+                                    <button class="btn btn-outline-primary w-100" onclick="generateQuickReport('occupancy')">
+                                        <i class="fas fa-bed me-2"></i>Occupancy Report
+                                    </button>
+                                </div>
+                                <div class="col-md-3">
+                                    <button class="btn btn-outline-success w-100" onclick="generateQuickReport('revenue')">
+                                        <i class="fas fa-dollar-sign me-2"></i>Revenue Report
+                                    </button>
+                                </div>
+                                <div class="col-md-3">
+                                    <button class="btn btn-outline-info w-100" onclick="generateQuickReport('customers')">
+                                        <i class="fas fa-users me-2"></i>Customer Report
+                                    </button>
+                                </div>
+                                <div class="col-md-3">
+                                    <button class="btn btn-outline-warning w-100" onclick="generateQuickReport('payments')">
+                                        <i class="fas fa-money-bill-wave me-2"></i>Payment Report
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+$(document).ready(function() {
+    console.log('Hotel Reports page initialized');
+    
+    // Initialize charts
+    initializeCharts();
+    
+    // Set default dates
+    const today = new Date();
+    const lastWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+    
+    $('#startDate').val(lastWeek.toISOString().split('T')[0]);
+    $('#endDate').val(today.toISOString().split('T')[0]);
+    
+    // Report type change handler
+    $('#reportType').on('change', function() {
+        const reportType = $(this).val();
+        const today = new Date();
+        
+        switch(reportType) {
+            case 'daily':
+                $('#startDate').val(today.toISOString().split('T')[0]);
+                $('#endDate').val(today.toISOString().split('T')[0]);
+                break;
+            case 'weekly':
+                const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+                $('#startDate').val(weekAgo.toISOString().split('T')[0]);
+                $('#endDate').val(today.toISOString().split('T')[0]);
+                break;
+            case 'monthly':
+                const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+                $('#startDate').val(monthAgo.toISOString().split('T')[0]);
+                $('#endDate').val(today.toISOString().split('T')[0]);
+                break;
+        }
+    });
+    
+    function initializeCharts() {
+        // Revenue Chart
+        const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+        new Chart(revenueCtx, {
+            type: 'line',
+            data: {
+                labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                datasets: [{
+                    label: 'Daily Revenue',
+                    data: [1800, 2200, 1900, 2500, 2800, 3200, 2900],
+                    borderColor: '#007bff',
+                    backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+        
+        // Room Type Chart
+        const roomTypeCtx = document.getElementById('roomTypeChart').getContext('2d');
+        new Chart(roomTypeCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Single', 'Double', 'Suite'],
+                datasets: [{
+                    data: [40, 35, 25],
+                    backgroundColor: ['#28a745', '#ffc107', '#dc3545']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false
+            }
+        });
+    }
+    
+    // Apply filters
+    window.applyFilters = function() {
+        const reportType = $('#reportType').val();
+        const startDate = $('#startDate').val();
+        const endDate = $('#endDate').val();
+        
+        console.log(`Generating ${reportType} report from ${startDate} to ${endDate}`);
+        
+        // This would typically make an AJAX call to generate the report
+        alert(`Generating ${reportType} report for the selected period...`);
+    };
+    
+    // Generate report
+    window.generateReport = function() {
+        alert('Report generation functionality will be implemented');
+    };
+    
+    // Generate quick reports
+    window.generateQuickReport = function(type) {
+        alert(`Generating Tsh{type} report...`);
+    };
+});
+</script>
+{% endblock %}

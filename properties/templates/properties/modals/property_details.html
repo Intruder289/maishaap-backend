@@ -1,0 +1,125 @@
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-home me-2"></i>Property Information</h6>
+            </div>
+            <div class="card-body">
+                <h5 class="card-title">{{ property.title }}</h5>
+                <p class="text-muted mb-3">{{ property.address }}</p>
+                
+                <div class="row">
+                    <div class="col-6">
+                        <div class="text-center">
+                            <div class="fw-bold text-primary">Tsh{{ property.rent_amount|floatformat:0 }}</div>
+                            <small class="text-muted">Monthly Rent</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="text-center">
+                            <div class="fw-bold text-success">{{ property.bedrooms }}</div>
+                            <small class="text-muted">Bedrooms</small>
+                        </div>
+                    </div>
+                </div>
+                
+                {% if property.description %}
+                <hr>
+                <h6>Description</h6>
+                <p class="text-muted">{{ property.description }}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-user me-2"></i>Current Tenant</h6>
+            </div>
+            <div class="card-body">
+                {% if current_booking %}
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3 fw-bold">
+                            {{ current_booking.customer.full_name|first|upper }}
+                        </div>
+                        <div>
+                            <h6 class="mb-0">{{ current_booking.customer.full_name }}</h6>
+                            <small class="text-muted">{{ current_booking.customer.email }}</small>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="text-center">
+                                <div class="fw-bold text-primary">{{ current_booking.check_in_date|date:"M d, Y" }}</div>
+                                <small class="text-muted">Move-in Date</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-center">
+                                <div class="fw-bold text-success">{{ current_booking.check_out_date|date:"M d, Y" }}</div>
+                                <small class="text-muted">Lease End</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    <div class="text-center">
+                        {% if current_booking.booking_status == 'confirmed' %}
+                            <span class="badge bg-success fs-6">Active Lease</span>
+                        {% elif current_booking.booking_status == 'checked_in' %}
+                            <span class="badge bg-primary fs-6">Checked In</span>
+                        {% else %}
+                            <span class="badge bg-warning fs-6">{{ current_booking.booking_status|title }}</span>
+                        {% endif %}
+                    </div>
+                {% else %}
+                    <div class="text-center">
+                        <i class="fas fa-home fa-3x text-muted mb-3"></i>
+                        <h6 class="text-muted">No Current Tenant</h6>
+                        <p class="text-muted">This property is currently available.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>Property Details</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-6">
+                        <strong>Property Type:</strong><br>
+                        <span class="text-muted">{{ property.property_type.name|title }}</span>
+                    </div>
+                    <div class="col-6">
+                        <strong>Owner:</strong><br>
+                        <span class="text-muted">{{ property.owner.get_full_name|default:property.owner.username }}</span>
+                    </div>
+                </div>
+                
+                {% if property.bathrooms %}
+                <hr>
+                <div class="row">
+                    <div class="col-6">
+                        <strong>Bedrooms:</strong><br>
+                        <span class="text-muted">{{ property.bedrooms }}</span>
+                    </div>
+                    <div class="col-6">
+                        <strong>Bathrooms:</strong><br>
+                        <span class="text-muted">{{ property.bathrooms }}</span>
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if property.amenities %}
+                <hr>
+                <strong>Amenities:</strong><br>
+                <span class="text-muted">{{ property.amenities }}</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
