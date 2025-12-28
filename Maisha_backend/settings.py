@@ -103,9 +103,9 @@ WSGI_APPLICATION = 'Maisha_backend.wsgi.application'
 DATABASES = {
     'default':{
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'maisha_backend_db',
-        'USER': 'postgres',
-        'PASSWORD': 'database',
+        'NAME': 'maishaportal_db',
+        'USER': 'admin',
+        'PASSWORD': 'admin@123',
         'HOST': 'localhost',
         'PORT': '5432',
     }
