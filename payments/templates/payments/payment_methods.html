@@ -95,10 +95,10 @@
         <div class="d-flex justify-content-between">
           <div>
             <h6 class="mb-2 text-500">Success Rate</h6>
-            <h4 class="mb-0">98.5%</h4>
-            <p class="fs--1 mb-0 text-success">
-              <span class="me-1 fas fa-trending-up"></span>
-              Excellent
+            <h4 class="mb-0">{{ success_rate }}%</h4>
+            <p class="fs--1 mb-0 {% if success_rate >= 90 %}text-success{% elif success_rate >= 70 %}text-info{% elif success_rate >= 50 %}text-warning{% else %}text-danger{% endif %}">
+              <span class="me-1 fas fa-trending-{% if success_rate >= 70 %}up{% else %}down{% endif %}"></span>
+              {{ success_status }}
             </p>
           </div>
           <div class="d-flex align-items-center">
@@ -123,9 +123,14 @@
       </div>
       <div class="col-auto">
         <div class="d-flex gap-2">
-          <button class="btn btn-secondary btn btn-primary-sm" type="button">
-            <span class="fas fa-download me-1"></span>
-            Export
+          <input type="text" id="providers-search-input" class="form-control form-control-sm" placeholder="Search providers..." value="{{ provider_search|default:'' }}">
+          <select id="providers-status-filter" class="form-select form-select-sm">
+            <option value="">All Status</option>
+            <option value="active" {% if provider_status_filter == 'active' %}selected{% endif %}>Active</option>
+            <option value="inactive" {% if provider_status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
+          </select>
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearProvidersFilters()">
+            <i class="fas fa-times"></i> Clear
           </button>
         </div>
       </div>
@@ -133,146 +138,286 @@
   </div>
   
   <div class="card-body p-0">
-    <div class="table-responsive">
-      <table class="table table-sm table-hover mb-0">
-        <thead class="bg-200">
-          <tr>
-            <th class="border-0">Provider</th>
-            <th class="border-0">Type</th>
-            <th class="border-0">Status</th>
-            <th class="border-0">Transaction Fee</th>
-            <th class="border-0">Last Used</th>
-            <th class="border-0">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for provider in providers %}
-          <tr>
-            <td>
-              <div class="d-flex align-items-center">
-                <div class="bg-200 rounded me-3 d-flex align-items-center justify-content-center">
-                  <span class="fas fa-credit-card text-600"></span>
-                </div>
-                <div>
-                  <h6 class="mb-0">{{ provider.name }}</h6>
-                  <small class="text-600">{{ provider.description|default:"Payment provider" }}</small>
-                </div>
-              </div>
-            </td>
-            <td>
-              <span class="badge bg-info-subtle text-info">{{ provider.provider_type|title }}</span>
-            </td>
-            <td>
-              {% if provider.is_active %}
-              <span class="badge bg-success-subtle text-success">
-                <span class="fas fa-check-circle me-1"></span>
-                Active
-              </span>
-              {% else %}
-              <span class="badge bg-danger-subtle text-danger">
-                <span class="fas fa-times-circle me-1"></span>
-                Inactive
-              </span>
-              {% endif %}
-            </td>
-            <td>
-              <span class="fw-bold">{{ provider.transaction_fee }}%</span>
-            </td>
-            <td>
-              <span class="text-600">{{ provider.created_at|date:"M j, Y" }}</span>
-            </td>
-            <td>
-              <div class="dropdown">
-                <button class="btn btn-link btn btn-primary-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                  <span class="fas fa-ellipsis-h"></span>
-                </button>
-                <ul class="dropdown-menu">
-                  <li><a class="dropdown-item" href="#">View Details</a></li>
-                  <li><a class="dropdown-item" href="#">Edit Settings</a></li>
-                  <li><hr class="dropdown-divider"></li>
-                  {% if provider.is_active %}
-                  <li><a class="dropdown-item text-warning" href="#">Disable</a></li>
-                  {% else %}
-                  <li><a class="dropdown-item text-success" href="#">Enable</a></li>
-                  {% endif %}
-                </ul>
-              </div>
-            </td>
-          </tr>
-          {% empty %}
-          <tr>
-            <td colspan="6" class="text-center py-4">
-              <div class="text-600">
-                <span class="fas fa-credit-card fs-3 mb-3 d-block"></span>
-                <p class="mb-0">No payment providers found</p>
-                <small>Add your first payment provider to get started</small>
-              </div>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <div id="providers-table-container">
+      {% include 'payments/payment_methods_providers_table.html' %}
     </div>
   </div>
 </div>
 
-<!-- Recent Transactions -->
+<!-- Transactions Table -->
 <div class="row g-3 mt-4">
   <div class="col-12">
     <div class="card">
       <div class="card-header">
-        <h5 class="mb-0">Recent Transactions</h5>
+        <div class="row flex-between-center">
+          <div class="col-auto">
+            <h5 class="mb-0">Transactions</h5>
+          </div>
+          <div class="col-auto">
+            <div class="d-flex gap-2">
+              <input type="text" id="methods-transactions-search" class="form-control form-control-sm" placeholder="Search..." value="{{ search_query|default:'' }}">
+              <select id="methods-transactions-status" class="form-select form-select-sm">
+                <option value="">All Status</option>
+                {% for value, label in status_choices %}
+                <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+              <select id="methods-transactions-provider" class="form-select form-select-sm">
+                <option value="">All Providers</option>
+                {% for provider in providers %}
+                <option value="{{ provider.id }}" {% if provider_filter == provider.id|stringformat:"s" %}selected{% endif %}>{{ provider.name }}</option>
+                {% endfor %}
+              </select>
+              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearMethodsFilters()">
+                <i class="fas fa-times"></i> Clear
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="card-body">
-        <div class="table-responsive">
-          <table class="table table-sm">
-            <thead>
-              <tr>
-                <th>Transaction ID</th>
-                <th>Provider</th>
-                <th>Amount</th>
-                <th>Status</th>
-                <th>Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for transaction in recent_transactions %}
-              <tr>
-                <td>
-                  <span class="fw-bold">#{{ transaction.id }}</span>
-                </td>
-                <td>
-                  <span class="text-600">{{ transaction.provider.name }}</span>
-                </td>
-                <td>
-                  <span class="fw-bold">{{ transaction.payment.amount|currency_tzs }}</span>
-                </td>
-                <td>
-                  {% if transaction.status == 'completed' %}
-                  <span class="badge bg-success-subtle text-success">Completed</span>
-                  {% elif transaction.status == 'pending' %}
-                  <span class="badge bg-warning-subtle text-warning">Pending</span>
-                  {% else %}
-                  <span class="badge bg-danger-subtle text-danger">Failed</span>
-                  {% endif %}
-                </td>
-                <td>
-                  <span class="text-600">{{ transaction.created_at|date:"M j, Y g:i A" }}</span>
-                </td>
-              </tr>
-              {% empty %}
-              <tr>
-                <td colspan="5" class="text-center py-3">
-                  <span class="text-500">No recent transactions</span>
-                </td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+        <div id="methods-transactions-container">
+          {% include 'payments/payment_methods_transactions_table.html' %}
         </div>
       </div>
     </div>
   </div>
 </div>
+
+<script>
+// Wait for jQuery
+function waitForJQuery() {
+    if (typeof $ !== 'undefined') {
+        initializeMethodsTransactions();
+        initializeProviders();
+    } else {
+        setTimeout(waitForJQuery, 100);
+    }
+}
+
+function initializeMethodsTransactions() {
+    // AJAX function to load transactions table
+    function loadMethodsTransactionsTable(page = 1) {
+        var search = $('#methods-transactions-search').val() || '';
+        var status = $('#methods-transactions-status').val() || '';
+        var provider = $('#methods-transactions-provider').val() || '';
+        
+        $('#methods-transactions-container').html('<div class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">Loading...</p></div>');
+        
+        $.ajax({
+            url: '{% url "payments:payment_methods" %}',
+            type: 'GET',
+            data: {
+                'search': search,
+                'status': status,
+                'provider': provider,
+                'page': page,
+                'table': 'transactions'
+            },
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(data) {
+                $('#methods-transactions-container').html(data);
+            },
+            error: function(xhr, status, error) {
+                $('#methods-transactions-container').html('<div class="text-center py-5"><p class="text-danger">Error loading data: ' + error + '</p></div>');
+            }
+        });
+    }
+    
+    // Search input handler
+    var searchTimeout;
+    $('#methods-transactions-search').on('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(function() {
+            loadMethodsTransactionsTable(1);
+        }, 500);
+    });
+    
+    // Filter change handlers
+    $('#methods-transactions-status').on('change', function() {
+        loadMethodsTransactionsTable(1);
+    });
+    
+    $('#methods-transactions-provider').on('change', function() {
+        loadMethodsTransactionsTable(1);
+    });
+    
+    // Global pagination function
+    window.loadMethodsTransactionsPage = function(page) {
+        loadMethodsTransactionsTable(page);
+    };
+    
+    // Clear filters function
+    window.clearMethodsFilters = function() {
+        $('#methods-transactions-search').val('');
+        $('#methods-transactions-status').val('');
+        $('#methods-transactions-provider').val('');
+        loadMethodsTransactionsTable(1);
+    };
+}
+
+// Transaction Action Functions
+function viewTransaction(transactionId) {
+    $.get('/payments/api/transaction/' + transactionId + '/view-details/', function(data) {
+        if ($('#transactionViewModal').length === 0) {
+            $('body').append('<div class="modal fade" id="transactionViewModal" tabindex="-1"><div class="modal-dialog modal-xl"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Transaction Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="transactionViewContent"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>');
+        }
+        $('#transactionViewContent').html(data);
+        $('#transactionViewModal').modal('show');
+    }).fail(function() {
+        alert('Failed to load transaction details.');
+    });
+}
+
+// Payment Action Functions
+function viewPayment(paymentId) {
+    $.get('/payments/api/payment/' + paymentId + '/view-details/', function(data) {
+        if ($('#paymentViewModal').length === 0) {
+            $('body').append('<div class="modal fade" id="paymentViewModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Payment Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="paymentViewContent"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>');
+        }
+        $('#paymentViewContent').html(data);
+        $('#paymentViewModal').modal('show');
+    }).fail(function() {
+        alert('Failed to load payment details.');
+    });
+}
+
+// Provider Action Functions
+function viewProvider(providerId) {
+    $.get('/payments/api/provider/' + providerId + '/view-details/', function(data) {
+        if ($('#providerViewModal').length === 0) {
+            $('body').append('<div class="modal fade" id="providerViewModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Provider Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="providerViewContent"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>');
+        }
+        $('#providerViewContent').html(data);
+        $('#providerViewModal').modal('show');
+    }).fail(function() {
+        alert('Failed to load provider details.');
+    });
+}
+
+function editProvider(providerId) {
+    $.get('/payments/api/provider/' + providerId + '/edit/', function(data) {
+        if ($('#providerEditModal').length === 0) {
+            $('body').append('<div class="modal fade" id="providerEditModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Edit Provider</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="providerEditContent"></div></div></div></div>');
+        }
+        $('#providerEditContent').html(data);
+        $('#providerEditModal').modal('show');
+    }).fail(function() {
+        alert('Failed to load provider edit form.');
+    });
+}
+
+function toggleProviderStatus(providerId) {
+    var action = confirm('Are you sure you want to change this provider\'s status?');
+    if (!action) return;
+    
+    $.ajax({
+        url: '/payments/api/provider/' + providerId + '/toggle-status/',
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val() || $('meta[name=csrf-token]').attr('content') || getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        success: function(response) {
+            if (response.success) {
+                alert(response.message);
+                // Reload providers table
+                if (typeof loadProvidersTable === 'function') {
+                    loadProvidersTable(1);
+                } else {
+                    location.reload();
+                }
+            } else {
+                alert('Failed: ' + (response.message || 'Unknown error'));
+            }
+        },
+        error: function(xhr) {
+            var errorMsg = 'Failed to update provider status';
+            if (xhr.responseJSON && xhr.responseJSON.message) {
+                errorMsg = xhr.responseJSON.message;
+            }
+            alert(errorMsg);
+        }
+    });
+}
+
+// Initialize Providers Table
+function initializeProviders() {
+    // AJAX function to load providers table
+    function loadProvidersTable(page = 1) {
+        var search = $('#providers-search-input').val() || '';
+        var status = $('#providers-status-filter').val() || '';
+        
+        $('#providers-table-container').html('<div class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">Loading...</p></div>');
+        
+        $.ajax({
+            url: '{% url "payments:payment_methods" %}',
+            type: 'GET',
+            data: {
+                'provider_search': search,
+                'provider_status': status,
+                'provider_page': page,
+                'table': 'providers'
+            },
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(data) {
+                $('#providers-table-container').html(data);
+            },
+            error: function(xhr, status, error) {
+                $('#providers-table-container').html('<div class="text-center py-5"><p class="text-danger">Error loading data: ' + error + '</p></div>');
+            }
+        });
+    }
+    
+    // Search input handler
+    var searchTimeout;
+    $('#providers-search-input').on('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(function() {
+            loadProvidersTable(1);
+        }, 500);
+    });
+    
+    // Status filter handler
+    $('#providers-status-filter').on('change', function() {
+        loadProvidersTable(1);
+    });
+    
+    // Global pagination function
+    window.loadProvidersPage = function(page) {
+        loadProvidersTable(page);
+    };
+    
+    // Clear filters function
+    window.clearProvidersFilters = function() {
+        $('#providers-search-input').val('');
+        $('#providers-status-filter').val('');
+        loadProvidersTable(1);
+    };
+}
+
+// Helper function to get CSRF token from cookies
+function getCookie(name) {
+    var cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        var cookies = document.cookie.split(';');
+        for (var i = 0; i < cookies.length; i++) {
+            var cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Start initialization
+waitForJQuery();
+</script>
 {% endblock %}
 

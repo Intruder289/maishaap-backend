@@ -108,8 +108,8 @@
                 <td>{{ payment.amount|currency_tzs }}</td>
                 <td>{{ payment.paid_date|date:"F d, Y"|default:payment.created_at|date:"F d, Y" }}</td>
                 <td>
-                  {% if payment.status == 'successful' %}
-                  <span class="badge bg-success">Successful</span>
+                  {% if payment.status == 'completed' %}
+                  <span class="badge bg-success">Completed</span>
                   {% elif payment.status == 'pending' %}
                   <span class="badge bg-warning">Pending</span>
                   {% else %}

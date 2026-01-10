@@ -92,11 +92,8 @@ class RentPayment(models.Model):
     """
     PAYMENT_METHOD_CHOICES = [
         ('cash', 'Cash'),
-        ('bank_transfer', 'Bank Transfer'),
-        ('check', 'Check'),
-        ('credit_card', 'Credit Card'),
-        ('mobile_money', 'Mobile Money'),
-        ('online', 'Online Payment'),
+        ('mobile_money', 'Mobile Money (AZAM Pay)'),
+        ('online', 'Online Payment (AZAM Pay)'),
     ]
     
     PAYMENT_STATUS_CHOICES = [

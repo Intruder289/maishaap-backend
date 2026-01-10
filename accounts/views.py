@@ -413,7 +413,7 @@ def user_list(request):
 		).distinct()
 		users = users_created_by_manager.select_related('profile').prefetch_related('user_roles__role')
 	else:
-		# Admin/Staff: see all users
+		# Admin/Staff: see all users (but filter inactive by default)
 		users = User.objects.select_related('profile').prefetch_related('user_roles__role').all()
 	
 	# Apply search filter
@@ -426,14 +426,18 @@ def user_list(request):
 		)
 	
 	# Apply status filter
-	if status_filter == 'active':
-		users = users.filter(is_active=True)
-	elif status_filter == 'inactive':
+	# Default: show only active users unless explicitly filtering for inactive
+	if status_filter == 'inactive':
 		users = users.filter(is_active=False)
+	elif status_filter == 'active':
+		users = users.filter(is_active=True)
 	elif status_filter == 'approved':
-		users = users.filter(profile__is_approved=True)
+		users = users.filter(profile__is_approved=True, is_active=True)
 	elif status_filter == 'pending':
-		users = users.filter(profile__is_approved=False)
+		users = users.filter(profile__is_approved=False, is_active=True)
+	else:
+		# Default: only show active users
+		users = users.filter(is_active=True)
 	
 	# Apply role filter
 	if role_filter:
@@ -886,8 +890,9 @@ def delete_user(request, user_id):
 		return redirect('accounts:user_list')
 	
 	# Prevent deletion of superusers by non-superusers
+	# Allow superusers to delete other accounts (including other superusers)
 	if user_obj.is_superuser and not request.user.is_superuser:
-		messages.error(request, 'You cannot delete a superuser.')
+		messages.error(request, 'You cannot delete a superuser. Only superusers can delete superuser accounts.')
 		return redirect('accounts:user_list')
 	
 	# Prevent users from deleting themselves

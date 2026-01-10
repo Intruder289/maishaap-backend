@@ -36,9 +36,21 @@
                             <h5 class="mb-0">Manage and monitor all house rental payments</h5>
                         </div>
                         <div class="col-auto">
-                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#recordPaymentModal">
-                                <span class="fas fa-plus me-2"></span>Record Payment
-                            </button>
+                            <div class="input-group">
+                                <select class="form-select" id="quickBookingSelect" style="max-width: 300px;">
+                                    <option value="">Select Booking to Pay...</option>
+                                    {% for booking in house_bookings %}
+                                        <option value="{{ booking.id }}">
+                                            {{ booking.booking_reference }} - {{ booking.customer.full_name }}
+                                        </option>
+                                    {% empty %}
+                                        <option value="" disabled>No bookings available</option>
+                                    {% endfor %}
+                                </select>
+                                <button type="button" class="btn btn-primary" onclick="redirectToBookingPayment()">
+                                    <span class="fas fa-plus me-2"></span>Record Payment
+                                </button>
+                            </div>
                             <button type="button" class="btn btn-secondary ms-2" onclick="clearAllFilters()">
                                 <span class="fas fa-times me-2"></span>Clear All
                             </button>
@@ -89,223 +101,164 @@
                 
                 <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-hover mb-0">
+                        <table class="table table-hover mb-0 align-middle">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Payment</th>
+                                    <th>Booking</th>
                                     <th>Tenant</th>
-                                    <th>Property</th>
-                                    <th>Type</th>
-                                    <th>Amount</th>
-                                    <th>Due Date</th>
-                                    <th>Paid Date</th>
-                                    <th>Method</th>
+                                    <th class="d-none d-lg-table-cell">Property</th>
+                                    <th>Total</th>
+                                    <th class="d-none d-md-table-cell">Paid</th>
+                                    <th>Balance</th>
+                                    <th class="d-none d-lg-table-cell">Last Payment</th>
                                     <th>Status</th>
-                                    <th>Actions</th>
+                                    <th class="text-end text-nowrap">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for payment in payments %}
-                                <tr data-payment-id="{{ payment.id }}">
-                                    <td>
+                                {% for payment_data in payments %}
+                                <tr data-booking-id="{% if payment_data.booking %}{{ payment_data.booking.id }}{% else %}visit-{{ payment_data.visit_payment.id }}{% endif %}">
+                                    <td class="text-nowrap">
                                         <div class="d-flex align-items-center">
                                             <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3 fw-bold">
-                                                {{ payment.id|stringformat:"s"|slice:":2" }}
+                                                {% if payment_data.booking %}
+                                                    {{ payment_data.booking.booking_reference|slice:":2" }}
+                                                {% else %}
+                                                    VP
+                                                {% endif %}
                                             </div>
                                             <div>
                                                 <strong>
-                                                    <a href="#" class="text-decoration-none">
-                                                        Payment #{{ payment.id }}
-                                                    </a>
+                                                    {% if payment_data.booking %}
+                                                        <a href="{% url 'properties:booking_detail' pk=payment_data.booking.id %}" class="text-decoration-none">
+                                                            {{ payment_data.booking.booking_reference }}
+                                                        </a>
+                                                    {% else %}
+                                                        <span>Visit Payment</span>
+                                                    {% endif %}
                                                 </strong>
                                                 <div class="text-muted small">
-                                                    {% if payment.paid_date %}
-                                                        {{ payment.paid_date|date:"M d, Y" }}
-                                                    {% elif payment.created_at %}
-                                                        {{ payment.created_at|date:"M d, Y" }}
+                                                    {% if payment_data.booking %}
+                                                        {{ payment_data.booking.created_at|date:"M d, Y" }}
+                                                    {% elif payment_data.last_payment_date %}
+                                                        {{ payment_data.last_payment_date|date:"M d, Y" }}
                                                     {% else %}
                                                         N/A
                                                     {% endif %}
                                                 </div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div class="d-flex align-items-center">
-                                            <i class="fas fa-user text-muted me-2"></i>
-                                            <div>
-                                                {% if payment.booking %}
-                                                    <div class="fw-bold">{{ payment.booking.customer.full_name }}</div>
-                                                    <div class="text-muted small">{{ payment.booking.customer.email|default:"N/A" }}</div>
-                                                {% elif payment.property_visit_payments.exists %}
-                                                    {% with visit_payment=payment.property_visit_payments.first %}
-                                                        <div class="fw-bold">{{ payment.tenant.get_full_name|default:payment.tenant.username }}</div>
-                                                        <div class="text-muted small">{{ payment.tenant.email|default:"N/A" }}</div>
-                                                    {% endwith %}
-                                                {% else %}
-                                                    <div class="fw-bold">{{ payment.tenant.get_full_name|default:payment.tenant.username }}</div>
-                                                    <div class="text-muted small">{{ payment.tenant.email|default:"N/A" }}</div>
+                                                {% if payment_data.payment_count > 1 %}
+                                                <div class="text-muted small">
+                                                    <i class="fas fa-receipt me-1"></i>{{ payment_data.payment_count }} payments
+                                                </div>
                                                 {% endif %}
                                             </div>
                                         </div>
                                     </td>
-                                    <td>
+                                    <td class="text-nowrap">
                                         <div class="d-flex align-items-center">
-                                            <i class="fas fa-home text-muted me-2"></i>
+                                            <i class="fas fa-user text-muted me-2"></i>
                                             <div>
-                                                {% if payment.booking %}
-                                                    <div class="fw-bold">{{ payment.booking.property_obj.title }}</div>
-                                                    <div class="text-muted small">{{ payment.booking.property_obj.address|truncatechars:30 }}</div>
-                                                {% elif payment.property_visit_payments.exists %}
-                                                    {% with visit_payment=payment.property_visit_payments.first %}
-                                                        <div class="fw-bold">{{ visit_payment.property.title }}</div>
-                                                        <div class="text-muted small">{{ visit_payment.property.address|truncatechars:30 }}</div>
-                                                    {% endwith %}
+                                                {% if payment_data.booking %}
+                                                    <div class="fw-bold">{{ payment_data.booking.customer.full_name }}</div>
+                                                    <div class="text-muted small">{{ payment_data.booking.customer.email|default:"N/A" }}</div>
+                                                {% elif payment_data.visit_payment %}
+                                                    <div class="fw-bold">{{ payment_data.visit_payment.tenant.get_full_name|default:payment_data.visit_payment.tenant.username }}</div>
+                                                    <div class="text-muted small">{{ payment_data.visit_payment.tenant.email|default:"N/A" }}</div>
                                                 {% else %}
                                                     <div class="text-muted">N/A</div>
                                                 {% endif %}
                                             </div>
                                         </div>
                                     </td>
-                                    <td>
-                                        {% if payment.property_visit_payments.exists %}
-                                            <span class="badge bg-success">Visit Payment</span>
-                                        {% elif payment.payment_type == 'rent' %}
-                                            <span class="badge bg-info">Monthly Rent</span>
-                                        {% elif payment.payment_type == 'deposit' %}
-                                            <span class="badge bg-warning">Security Deposit</span>
-                                        {% elif payment.payment_type == 'late_fee' %}
-                                            <span class="badge bg-danger">Late Fee</span>
-                                        {% elif payment.payment_type == 'maintenance' %}
-                                            <span class="badge bg-secondary">Maintenance</span>
-                                        {% elif payment.payment_type == 'utility' %}
-                                            <span class="badge bg-primary">Utility</span>
-                                        {% else %}
-                                            <span class="badge bg-light text-dark">{{ payment.payment_type|title|default:"Other" }}</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <div class="fw-bold">Tsh{{ payment.amount|floatformat:0 }}</div>
-                                        <div class="text-muted small">{{ payment.currency|default:"TZS" }}</div>
-                                    </td>
-                                    <td>
-                                        {% if payment.due_date %}
-                                            <div class="fw-bold">{{ payment.due_date|date:"M d, Y" }}</div>
-                                            <div class="text-muted small">{{ payment.due_date|timeuntil }}</div>
-                                        {% else %}
-                                            <div class="text-muted">N/A</div>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if payment.paid_date %}
-                                            <div class="fw-bold">{{ payment.paid_date|date:"M d, Y" }}</div>
-                                            <div class="text-muted small">{{ payment.paid_date|timesince }} ago</div>
-                                        {% elif payment.property_visit_payments.exists %}
-                                            {% with visit_payment=payment.property_visit_payments.first %}
-                                                {% if visit_payment.paid_at %}
-                                                    <div class="fw-bold">{{ visit_payment.paid_at|date:"M d, Y" }}</div>
-                                                    <div class="text-muted small">{{ visit_payment.paid_at|timesince }} ago</div>
+                                    <td class="d-none d-lg-table-cell">
+                                        <div class="d-flex align-items-center">
+                                            <i class="fas fa-home text-muted me-2"></i>
+                                            <div>
+                                                {% if payment_data.booking %}
+                                                    <div class="fw-bold">{{ payment_data.booking.property_obj.title }}</div>
+                                                    <div class="text-muted small">{{ payment_data.booking.property_obj.address|truncatechars:30 }}</div>
+                                                {% elif payment_data.visit_payment_obj %}
+                                                    <div class="fw-bold">{{ payment_data.visit_payment_obj.property.title }}</div>
+                                                    <div class="text-muted small">{{ payment_data.visit_payment_obj.property.address|truncatechars:30 }}</div>
                                                 {% else %}
-                                                    <div class="text-muted">Pending</div>
+                                                    <div class="text-muted">N/A</div>
                                                 {% endif %}
-                                            {% endwith %}
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="text-nowrap">
+                                        <div class="fw-bold text-primary">Tsh{{ payment_data.total_required|floatformat:0 }}</div>
+                                        <div class="text-muted small">Total Required</div>
+                                    </td>
+                                    <td class="d-none d-md-table-cell text-nowrap">
+                                        <div class="fw-bold text-success">Tsh{{ payment_data.paid_so_far|floatformat:0 }}</div>
+                                        <div class="text-muted small">Paid So Far</div>
+                                    </td>
+                                    <td class="text-nowrap">
+                                        {% if payment_data.remaining > 0 %}
+                                            <div class="fw-bold text-danger">Tsh{{ payment_data.remaining|floatformat:0 }}</div>
+                                            <div class="text-muted small">Remaining</div>
                                         {% else %}
-                                            <div class="text-muted">N/A</div>
+                                            <div class="fw-bold text-success">Tsh0</div>
+                                            <div class="text-muted small">Fully Paid</div>
                                         {% endif %}
                                     </td>
-                                    <td>
-                                        {% if payment.payment_method == 'bank_transfer' %}
-                                            <span class="badge bg-success">Bank Transfer</span>
-                                        {% elif payment.payment_method == 'cash' %}
-                                            <span class="badge bg-primary">Cash</span>
-                                        {% elif payment.payment_method == 'mobile_money' %}
-                                            <span class="badge bg-info">Mobile Money</span>
-                                        {% elif payment.payment_method == 'check' %}
-                                            <span class="badge bg-warning">Check</span>
-                                        {% elif payment.payment_method == 'card' %}
-                                            <span class="badge bg-secondary">Card</span>
+                                    <td class="d-none d-lg-table-cell text-nowrap">
+                                        {% if payment_data.last_payment_date %}
+                                            <div class="fw-bold">{{ payment_data.last_payment_date|date:"M d, Y" }}</div>
+                                            <div class="text-muted small">{{ payment_data.last_payment_date|timesince }} ago</div>
                                         {% else %}
-                                            <span class="badge bg-light text-dark">{{ payment.payment_method|title }}</span>
+                                            <div class="text-muted">No payments yet</div>
                                         {% endif %}
                                     </td>
-                                    <td>
-                                        {% if payment.property_visit_payments.exists %}
-                                            {% with visit_payment=payment.property_visit_payments.first %}
-                                                {% if visit_payment.status == 'successful' %}
-                                                    <span class="badge bg-success">Successful</span>
-                                                {% elif visit_payment.status == 'pending' %}
-                                                    <span class="badge bg-warning">Pending</span>
-                                                {% elif visit_payment.status == 'failed' %}
-                                                    <span class="badge bg-danger">Failed</span>
-                                                {% else %}
-                                                    <span class="badge bg-secondary">{{ visit_payment.status|title }}</span>
-                                                {% endif %}
-                                            {% endwith %}
-                                        {% elif payment.status == 'completed' or payment.status == 'successful' %}
-                                            <span class="badge bg-success">Paid</span>
-                                        {% elif payment.status == 'pending' %}
-                                            <span class="badge bg-warning">Pending</span>
-                                        {% elif payment.status == 'overdue' %}
-                                            <span class="badge bg-danger">Overdue</span>
-                                        {% elif payment.status == 'partial' %}
-                                            <span class="badge bg-info">Partial</span>
-                                        {% elif payment.status == 'failed' %}
-                                            <span class="badge bg-danger">Failed</span>
+                                    <td class="text-nowrap">
+                                        {% if payment_data.booking %}
+                                            {% if payment_data.booking.payment_status == 'paid' %}
+                                                <span class="badge bg-success">Fully Paid</span>
+                                            {% elif payment_data.booking.payment_status == 'partial' %}
+                                                <span class="badge bg-warning">Partial Payment</span>
+                                            {% elif payment_data.booking.payment_status == 'pending' %}
+                                                <span class="badge bg-secondary">Pending</span>
+                                            {% elif payment_data.booking.payment_status == 'refunded' %}
+                                                <span class="badge bg-danger">Refunded</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">{{ payment_data.booking.payment_status|title }}</span>
+                                            {% endif %}
+                                        {% elif payment_data.visit_payment_obj %}
+                                            {% if payment_data.visit_payment_obj.status == 'completed' %}
+                                                <span class="badge bg-success">Paid</span>
+                                            {% elif payment_data.visit_payment_obj.status == 'pending' %}
+                                                <span class="badge bg-warning">Pending</span>
+                                            {% elif payment_data.visit_payment_obj.status == 'failed' %}
+                                                <span class="badge bg-danger">Failed</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">{{ payment_data.visit_payment_obj.status|title }}</span>
+                                            {% endif %}
                                         {% else %}
-                                            <span class="badge bg-secondary">{{ payment.status|title }}</span>
+                                            <span class="badge bg-secondary">Unknown</span>
                                         {% endif %}
                                     </td>
-                                    <td>
+                                    <td class="text-end text-nowrap">
                                         <div class="dropdown">
                                             <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
                                                 <i class="fas fa-ellipsis-v"></i>
                                             </button>
                                             <ul class="dropdown-menu">
-                                                <li><a class="dropdown-item" href="#" onclick="openPaymentViewDetailsModal({{ payment.id }})">
-                                                    <i class="fas fa-eye me-2"></i>View Details
-                                                </a></li>
-                                                <li><a class="dropdown-item" href="#" onclick="openPaymentGenerateReceiptModal({{ payment.id }})">
-                                                    <i class="fas fa-receipt me-2"></i>Generate Receipt
-                                                </a></li>
-                                                <li><a class="dropdown-item" href="#" onclick="openPaymentEditModal({{ payment.id }})">
-                                                    <i class="fas fa-edit me-2"></i>Edit Payment
-                                                </a></li>
-                                                {% if payment.property_visit_payments.exists %}
-                                                    {% with visit_payment=payment.property_visit_payments.first %}
-                                                        {% if visit_payment.status == 'pending' %}
-                                                        <li><a class="dropdown-item" href="#" onclick="openPaymentMarkPaidModal({{ payment.id }})">
-                                                            <i class="fas fa-check me-2"></i>Mark Paid
-                                                        </a></li>
-                                                        {% endif %}
-                                                    {% endwith %}
-                                                {% elif payment.status == 'pending' %}
-                                                <li><a class="dropdown-item" href="#" onclick="openPaymentMarkPaidModal({{ payment.id }})">
-                                                    <i class="fas fa-check me-2"></i>Mark Paid
-                                                </a></li>
-                                                {% elif payment.status == 'completed' %}
-                                                <li><a class="dropdown-item" href="#">
-                                                    <i class="fas fa-redo me-2"></i>Refund
-                                                </a></li>
-                                                {% endif %}
-                                                <li><hr class="dropdown-divider"></li>
-                                                {% if not payment.property_visit_payments.exists %}
-                                                <li><a class="dropdown-item" href="#" onclick="openPaymentBookingDetailsModal({{ payment.id }})">
-                                                    <i class="fas fa-calendar me-2"></i>Booking Details
-                                                </a></li>
-                                                {% endif %}
-                                                <li><a class="dropdown-item" href="#" onclick="openPaymentPropertyDetailsModal({{ payment.id }})">
-                                                    <i class="fas fa-home me-2"></i>Property Details
-                                                </a></li>
-                                                <li><hr class="dropdown-divider"></li>
-                                                {% if payment.status in 'pending,overdue' %}
-                                                <li><a class="dropdown-item" href="#" onclick="openPaymentSendReminderModal({{ payment.id }})">
-                                                    <i class="fas fa-bell me-2"></i>Send Reminder
-                                                </a></li>
-                                                {% endif %}
-                                                {% if payment.status == 'overdue' %}
-                                                <li><a class="dropdown-item text-danger" href="#">
-                                                    <i class="fas fa-gavel me-2"></i>Legal Action
-                                                </a></li>
+                                                {% if payment_data.booking %}
+                                                    <li><a class="dropdown-item" href="{% url 'properties:booking_detail' pk=payment_data.booking.id %}">
+                                                        <i class="fas fa-eye me-2"></i>View Booking Details
+                                                    </a></li>
+                                                    {% if payment_data.booking.payment_status != 'paid' %}
+                                                    <li><a class="dropdown-item" href="{% url 'properties:create_payment' payment_data.booking.id %}">
+                                                        <i class="fas fa-credit-card me-2"></i>Record Payment
+                                                    </a></li>
+                                                    {% endif %}
+                                                {% elif payment_data.visit_payment_obj %}
+                                                    {% if payment_data.visit_payment_obj.status == 'pending' %}
+                                                    <li><a class="dropdown-item" href="{% url 'properties:create_visit_payment' payment_data.visit_payment.id %}">
+                                                        <i class="fas fa-credit-card me-2"></i>Record Payment
+                                                    </a></li>
+                                                    {% endif %}
                                                 {% endif %}
                                             </ul>
                                         </div>
@@ -381,114 +334,6 @@
                         </div>
                     </div>
                     {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Record Payment Modal -->
-    <div class="modal fade" id="recordPaymentModal" tabindex="-1" aria-labelledby="recordPaymentModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="recordPaymentModalLabel">Record Payment</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="recordPaymentForm">
-                        {% csrf_token %}
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label for="bookingSelect" class="form-label">Booking Reference *</label>
-                                <select class="form-control" id="bookingReference" required>
-                                    <option value="">Select Booking</option>
-                                    {% for booking in house_bookings %}
-                                        <option value="{{ booking.id }}" 
-                                                data-reference="{{ booking.booking_reference }}"
-                                                data-customer="{{ booking.customer.full_name }}"
-                                                data-property="{{ booking.property_obj.title }}"
-                                                data-total-amount="{{ booking.total_amount }}"
-                                                data-paid-amount="{{ booking.paid_amount }}">
-                                            {{ booking.booking_reference }} - {{ booking.customer.full_name }} ({{ booking.property_obj.title }})
-                                        </option>
-                                    {% empty %}
-                                        <option value="" disabled>No bookings available</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="tenantSelect" class="form-label">Tenant *</label>
-                                <select class="form-control" id="tenantSelect" required>
-                                    <option value="">Select Tenant</option>
-                                    {% for tenant in tenants %}
-                                        <option value="{{ tenant.id }}">{{ tenant.full_name }} ({{ tenant.email }})</option>
-                                    {% empty %}
-                                        <option value="" disabled>No tenants available</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="paymentType" class="form-label">Payment Type *</label>
-                                <select class="form-control" id="paymentType" required>
-                                    <option value="">Select Type</option>
-                                    {% for value, label in payment_type_choices %}
-                                        <option value="{{ value }}">{{ label }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-md-6" id="partialAmountDiv" style="display: none;">
-                                <label class="form-label">Partial Amount *</label>
-                                <input type="number" class="form-control" id="partialAmount" step="0.01" min="0" placeholder="Enter partial amount">
-                                <small class="text-muted">Enter the amount customer wants to pay now</small>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="amount" class="form-label">Amount *</label>
-                                <input type="number" class="form-control" id="amount" step="0.01" min="0" required>
-                                <div id="balanceInfo" class="mt-2" style="display: none;">
-                                    <div class="alert alert-info py-2">
-                                        <small>
-                                            <strong>Total:</strong> <span id="totalAmountDisplay"></span><br>
-                                            <strong>Paid:</strong> <span id="paidAmountDisplay"></span><br>
-                                            <strong>Remaining:</strong> <span id="remainingAmountDisplay"></span>
-                                        </small>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="paymentMethod" class="form-label">Payment Method *</label>
-                                <select class="form-control" id="paymentMethod" required>
-                                    <option value="">Select Method</option>
-                                    {% for value, label in payment_method_choices %}
-                                        <option value="{{ value }}">{{ label }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="paymentDate" class="form-label">Payment Date *</label>
-                                <input type="datetime-local" class="form-control" id="paymentDate" required>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="referenceNumber" class="form-label">Reference Number</label>
-                                <input type="text" class="form-control" id="referenceNumber" placeholder="Transaction reference">
-                            </div>
-                            <div class="col-md-6">
-                                <label for="status" class="form-label">Status</label>
-                                <select class="form-control" id="status">
-                                    {% for value, label in payment_status_choices %}
-                                        <option value="{{ value }}" {% if value == 'active' %}selected{% endif %}>{{ label }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-12">
-                                <label for="notes" class="form-label">Notes</label>
-                                <textarea class="form-control" id="notes" rows="3" placeholder="Payment notes, special instructions, etc..."></textarea>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" onclick="submitRecordPayment()">Record Payment</button>
                 </div>
             </div>
         </div>
@@ -611,6 +456,29 @@
 <script>
 $(document).ready(function() {
     console.log('House Payments page initialized');
+    
+    // Redirect to booking payment page
+    function redirectToBookingPayment() {
+        const bookingSelect = document.getElementById('quickBookingSelect');
+        if (bookingSelect && bookingSelect.value) {
+            const bookingId = bookingSelect.value;
+            window.location.href = `/properties/bookings/${bookingId}/payment/`;
+        } else {
+            // Show alert to select booking first
+            alert('Please select a booking from the dropdown first.');
+            bookingSelect.focus();
+        }
+    }
+    
+    // Make function available globally
+    window.redirectToBookingPayment = redirectToBookingPayment;
+    
+    // Allow Enter key on booking select to trigger payment
+    document.getElementById('quickBookingSelect')?.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter' && this.value) {
+            redirectToBookingPayment();
+        }
+    });
     
     // Search input handler
     var searchTimeout;

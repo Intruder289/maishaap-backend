@@ -5,111 +5,95 @@
 
 {% block content %}
 <div class="container-fluid">
-    <div class="row">
-        <div class="col-12">
-            <div class="page-title-box">
-                <div class="page-title-right">
-                    <ol class="breadcrumb m-0">
-                        <li class="breadcrumb-item"><a href="{% url 'properties:dashboard' %}">Properties</a></li>
-                        <li class="breadcrumb-item active">{{ management_type }}</li>
-                    </ol>
-                </div>
-                <h4 class="page-title">{{ management_type }} - Property Selection</h4>
-            </div>
-        </div>
-    </div>
+    <!-- Breadcrumb Navigation -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'properties:dashboard' %}"><i class="fas fa-home me-1"></i>Properties</a></li>
+            <li class="breadcrumb-item active" aria-current="page"><i class="fas fa-building me-1"></i>{{ management_type }} Selection</li>
+        </ol>
+    </nav>
 
     <div class="row">
         <div class="col-12">
+            <!-- Page Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2 class="mb-1">
+                        <i class="fas fa-building text-primary me-2"></i>{{ management_type }} - Property Selection
+                    </h2>
+                    <p class="text-muted mb-0">Select a property to manage or work with all properties</p>
+                </div>
+                <div>
+                    <a href="{% url 'properties:property_create' %}?type={{ property_type }}" class="btn btn-primary">
+                        <i class="fas fa-plus me-2"></i>Add Property
+                    </a>
+                </div>
+            </div>
+            
+            <!-- All Properties Option Card -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center">
+                            <div class="avatar-lg bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 60px; height: 60px;">
+                                <i class="fas fa-globe fa-2x"></i>
+                            </div>
+                            <div>
+                                <h5 class="mb-1">All {{ management_type }}s</h5>
+                                <p class="text-muted mb-0">Manage all {{ property_type }} properties in the system</p>
+                            </div>
+                        </div>
+                        <div>
+                            <span class="badge bg-primary me-2">{{ total_count|default:0 }} Properties</span>
+                            <button type="button" class="btn btn-primary" onclick="selectProperty('all')">
+                                <i class="fas fa-check me-1"></i>Select All
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Properties Table Card -->
             <div class="card">
                 <div class="card-header">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-building me-2"></i>Select {{ management_type }} Property
-                    </h5>
-                    <p class="text-muted mb-0">Choose a property to manage or work with all properties</p>
+                    <div class="row flex-between-center">
+                        <div class="col">
+                            <h6 class="mb-2">Select Property</h6>
+                            <h5 class="mb-0">Choose a specific property to manage</h5>
+                        </div>
+                    </div>
                 </div>
+                
+                <!-- Search and Filters -->
                 <div class="card-body">
-                    {% if properties %}
-                        <div class="row g-4">
-                            <!-- Work with All Properties Option -->
-                            <div class="col-md-6 col-lg-4">
-                                <div class="card property-selection-card h-100" onclick="selectProperty('all')">
-                                    <div class="card-body text-center">
-                                        <div class="mb-3">
-                                            <i class="fas fa-globe fa-3x text-primary"></i>
-                                        </div>
-                                        <h5 class="card-title">All {{ management_type }}s</h5>
-                                        <p class="card-text text-muted">
-                                            Manage all {{ property_type }} properties in the system
-                                        </p>
-                                        <div class="mt-3">
-                                            <span class="badge bg-primary">{{ properties.count }} Properties</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Individual Properties -->
-                            {% for property in properties %}
-                            <div class="col-md-6 col-lg-4">
-                                <div class="card property-selection-card h-100" onclick="selectProperty('{{ property.id }}')">
-                                    <div class="card-body">
-                                        {% with primary_image=property.get_primary_image %}
-                                        {% if primary_image %}
-                                            <img src="{{ primary_image.image.url }}" 
-                                                 class="card-img-top mb-3" 
-                                                 alt="{{ property.title }}"
-                                                 style="height: 150px; object-fit: cover;">
-                                        {% else %}
-                                            <div class="bg-light mb-3 d-flex align-items-center justify-content-center" 
-                                                 style="height: 150px;">
-                                                <i class="fas fa-image fa-2x text-muted"></i>
-                                            </div>
-                                        {% endif %}
-                                        {% endwith %}
-                                        
-                                        <h6 class="card-title">{{ property.title }}</h6>
-                                        <p class="card-text text-muted small">
-                                            <i class="fas fa-map-marker-alt me-1"></i>{{ property.address }}
-                                        </p>
-                                        
-                                        <div class="row text-center">
-                                            {% if property.total_rooms %}
-                                            <div class="col-4">
-                                                <small class="text-muted">Rooms</small>
-                                                <div class="fw-bold">{{ property.total_rooms }}</div>
-                                            </div>
-                                            {% endif %}
-                                            {% if property.capacity %}
-                                            <div class="col-4">
-                                                <small class="text-muted">Capacity</small>
-                                                <div class="fw-bold">{{ property.capacity }}</div>
-                                            </div>
-                                            {% endif %}
-                                            <div class="col-4">
-                                                <small class="text-muted">Status</small>
-                                                <div class="fw-bold">
-                                                    <span class="badge bg-{% if property.status == 'available' %}success{% else %}warning{% endif %}">
-                                                        {{ property.get_status_display }}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            {% endfor %}
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label for="search-input" class="form-label">Search</label>
+                            <input type="text" class="form-control" id="search-input" placeholder="Search properties..." value="{{ search_query }}">
                         </div>
-                    {% else %}
-                        <div class="text-center py-5">
-                            <i class="fas fa-building fa-3x text-muted mb-3"></i>
-                            <h5>No {{ management_type }} Properties Found</h5>
-                            <p class="text-muted">You need to create {{ property_type }} properties first.</p>
-                            <a href="{% url 'properties:property_create' %}?type={{ property_type }}" class="btn btn-primary">
-                                <i class="fas fa-plus me-2"></i>Add {{ management_type }} Property
-                            </a>
+                        <div class="col-md-4">
+                            <label for="status-filter" class="form-label">Status</label>
+                            <select class="form-select" id="status-filter">
+                                <option value="">All Statuses</option>
+                                <option value="available" {% if status_filter == 'available' %}selected{% endif %}>Available</option>
+                                <option value="rented" {% if status_filter == 'rented' %}selected{% endif %}>Rented</option>
+                            </select>
                         </div>
-                    {% endif %}
+                        <div class="col-md-4">
+                            <label for="page-size-select" class="form-label">Items per page</label>
+                            <select class="form-select" id="page-size-select">
+                                <option value="5" {% if request.GET.page_size == '5' or not request.GET.page_size %}selected{% endif %}>5</option>
+                                <option value="10" {% if request.GET.page_size == '10' %}selected{% endif %}>10</option>
+                                <option value="25" {% if request.GET.page_size == '25' %}selected{% endif %}>25</option>
+                                <option value="50" {% if request.GET.page_size == '50' %}selected{% endif %}>50</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Table Container -->
+                <div class="card-body p-0" id="property-selection-table-wrapper">
+                    {% include 'properties/partials/property_selection_table.html' %}
                 </div>
             </div>
         </div>
@@ -126,42 +110,84 @@
 
 {% block extra_js %}
 <script>
+// Define jQuery alias
+var $ = jQuery.noConflict();
+
 function selectProperty(propertyId) {
     document.getElementById('selectedPropertyId').value = propertyId;
     document.getElementById('propertySelectionForm').submit();
 }
 
-// Add hover effects
-document.addEventListener('DOMContentLoaded', function() {
-    const cards = document.querySelectorAll('.property-selection-card');
-    cards.forEach(card => {
-        card.style.cursor = 'pointer';
-        card.addEventListener('mouseenter', function() {
-            this.style.transform = 'translateY(-5px)';
-            this.style.transition = 'transform 0.3s ease';
+$(document).ready(function() {
+    console.log('Property Selection initialized');
+    
+    var searchTimeout;
+    var $searchInput = $('#search-input');
+    var $statusFilter = $('#status-filter');
+    var $pageSizeSelect = $('#page-size-select');
+    var $tableWrapper = $('#property-selection-table-wrapper');
+    
+    function loadPropertySelectionTable(page = 1) {
+        var params = {
+            search: $searchInput.val() || '',
+            status: $statusFilter.val() || '',
+            page_size: $pageSizeSelect.val() || '5',
+            page: page
+        };
+        
+        $tableWrapper.html(
+            '<div class="text-center py-5">' +
+                '<div class="spinner-border text-primary mb-3" role="status"></div>' +
+                '<p class="text-muted mb-0">Loading properties...</p>' +
+            '</div>'
+        );
+        
+        $.ajax({
+            url: window.location.pathname,
+            type: 'GET',
+            data: params,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(html) {
+                $tableWrapper.html(html);
+            },
+            error: function(xhr, status, error) {
+                console.error('Error loading properties table:', error, xhr.responseText);
+                $tableWrapper.html(
+                    '<div class="text-center py-5">' +
+                        '<p class="text-danger mb-3">Unable to load properties.</p>' +
+                        '<button class="btn btn-outline-primary btn-sm" type="button" onclick="location.reload()">' +
+                            '<i class="fas fa-sync-alt me-1"></i>Reload Page' +
+                        '</button>' +
+                    '</div>'
+                );
+            }
         });
-        card.addEventListener('mouseleave', function() {
-            this.style.transform = 'translateY(0)';
-        });
+    }
+    
+    // Search input handler with debounce
+    $searchInput.on('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(function() {
+            loadPropertySelectionTable(1);
+        }, 400);
     });
+    
+    // Status filter change handler
+    $statusFilter.on('change', function() {
+        loadPropertySelectionTable(1);
+    });
+    
+    // Page size change handler
+    $pageSizeSelect.on('change', function() {
+        loadPropertySelectionTable(1);
+    });
+    
+    // Make function available globally for pagination
+    window.loadPropertySelectionPage = function(page) {
+        loadPropertySelectionTable(page);
+    };
 });
 </script>
-{% endblock %}
-
-{% block extra_css %}
-<style>
-.property-selection-card {
-    transition: all 0.3s ease;
-    border: 2px solid transparent;
-}
-
-.property-selection-card:hover {
-    border-color: var(--bs-primary);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-}
-
-.card-img-top {
-    border-radius: 8px;
-}
-</style>
 {% endblock %}

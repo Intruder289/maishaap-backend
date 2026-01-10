@@ -1,7 +1,7 @@
-{% extends 'base.html' %}
+{% extends 'accounts/base.html' %}
 {% load static %}
 
-{% block title %}Create Payment{% endblock %}
+{% block title %}{% if is_visit_payment %}Record Payment{% else %}Create Payment{% endif %}{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
@@ -11,11 +11,16 @@
                 <div class="page-title-right">
                     <ol class="breadcrumb m-0">
                         <li class="breadcrumb-item"><a href="{% url 'properties:dashboard' %}">Properties</a></li>
+                        {% if is_visit_payment %}
+                        <li class="breadcrumb-item"><a href="{% url 'properties:house_payments' %}">House Payments</a></li>
+                        <li class="breadcrumb-item active">Record Payment</li>
+                        {% else %}
                         <li class="breadcrumb-item"><a href="{% url 'properties:booking_detail' pk=booking.pk %}">Booking {{ booking.booking_reference }}</a></li>
                         <li class="breadcrumb-item active">Create Payment</li>
+                        {% endif %}
                     </ol>
                 </div>
-                <h4 class="page-title">Create Payment</h4>
+                <h4 class="page-title">{% if is_visit_payment %}Record Payment{% else %}Create Payment{% endif %}</h4>
             </div>
         </div>
     </div>
@@ -25,41 +30,100 @@
             <div class="card">
                 <div class="card-header">
                     <h5 class="card-title mb-0">
-                        <i class="fas fa-money-bill-wave me-2"></i>New Payment
+                        <i class="fas fa-money-bill-wave me-2"></i>{% if is_visit_payment %}Record Payment{% else %}New Payment{% endif %}
                     </h5>
+                    {% if is_visit_payment %}
+                    <p class="text-muted mb-0">Property: <strong>{{ property.title }}</strong> - Visit Payment</p>
+                    {% else %}
                     <p class="text-muted mb-0">Booking: <strong>{{ booking.booking_reference }}</strong> - {{ booking.customer.full_name }}</p>
+                    {% endif %}
                 </div>
                 <div class="card-body">
-                    <!-- Booking Summary -->
+                    {% if is_visit_payment %}
+                    <!-- Visit Payment Summary -->
                     <div class="row mb-4">
                         <div class="col-12">
-                            <div class="alert alert-info">
-                                <h6 class="alert-heading">Booking Summary</h6>
-                                <div class="row">
-                                    <div class="col-md-3">
-                                        <strong>Total Amount:</strong><br>
-                                        <span class="h5 text-primary">Tsh{{ booking.total_amount }}</span>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <strong>Paid Amount:</strong><br>
-                                        <span class="h5 text-success">Tsh{{ booking.paid_amount }}</span>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <strong>Remaining:</strong><br>
-                                        <span class="h5 text-warning">Tsh{{ booking.remaining_amount }}</span>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <strong>Status:</strong><br>
-                                        <span class="badge bg-{% if booking.payment_status == 'paid' %}success{% elif booking.payment_status == 'partial' %}warning{% else %}danger{% endif %}">
-                                            {{ booking.get_payment_status_display }}
-                                        </span>
+                            <div class="card border">
+                                <div class="card-body">
+                                    <h6 class="card-title mb-3">Visit Payment Summary</h6>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <strong class="text-muted">Property:</strong><br>
+                                            <span class="h6 text-dark">{{ property.title }}</span>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <strong class="text-muted">Amount:</strong><br>
+                                            <span class="h5 text-dark">Tsh{{ amount|floatformat:2 }}</span>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <strong class="text-muted">Status:</strong><br>
+                                            <span class="badge bg-{% if visit_payment.status == 'completed' %}success{% elif visit_payment.status == 'pending' %}warning{% else %}danger{% endif %}">
+                                                {{ visit_payment.get_status_display }}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
+                    {% else %}
+                    <!-- Booking Summary -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="card border">
+                                <div class="card-body">
+                                    <h6 class="card-title mb-3">Booking Summary</h6>
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <strong class="text-muted">Total Amount:</strong><br>
+                                            <span class="h5 text-dark">Tsh{{ total_amount|floatformat:2 }}</span>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <strong class="text-muted">Paid Amount:</strong><br>
+                                            <span class="h5 text-dark">Tsh{{ paid_amount|floatformat:2 }}</span>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <strong class="text-muted">Remaining:</strong><br>
+                                            <span class="h5 text-dark">Tsh{{ remaining_amount|floatformat:2 }}</span>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <strong class="text-muted">Status:</strong><br>
+                                            {% if paid_amount >= total_amount and total_amount > 0 %}
+                                                <span class="badge bg-success">Paid</span>
+                                            {% elif paid_amount > 0 %}
+                                                <span class="badge bg-warning">Partial</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">Pending</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    {% if paid_amount > total_amount or remaining_amount < 0 %}
+                                    <div class="alert alert-danger mt-3 mb-0">
+                                        <i class="fas fa-exclamation-triangle me-2"></i>
+                                        <strong>Data Inconsistency Detected:</strong><br>
+                                        <ul class="mb-0 mt-2">
+                                            <li>Total Amount: Tsh{{ total_amount|floatformat:2 }}</li>
+                                            <li>Paid Amount: Tsh{{ paid_amount|floatformat:2 }}</li>
+                                            <li>Remaining: Tsh{{ remaining_amount|floatformat:2 }}</li>
+                                            {% if overpayment > 0 %}
+                                            <li><strong>Issue:</strong> Paid amount exceeds total by Tsh{{ overpayment|floatformat:2 }}</li>
+                                            {% endif %}
+                                        </ul>
+                                        <p class="mb-0 mt-2">This may indicate overpayment, refunds, or data entry errors. Please verify payment records before proceeding.</p>
+                                    </div>
+                                    {% endif %}
+                                    <div class="mt-2">
+                                        <small class="text-muted">
+                                            <strong>Calculation Breakdown:</strong> Total (Tsh{{ total_amount|floatformat:2 }}) - Paid (Tsh{{ paid_amount|floatformat:2 }}) = Remaining (Tsh{{ remaining_amount|floatformat:2 }})
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
 
-                    <form method="post">
+                    <form method="post" enctype="multipart/form-data">
                         {% csrf_token %}
                         
                         <!-- Payment Information -->
@@ -69,35 +133,116 @@
                                     <i class="fas fa-credit-card me-2"></i>Payment Information
                                 </h6>
                             </div>
+                            {% if is_visit_payment %}
                             <div class="col-md-6">
                                 <label class="form-label">Payment Amount *</label>
                                 <div class="input-group">
                                     <span class="input-group-text">Tsh</span>
-                                    <input type="number" class="form-control" name="amount" step="0.01" min="0" max="{{ booking.remaining_amount }}" required>
+                                    <input type="number" class="form-control" name="amount" step="0.01" min="0" max="{{ amount }}" value="{{ amount }}" required id="payment_amount_input">
                                 </div>
-                                <div class="form-text">Maximum: Tsh{{ booking.remaining_amount }}</div>
+                                <div class="form-text">Maximum: Tsh<span id="max_amount_display">{{ amount|floatformat:2 }}</span></div>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Payment Method *</label>
-                                <select class="form-control" name="payment_method" required>
+                                <select class="form-control" name="payment_method" required id="payment_method_select">
                                     <option value="">Select Payment Method</option>
                                     <option value="cash">Cash</option>
-                                    <option value="card">Card</option>
-                                    <option value="bank_transfer">Bank Transfer</option>
-                                    <option value="mobile_money">Mobile Money</option>
-                                    <option value="check">Check</option>
-                                    <option value="other">Other</option>
+                                    <option value="mobile_money">Mobile Money (AZAM Pay)</option>
+                                    <option value="online">Online Payment (AZAM Pay)</option>
                                 </select>
+                                <div class="form-text text-info">
+                                    <i class="fas fa-info-circle me-1"></i>Visit payments always go through AZAM Pay gateway.
+                                </div>
+                            </div>
+                            <!-- Mobile Money Provider Selection (only for mobile_money payments) -->
+                            <div class="col-md-6" id="mobile_money_provider_div_visit" style="display: none;">
+                                <label class="form-label">Mobile Money Provider *</label>
+                                <select class="form-control" name="mobile_money_provider" id="mobile_money_provider_select_visit">
+                                    <option value="">Select Provider</option>
+                                    <option value="AIRTEL">AIRTEL</option>
+                                    <option value="TIGO">TIGO</option>
+                                    <option value="MPESA">MPESA (Vodacom)</option>
+                                    <option value="HALOPESA">HALOPESA</option>
+                                </select>
+                                <div class="form-text">
+                                    <i class="fas fa-info-circle me-1"></i>Select your mobile money provider. This must match your SIM card.
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Payment Date *</label>
+                                <input type="date" class="form-control" name="paid_date" required id="paid_date_input">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Reference Number</label>
+                                <input type="text" class="form-control" name="reference_number" id="visit_reference_number" placeholder="Auto-generated" readonly>
+                                <div class="form-text">Auto-generated visit reference number</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Transaction ID</label>
+                                <input type="text" class="form-control" name="transaction_id" placeholder="Transaction ID">
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label">Notes</label>
+                                <textarea class="form-control" name="notes" rows="3" placeholder="Additional payment notes"></textarea>
+                            </div>
+                            {% else %}
+                            <div class="col-md-6">
+                                <label class="form-label">Payment Amount *</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">Tsh</span>
+                                    <input type="number" class="form-control" name="amount" step="0.01" min="0" max="{{ remaining_amount }}" required id="payment_amount_input">
+                                </div>
+                                <div class="form-text">Maximum: Tsh<span id="max_amount_display">{{ remaining_amount|floatformat:2 }}</span></div>
+                                {% if remaining_amount < 0 %}
+                                <div class="alert alert-danger mt-2">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    <strong>Data Inconsistency Detected:</strong> Remaining amount is negative. 
+                                    This indicates paid amount exceeds total. Please review payment records.
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Payment Method *</label>
+                                <select class="form-control" name="payment_method" required id="payment_method_select">
+                                    <option value="">Select Payment Method</option>
+                                    <option value="cash">Cash</option>
+                                    <option value="mobile_money">Mobile Money (AZAM Pay)</option>
+                                    <option value="online">Online Payment (AZAM Pay)</option>
+                                </select>
+                                <div class="form-text" id="payment_method_help">
+                                    Select payment method. Online/Mobile Money will redirect to AZAM Pay.
+                                </div>
+                            </div>
+                            <!-- Mobile Money Provider Selection (only for mobile_money payments) -->
+                            <div class="col-md-6" id="mobile_money_provider_div" style="display: none;">
+                                <label class="form-label">Mobile Money Provider *</label>
+                                <select class="form-control" name="mobile_money_provider" id="mobile_money_provider_select">
+                                    <option value="">Select Provider</option>
+                                    <option value="AIRTEL">AIRTEL</option>
+                                    <option value="TIGO">TIGO</option>
+                                    <option value="MPESA">MPESA (Vodacom)</option>
+                                    <option value="HALOPESA">HALOPESA</option>
+                                </select>
+                                <div class="form-text">
+                                    <i class="fas fa-info-circle me-1"></i>Select your mobile money provider. This must match your SIM card.
+                                </div>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Payment Type *</label>
-                                <select class="form-control" name="payment_type" required>
+                                <select class="form-control" name="payment_type" required id="payment_type_select">
                                     <option value="">Select Payment Type</option>
-                                    <option value="deposit">Deposit</option>
                                     <option value="partial">Partial Payment</option>
                                     <option value="full">Full Payment</option>
                                     <option value="refund">Refund</option>
                                 </select>
+                            </div>
+                            <div class="col-md-6" id="partial_amount_div" style="display: none;">
+                                <label class="form-label">Partial Amount *</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">Tsh</span>
+                                    <input type="number" class="form-control" name="partial_amount" step="0.01" min="0" id="partial_amount_input" placeholder="Enter partial amount">
+                                </div>
+                                <div class="form-text">Enter the amount customer wants to pay now. Max: Tsh<span id="partial_max_amount">{{ remaining_amount|floatformat:2 }}</span></div>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Payment Date *</label>
@@ -105,31 +250,54 @@
                             </div>
                             <div class="col-md-12">
                                 <label class="form-label">Transaction Reference</label>
-                                <input type="text" class="form-control" name="transaction_reference" placeholder="Transaction ID, receipt number, etc.">
+                                <input type="text" class="form-control" name="transaction_reference" id="transaction_reference" placeholder="Auto-generated transaction reference">
+                                <div class="form-text">Transaction reference will be auto-generated. You can edit it if needed.</div>
                             </div>
                             <div class="col-md-12">
                                 <label class="form-label">Notes</label>
                                 <textarea class="form-control" name="notes" rows="3" placeholder="Additional payment notes"></textarea>
                             </div>
+                            <!-- Receipt upload field (only for cash payments) -->
+                            <div class="col-md-12" id="receipt_upload_div" style="display: none;">
+                                <label class="form-label">Receipt/Proof of Payment *</label>
+                                <input type="file" class="form-control" name="receipt" id="receipt_input" accept="image/*,.pdf">
+                                <div class="form-text">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    Upload receipt or proof of payment (Image or PDF). Required for cash payments.
+                                </div>
+                            </div>
+                            {% endif %}
                         </div>
 
+                        {% if not is_visit_payment %}
                         <!-- Quick Amount Buttons -->
                         <div class="row mb-4">
                             <div class="col-12">
                                 <h6 class="text-primary mb-3">Quick Amount</h6>
                                 <div class="btn-group" role="group">
-                                    <button type="button" class="btn btn-outline-primary" onclick="setAmount({{ booking.total_amount|floatformat:2 }})">
-                                        Full Amount (Tsh{{ booking.total_amount|floatformat:2 }})
+                                    <button type="button" class="btn btn-outline-primary" onclick="setAmount({{ total_amount|floatformat:2 }})">
+                                        Full Amount (Tsh{{ total_amount|floatformat:2 }})
                                     </button>
-                                    <button type="button" class="btn btn-outline-warning" onclick="setAmount({{ booking.remaining_amount|floatformat:2 }})">
-                                        Remaining (Tsh{{ booking.remaining_amount|floatformat:2 }})
+                                    <button type="button" class="btn btn-outline-secondary" onclick="setAmount({{ remaining_amount|floatformat:2 }})">
+                                        Remaining (Tsh{{ remaining_amount|floatformat:2 }})
                                     </button>
-                                    <button type="button" class="btn btn-outline-info" onclick="setAmount({{ booking.total_amount|floatformat:2|add:"-1"|div:2 }})">
-                                        Half Amount (Tsh{{ booking.total_amount|floatformat:2|add:"-1"|div:2 }})
+                                    {% if remaining_amount > 0 %}
+                                    <button type="button" class="btn btn-outline-secondary" onclick="setAmount({{ half_amount|floatformat:2 }})">
+                                        Half Amount (Tsh{{ half_amount|floatformat:2 }})
                                     </button>
+                                    {% endif %}
+                                </div>
+                                <div class="mt-2">
+                                    <small class="text-muted">
+                                        <strong>Booking:</strong> {{ booking.booking_reference }} | 
+                                        <strong>Total:</strong> Tsh{{ total_amount|floatformat:2 }} | 
+                                        <strong>Paid:</strong> Tsh{{ paid_amount|floatformat:2 }} | 
+                                        <strong>Remaining:</strong> Tsh{{ remaining_amount|floatformat:2 }}
+                                    </small>
                                 </div>
                             </div>
                         </div>
+                        {% endif %}
 
                         <!-- Action Buttons -->
                         <div class="row">
@@ -138,9 +306,15 @@
                                     <button type="submit" class="btn btn-primary">
                                         <i class="fas fa-save me-2"></i>Record Payment
                                     </button>
+                                    {% if is_visit_payment %}
+                                    <a href="{% url 'properties:house_payments' %}" class="btn btn-secondary">
+                                        <i class="fas fa-times me-2"></i>Cancel
+                                    </a>
+                                    {% else %}
                                     <a href="{% url 'properties:booking_detail' pk=booking.pk %}" class="btn btn-secondary">
                                         <i class="fas fa-times me-2"></i>Cancel
                                     </a>
+                                    {% endif %}
                                 </div>
                             </div>
                         </div>
@@ -158,26 +332,323 @@ function setAmount(amount) {
     document.querySelector('input[name="amount"]').value = amount.toFixed(2);
 }
 
-// Set default payment date to now
+// Set default payment date to now and generate transaction reference
 document.addEventListener('DOMContentLoaded', function() {
     const now = new Date();
+    {% if is_visit_payment %}
+    // For visit payments, set paid_date
+    const paidDateInput = document.querySelector('input[name="paid_date"]');
+    if (paidDateInput) {
+        const today = now.toISOString().slice(0, 10);
+        paidDateInput.value = today;
+    }
+    {% else %}
     const localDateTime = now.toISOString().slice(0, 16);
-    document.querySelector('input[name="payment_date"]').value = localDateTime;
+    var paymentDateInput = document.querySelector('input[name="payment_date"]');
+    if (paymentDateInput) {
+        paymentDateInput.value = localDateTime;
+    }
+    {% endif %}
     
-    // Auto-suggest payment type based on amount
+    // Ensure paymentDateInput is available for booking payments
+    {% if not is_visit_payment %}
+    if (typeof paymentDateInput === 'undefined') {
+        paymentDateInput = document.querySelector('input[name="payment_date"]');
+    }
+    {% endif %}
+    
+    // Auto-generate transaction reference if empty
+    const transactionRefInput = document.querySelector('#transaction_reference');
+    if (transactionRefInput && !transactionRefInput.value.trim()) {
+        const bookingRef = '{{ booking.booking_reference }}';
+        const timestamp = now.getTime().toString().slice(-6);
+        const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+        const generatedRef = `PAY-${bookingRef}-${timestamp}${random}`;
+        transactionRefInput.value = generatedRef;
+    }
+    
+    // Declare variables first (before they're used)
     const amountInput = document.querySelector('input[name="amount"]');
-    const paymentTypeSelect = document.querySelector('select[name="payment_type"]');
+    const paymentMethodSelect = document.querySelector('#payment_method_select');
+    const paymentMethodHelp = document.querySelector('#payment_method_help');
+    const paymentTypeSelect = document.querySelector('#payment_type_select');
+    const partialAmountDiv = document.querySelector('#partial_amount_div');
+    const partialAmountInput = document.querySelector('#partial_amount_input');
     
-    amountInput.addEventListener('input', function() {
-        const amount = parseFloat(this.value);
-        const remaining = {{ booking.remaining_amount }};
+    // Handle partial payment field visibility
+    if (paymentTypeSelect && partialAmountDiv) {
+        paymentTypeSelect.addEventListener('change', function() {
+            if (this.value === 'partial') {
+                partialAmountDiv.style.display = 'block';
+                if (partialAmountInput) {
+                    partialAmountInput.required = true;
+                    // Set max to remaining amount
+                    const remaining = parseFloat('{{ remaining_amount }}') || 0;
+                    partialAmountInput.max = remaining;
+                    // Update max display
+                    const maxDisplay = document.querySelector('#partial_max_amount');
+                    if (maxDisplay) maxDisplay.textContent = remaining.toFixed(2);
+                }
+            } else {
+                partialAmountDiv.style.display = 'none';
+                if (partialAmountInput) {
+                    partialAmountInput.required = false;
+                    partialAmountInput.value = '';
+                }
+            }
+        });
         
-        if (amount >= remaining) {
-            paymentTypeSelect.value = 'full';
-        } else if (amount > 0) {
-            paymentTypeSelect.value = 'partial';
+        // Update main amount field when partial amount changes
+        if (partialAmountInput && amountInput) {
+            partialAmountInput.addEventListener('input', function() {
+                const partialAmount = parseFloat(this.value) || 0;
+                if (partialAmount > 0) {
+                    amountInput.value = partialAmount.toFixed(2);
+                }
+            });
         }
-    });
+    }
+    
+    // Show/hide payment date, transaction reference, receipt upload, and provider selection based on payment method
+    function togglePaymentFields() {
+        if (!paymentMethodSelect) return;
+        
+        const paymentMethod = paymentMethodSelect.value;
+        const paymentDateField = paymentDateInput ? paymentDateInput.closest('.col-md-6') : null;
+        const transactionRefField = document.querySelector('input[name="transaction_reference"]')?.closest('.col-md-12');
+        const receiptUploadDiv = document.querySelector('#receipt_upload_div');
+        const receiptInput = document.querySelector('#receipt_input');
+        const mobileMoneyProviderDiv = document.querySelector('#mobile_money_provider_div');
+        const mobileMoneyProviderSelect = document.querySelector('#mobile_money_provider_select');
+        
+        if (paymentMethod === 'online') {
+            // Hide payment date, transaction reference, receipt, and provider for online payments
+            if (paymentDateField) paymentDateField.style.display = 'none';
+            if (transactionRefField) transactionRefField.style.display = 'none';
+            if (receiptUploadDiv) receiptUploadDiv.style.display = 'none';
+            if (receiptInput) receiptInput.required = false;
+            if (mobileMoneyProviderDiv) mobileMoneyProviderDiv.style.display = 'none';
+            if (mobileMoneyProviderSelect) mobileMoneyProviderSelect.required = false;
+            if (paymentMethodHelp) {
+                paymentMethodHelp.innerHTML = '<i class="fas fa-info-circle me-1"></i>You will be redirected to AZAM Pay to complete payment.';
+                paymentMethodHelp.className = 'form-text text-info';
+            }
+        } else if (paymentMethod === 'mobile_money') {
+            // Show provider selection for mobile money, hide other fields
+            if (paymentDateField) paymentDateField.style.display = 'none';
+            if (transactionRefField) transactionRefField.style.display = 'none';
+            if (receiptUploadDiv) receiptUploadDiv.style.display = 'none';
+            if (receiptInput) receiptInput.required = false;
+            if (mobileMoneyProviderDiv) mobileMoneyProviderDiv.style.display = 'block';
+            if (mobileMoneyProviderSelect) mobileMoneyProviderSelect.required = true;
+            if (paymentMethodHelp) {
+                paymentMethodHelp.innerHTML = '<i class="fas fa-info-circle me-1"></i>Select your mobile money provider. You will receive a payment prompt on your phone.';
+                paymentMethodHelp.className = 'form-text text-info';
+            }
+        } else if (paymentMethod === 'cash') {
+            // Show all fields for cash payments, require receipt, hide provider
+            if (paymentDateField) paymentDateField.style.display = 'block';
+            if (transactionRefField) transactionRefField.style.display = 'block';
+            if (receiptUploadDiv) {
+                receiptUploadDiv.style.display = 'block';
+            }
+            if (receiptInput) {
+                receiptInput.required = true;
+            }
+            if (mobileMoneyProviderDiv) mobileMoneyProviderDiv.style.display = 'none';
+            if (mobileMoneyProviderSelect) mobileMoneyProviderSelect.required = false;
+            if (paymentMethodHelp) {
+                paymentMethodHelp.innerHTML = '<i class="fas fa-info-circle me-1"></i>Cash payment - receipt upload required. This will be recorded immediately without AZAM Pay.';
+                paymentMethodHelp.className = 'form-text text-warning';
+            }
+        } else {
+            // Show fields for other offline payments (no receipt required, no provider)
+            if (paymentDateField) paymentDateField.style.display = 'block';
+            if (transactionRefField) transactionRefField.style.display = 'block';
+            if (receiptUploadDiv) receiptUploadDiv.style.display = 'none';
+            if (receiptInput) receiptInput.required = false;
+            if (mobileMoneyProviderDiv) mobileMoneyProviderDiv.style.display = 'none';
+            if (mobileMoneyProviderSelect) mobileMoneyProviderSelect.required = false;
+            if (paymentMethodHelp) {
+                paymentMethodHelp.innerHTML = 'Select payment method. Online/Mobile Money will redirect to AZAM Pay.';
+                paymentMethodHelp.className = 'form-text';
+            }
+        }
+    }
+    
+    if (paymentMethodSelect) {
+        paymentMethodSelect.addEventListener('change', togglePaymentFields);
+        // Initial call to show/hide fields based on current selection
+        togglePaymentFields();
+        
+        // Also trigger on page load if cash is already selected
+        if (paymentMethodSelect.value === 'cash') {
+            setTimeout(togglePaymentFields, 100); // Small delay to ensure DOM is ready
+        }
+    }
+    
+    // Visit payments always go through AZAMPAY - hide payment date and transaction fields, show provider selection
+    {% if is_visit_payment %}
+    const paymentMethodSelectVisit = document.querySelector('#payment_method_select');
+    const paymentDateFieldVisit = document.querySelector('input[name="paid_date"]')?.closest('.col-md-6');
+    const transactionIdFieldVisit = document.querySelector('input[name="transaction_id"]')?.closest('.col-md-6');
+    const referenceFieldVisit = document.querySelector('input[name="reference_number"]')?.closest('.col-md-6');
+    const mobileMoneyProviderDivVisit = document.querySelector('#mobile_money_provider_div_visit');
+    const mobileMoneyProviderSelectVisit = document.querySelector('#mobile_money_provider_select_visit');
+    
+    if (paymentMethodSelectVisit) {
+        paymentMethodSelectVisit.addEventListener('change', function() {
+            const method = this.value;
+            // All visit payments go through AZAMPAY, so hide manual fields
+            if (paymentDateFieldVisit) paymentDateFieldVisit.style.display = 'none';
+            if (transactionIdFieldVisit) transactionIdFieldVisit.style.display = 'none';
+            if (referenceFieldVisit) referenceFieldVisit.style.display = 'none';
+            
+            // Show provider selection for mobile_money
+            if (method === 'mobile_money') {
+                if (mobileMoneyProviderDivVisit) mobileMoneyProviderDivVisit.style.display = 'block';
+                if (mobileMoneyProviderSelectVisit) mobileMoneyProviderSelectVisit.required = true;
+            } else {
+                if (mobileMoneyProviderDivVisit) mobileMoneyProviderDivVisit.style.display = 'none';
+                if (mobileMoneyProviderSelectVisit) mobileMoneyProviderSelectVisit.required = false;
+            }
+        });
+        // Initial call
+        if (paymentDateFieldVisit) paymentDateFieldVisit.style.display = 'none';
+        if (transactionIdFieldVisit) transactionIdFieldVisit.style.display = 'none';
+        if (referenceFieldVisit) referenceFieldVisit.style.display = 'none';
+        if (paymentMethodSelectVisit.value === 'mobile_money') {
+            if (mobileMoneyProviderDivVisit) mobileMoneyProviderDivVisit.style.display = 'block';
+            if (mobileMoneyProviderSelectVisit) mobileMoneyProviderSelectVisit.required = true;
+        }
+    }
+    {% endif %}
+    
+    if (amountInput && paymentTypeSelect) {
+        const remaining = parseFloat('{{ remaining_amount }}') || 0;
+        const total = parseFloat('{{ total_amount }}') || 0;
+        const paid = parseFloat('{{ paid_amount }}') || 0;
+        
+        // Update max amount display
+        const maxAmountDisplay = document.querySelector('#max_amount_display');
+        if (maxAmountDisplay) {
+            maxAmountDisplay.textContent = remaining.toFixed(2);
+        }
+        
+        // Update max attribute (only if remaining is positive)
+        if (remaining > 0) {
+            amountInput.max = remaining;
+        } else {
+            amountInput.max = '';
+            amountInput.setAttribute('readonly', 'readonly');
+            amountInput.style.backgroundColor = '#f8f9fa';
+            amountInput.setCustomValidity('Cannot process payment. Remaining balance is zero or negative. Please review payment records.');
+        }
+        
+        amountInput.addEventListener('input', function() {
+            const amount = parseFloat(this.value) || 0;
+            
+            // Validate amount doesn't exceed remaining (only if remaining is positive)
+            if (remaining > 0 && amount > remaining) {
+                this.setCustomValidity(`Amount cannot exceed remaining balance of Tsh${remaining.toFixed(2)}`);
+            } else if (amount <= 0) {
+                this.setCustomValidity('Payment amount must be greater than zero');
+            } else {
+                this.setCustomValidity('');
+            }
+            
+            // Auto-select payment type
+            if (remaining > 0 && amount >= remaining) {
+                paymentTypeSelect.value = 'full';
+                if (partialAmountDiv) partialAmountDiv.style.display = 'none';
+                if (partialAmountInput) {
+                    partialAmountInput.required = false;
+                    partialAmountInput.value = '';
+                }
+            } else if (amount > 0) {
+                paymentTypeSelect.value = 'partial';
+                if (partialAmountDiv) partialAmountDiv.style.display = 'block';
+                if (partialAmountInput) {
+                    partialAmountInput.required = true;
+                    partialAmountInput.max = remaining;
+                }
+            } else {
+                paymentTypeSelect.value = '';
+                if (partialAmountDiv) partialAmountDiv.style.display = 'none';
+            }
+        });
+        
+        // Validate on form submit
+        const form = document.querySelector('form');
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                const amount = parseFloat(amountInput.value) || 0;
+                const paymentMethod = paymentMethodSelect ? paymentMethodSelect.value : '';
+                
+                if (amount <= 0) {
+                    e.preventDefault();
+                    alert('Payment amount must be greater than zero.');
+                    return false;
+                }
+                
+                if (remaining <= 0) {
+                    e.preventDefault();
+                    alert(`Cannot process payment. Remaining balance is Tsh${remaining.toFixed(2)}. This booking may already be fully paid or has data inconsistencies. Please review payment records.`);
+                    return false;
+                }
+                
+                if (remaining > 0 && amount > remaining) {
+                    e.preventDefault();
+                    alert(`Payment amount (Tsh${amount.toFixed(2)}) cannot exceed remaining balance (Tsh${remaining.toFixed(2)}).`);
+                    return false;
+                }
+                
+                // Validate mobile money provider for mobile_money payments
+                if (paymentMethod === 'mobile_money') {
+                    const mobileMoneyProvider = document.querySelector('#mobile_money_provider_select')?.value || 
+                                                document.querySelector('#mobile_money_provider_select_visit')?.value || '';
+                    if (!mobileMoneyProvider) {
+                        e.preventDefault();
+                        alert('Please select your Mobile Money Provider (AIRTEL, TIGO, MPESA, or HALOPESA).');
+                        return false;
+                    }
+                }
+                
+                // Handle partial payment
+                const paymentType = paymentTypeSelect ? paymentTypeSelect.value : '';
+                if (paymentType === 'partial') {
+                    const partialAmount = parseFloat(partialAmountInput ? partialAmountInput.value : 0) || 0;
+                    if (partialAmount <= 0) {
+                        e.preventDefault();
+                        alert('Please enter a valid partial amount.');
+                        return false;
+                    }
+                    if (partialAmount > remaining) {
+                        e.preventDefault();
+                        alert(`Partial amount (Tsh${partialAmount.toFixed(2)}) cannot exceed remaining balance (Tsh${remaining.toFixed(2)}).`);
+                        return false;
+                    }
+                    // Update main amount field with partial amount
+                    if (amountInput) {
+                        amountInput.value = partialAmount.toFixed(2);
+                    }
+                }
+            });
+        }
+    }
+    
+    // Auto-generate visit reference number for visit payments
+    {% if is_visit_payment %}
+    const visitRefInput = document.querySelector('#visit_reference_number');
+    if (visitRefInput && !visitRefInput.value.trim()) {
+        const now = new Date();
+        const timestamp = now.getTime().toString().slice(-6);
+        const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+        const propertyId = '{{ property.id }}';
+        const generatedRef = `VISIT-${propertyId}-${timestamp}${random}`;
+        visitRefInput.value = generatedRef;
+    }
+    {% endif %}
 });
 </script>
 {% endblock %}

@@ -7,6 +7,8 @@ from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import User
 from datetime import datetime, timedelta
 from decimal import Decimal
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 
 from .models import RentInvoice, LateFee, RentReminder
 from payments.models import Payment, PaymentTransaction, PaymentProvider
@@ -21,7 +23,16 @@ from documents.models import Lease
 
 
 class RentInvoiceViewSet(viewsets.ModelViewSet):
-    """API ViewSet for rent invoices"""
+    """
+    API ViewSet for Rent Invoice management
+    
+    list: Get all rent invoices (filtered by user role)
+    retrieve: Get a specific rent invoice
+    create: Create a new rent invoice
+    update: Update a rent invoice
+    partial_update: Partially update a rent invoice
+    destroy: Delete a rent invoice
+    """
     permission_classes = [permissions.IsAuthenticated]
     
     def get_serializer_class(self):
@@ -63,6 +74,36 @@ class RentInvoiceViewSet(viewsets.ModelViewSet):
         
         return queryset.order_by('-due_date')
     
+    @swagger_auto_schema(
+        method='post',
+        operation_description="Mark a rent invoice as paid. Creates a payment record and updates invoice status.",
+        operation_summary="Mark Invoice as Paid",
+        tags=['Rent'],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'amount': openapi.Schema(type=openapi.TYPE_NUMBER, description='Payment amount (defaults to balance due)'),
+                'payment_method': openapi.Schema(type=openapi.TYPE_STRING, description='Payment method (cash, mobile_money, bank_transfer)'),
+                'reference_number': openapi.Schema(type=openapi.TYPE_STRING, description='Payment reference number')
+            }
+        ),
+        responses={
+            200: openapi.Response(
+                description="Payment recorded successfully",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'message': openapi.Schema(type=openapi.TYPE_STRING),
+                        'payment_id': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'invoice_status': openapi.Schema(type=openapi.TYPE_STRING)
+                    }
+                )
+            ),
+            401: "Authentication required",
+            403: "Permission denied"
+        },
+        security=[{'Bearer': []}]
+    )
     @action(detail=True, methods=['post'])
     def mark_paid(self, request, pk=None):
         """Mark an invoice as paid"""
@@ -90,6 +131,17 @@ class RentInvoiceViewSet(viewsets.ModelViewSet):
             'invoice_status': invoice.status
         })
     
+    @swagger_auto_schema(
+        method='get',
+        operation_description="Get all overdue rent invoices (invoices past due date with status 'sent' or 'overdue')",
+        operation_summary="Get Overdue Invoices",
+        tags=['Rent'],
+        responses={
+            200: RentInvoiceSerializer(many=True),
+            401: "Authentication required"
+        },
+        security=[{'Bearer': []}]
+    )
     @action(detail=False)
     def overdue(self, request):
         """Get overdue invoices"""
@@ -100,7 +152,35 @@ class RentInvoiceViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
     
-    @action(detail=False)
+    @swagger_auto_schema(
+        method='post',
+        operation_description="Generate monthly rent invoices for all active leases. Admin/staff only.",
+        operation_summary="Generate Monthly Invoices",
+        tags=['Rent'],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'month': openapi.Schema(type=openapi.TYPE_INTEGER, description='Month (1-12), defaults to current month'),
+                'year': openapi.Schema(type=openapi.TYPE_INTEGER, description='Year, defaults to current year')
+            }
+        ),
+        responses={
+            200: openapi.Response(
+                description="Invoices generated successfully",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'message': openapi.Schema(type=openapi.TYPE_STRING),
+                        'created_count': openapi.Schema(type=openapi.TYPE_INTEGER)
+                    }
+                )
+            ),
+            403: "Permission denied (admin/staff only)",
+            401: "Authentication required"
+        },
+        security=[{'Bearer': []}]
+    )
+    @action(detail=False, methods=['post'])
     def generate_monthly(self, request):
         """Generate monthly invoices for all active leases"""
         if not request.user.is_staff:
@@ -150,7 +230,16 @@ class RentInvoiceViewSet(viewsets.ModelViewSet):
 
 
 class RentPaymentViewSet(viewsets.ModelViewSet):
-    """API ViewSet for rent payments (using unified Payment model)"""
+    """
+    API ViewSet for Rent Payment management (using unified Payment model)
+    
+    list: Get all rent payments (filtered by user role)
+    retrieve: Get a specific rent payment
+    create: Create a new rent payment
+    update: Update a rent payment
+    partial_update: Partially update a rent payment
+    destroy: Delete a rent payment
+    """
     permission_classes = [permissions.IsAuthenticated]
     
     def get_serializer_class(self):
@@ -185,6 +274,20 @@ class RentPaymentViewSet(viewsets.ModelViewSet):
         
         return queryset.order_by('-paid_date')
     
+    @swagger_auto_schema(
+        method='get',
+        operation_description="Get recent rent payments. Returns the most recent payments, limited by 'limit' query parameter (default: 10).",
+        operation_summary="Get Recent Rent Payments",
+        tags=['Rent'],
+        manual_parameters=[
+            openapi.Parameter('limit', openapi.IN_QUERY, description="Number of recent payments to return (default: 10)", type=openapi.TYPE_INTEGER, required=False)
+        ],
+        responses={
+            200: RentPaymentSerializer(many=True),
+            401: "Authentication required"
+        },
+        security=[{'Bearer': []}]
+    )
     @action(detail=False)
     def recent(self, request):
         """Get recent payments"""
@@ -193,6 +296,31 @@ class RentPaymentViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
     
+    @swagger_auto_schema(
+        method='post',
+        operation_description="Initiate payment with payment gateway (AZAM Pay). Creates PaymentTransaction and returns payment link for mobile app.",
+        operation_summary="Initiate Gateway Payment",
+        tags=['Rent'],
+        responses={
+            201: openapi.Response(
+                description="Payment initiated successfully",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        'payment_id': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'transaction_id': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'payment_link': openapi.Schema(type=openapi.TYPE_STRING, description='URL to redirect user for payment'),
+                        'transaction_reference': openapi.Schema(type=openapi.TYPE_STRING),
+                        'message': openapi.Schema(type=openapi.TYPE_STRING)
+                    }
+                )
+            ),
+            400: "Payment already completed or gateway error",
+            401: "Authentication required"
+        },
+        security=[{'Bearer': []}]
+    )
     @action(detail=True, methods=['post'])
     def initiate_gateway(self, request, pk=None):
         """
@@ -218,10 +346,13 @@ class RentPaymentViewSet(viewsets.ModelViewSet):
             defaults={'description': 'AZAM Pay Payment Gateway'}
         )
         
-        # Get callback URL
+        # Get callback URL - use configured webhook URL (production) instead of localhost
         from django.conf import settings
-        base_url = getattr(settings, 'BASE_URL', request.build_absolute_uri('/'))
-        callback_url = f"{base_url}api/v1/payments/webhook/azam-pay/"
+        callback_url = getattr(settings, 'AZAM_PAY_WEBHOOK_URL', None)
+        if not callback_url:
+            # Fallback to BASE_URL if webhook URL not configured
+            base_domain = getattr(settings, 'BASE_URL', 'https://portal.maishaapp.co.tz')
+            callback_url = f"{base_domain}/api/v1/payments/webhook/azam-pay/"
         
         # Initiate payment with gateway
         gateway_result = PaymentGatewayService.initiate_payment(
@@ -262,6 +393,31 @@ class RentPaymentViewSet(viewsets.ModelViewSet):
             'message': 'Payment initiated successfully. Redirect user to payment_link.'
         }, status=status.HTTP_201_CREATED)
     
+    @swagger_auto_schema(
+        method='post',
+        operation_description="Verify payment status with payment gateway. Mobile app should call this after user completes payment on gateway.",
+        operation_summary="Verify Payment",
+        tags=['Rent'],
+        responses={
+            200: openapi.Response(
+                description="Payment verification result",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        'payment_id': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'status': openapi.Schema(type=openapi.TYPE_STRING),
+                        'transaction_status': openapi.Schema(type=openapi.TYPE_STRING),
+                        'verified': openapi.Schema(type=openapi.TYPE_BOOLEAN)
+                    }
+                )
+            ),
+            400: "Verification failed or no transaction found",
+            404: "Transaction not found",
+            401: "Authentication required"
+        },
+        security=[{'Bearer': []}]
+    )
     @action(detail=True, methods=['post'])
     def verify(self, request, pk=None):
         """
@@ -317,7 +473,16 @@ class RentPaymentViewSet(viewsets.ModelViewSet):
 
 
 class LateFeeViewSet(viewsets.ModelViewSet):
-    """API ViewSet for late fee configurations"""
+    """
+    API ViewSet for Late Fee management
+    
+    list: Get all late fees (filtered by user role)
+    retrieve: Get a specific late fee
+    create: Create a new late fee
+    update: Update a late fee
+    partial_update: Partially update a late fee
+    destroy: Delete a late fee
+    """
     serializer_class = LateFeeSerializer
     permission_classes = [permissions.IsAuthenticated]
     
@@ -335,7 +500,12 @@ class LateFeeViewSet(viewsets.ModelViewSet):
 
 
 class RentReminderViewSet(viewsets.ReadOnlyModelViewSet):
-    """API ViewSet for rent reminders (read-only)"""
+    """
+    API ViewSet for Rent Reminder management (Read-only)
+    
+    list: Get all rent reminders (filtered by user role)
+    retrieve: Get a specific rent reminder
+    """
     serializer_class = RentReminderSerializer
     permission_classes = [permissions.IsAuthenticated]
     
@@ -353,9 +523,24 @@ class RentReminderViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class RentDashboardViewSet(viewsets.ViewSet):
-    """API ViewSet for rent dashboard and statistics"""
+    """
+    API ViewSet for Rent Dashboard and Statistics
+    
+    Provides dashboard statistics and tenant summaries for rent management.
+    """
     permission_classes = [permissions.IsAuthenticated]
     
+    @swagger_auto_schema(
+        method='get',
+        operation_description="Get rent dashboard statistics including total monthly rent, collected amount, outstanding amount, overdue amount, collection rate, and recent data.",
+        operation_summary="Get Rent Dashboard Statistics",
+        tags=['Rent'],
+        responses={
+            200: RentDashboardSerializer,
+            401: "Authentication required"
+        },
+        security=[{'Bearer': []}]
+    )
     @action(detail=False)
     def stats(self, request):
         """Get rent dashboard statistics"""
@@ -425,6 +610,22 @@ class RentDashboardViewSet(viewsets.ViewSet):
         serializer = RentDashboardSerializer(data)
         return Response(serializer.data)
     
+    @swagger_auto_schema(
+        method='get',
+        operation_description="Get rent summary for a specific tenant. Includes active lease, current invoice, payment history, outstanding balance, and next due date.",
+        operation_summary="Get Tenant Rent Summary",
+        tags=['Rent'],
+        manual_parameters=[
+            openapi.Parameter('tenant_id', openapi.IN_QUERY, description="Tenant user ID (required for staff, optional for tenants)", type=openapi.TYPE_INTEGER, required=False)
+        ],
+        responses={
+            200: TenantRentSummarySerializer,
+            403: "Permission denied",
+            404: "No active lease found",
+            401: "Authentication required"
+        },
+        security=[{'Bearer': []}]
+    )
     @action(detail=False)
     def tenant_summary(self, request):
         """Get rent summary for a specific tenant"""

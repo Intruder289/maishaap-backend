@@ -248,7 +248,12 @@
                                         <label for="{{ form.address.id_for_label }}" class="form-label fw-semibold">
                                             Address <span class="text-danger">*</span>
                                         </label>
-                                        {{ form.address }}
+                                        <div class="input-group">
+                                            {{ form.address }}
+                                            <button type="button" class="btn btn-outline-primary" id="geocodeBtn" title="Get coordinates from address">
+                                                <i class="fas fa-map-marker-alt me-1"></i>Get Coordinates
+                                            </button>
+                                        </div>
                                         {% if form.address.errors %}
                                             <div class="invalid-feedback d-block">
                                                 {% for error in form.address.errors %}
@@ -256,7 +261,19 @@
                                                 {% endfor %}
                                             </div>
                                         {% endif %}
-                                        <div class="form-text">Full street address of the property</div>
+                                        <div class="form-text">
+                                            Full street address of the property. Click "Get Coordinates" to automatically find GPS coordinates.
+                                        </div>
+                                        <div id="geocodeStatus" class="mt-2" style="display: none;"></div>
+                                        <style>
+                                            #geocodeBtn {
+                                                white-space: nowrap;
+                                            }
+                                            #geocodeStatus .alert {
+                                                margin-top: 0.5rem;
+                                                margin-bottom: 0;
+                                            }
+                                        </style>
                                     </div>
                                 </div>
                             </div>
@@ -1488,6 +1505,98 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
                 }
             });
+    }
+});
+
+// Geocoding functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const geocodeBtn = document.getElementById('geocodeBtn');
+    const addressField = document.getElementById('id_address');
+    const latitudeField = document.getElementById('id_latitude');
+    const longitudeField = document.getElementById('id_longitude');
+    const regionField = document.getElementById('id_region');
+    const geocodeStatus = document.getElementById('geocodeStatus');
+    
+    if (!geocodeBtn || !addressField) {
+        return; // Form elements not found
+    }
+    
+    geocodeBtn.addEventListener('click', function() {
+        const address = addressField.value.trim();
+        
+        if (!address) {
+            showGeocodeStatus('Please enter an address first.', 'warning');
+            return;
+        }
+        
+        // Disable button and show loading
+        geocodeBtn.disabled = true;
+        geocodeBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Finding...';
+        geocodeStatus.style.display = 'none';
+        
+        // Get region ID if available
+        const regionId = regionField ? regionField.value : null;
+        
+        // Make AJAX request
+        fetch('{% url "properties:geocode_address" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                address: address,
+                region_id: regionId
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Fill in coordinates
+                if (latitudeField) {
+                    latitudeField.value = data.latitude.toFixed(8);
+                }
+                if (longitudeField) {
+                    longitudeField.value = data.longitude.toFixed(8);
+                }
+                showGeocodeStatus('Coordinates found successfully!', 'success');
+            } else {
+                showGeocodeStatus(data.error || 'Could not find coordinates. Please enter them manually.', 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Geocoding error:', error);
+            showGeocodeStatus('An error occurred while geocoding. Please try again or enter coordinates manually.', 'danger');
+        })
+        .finally(() => {
+            // Re-enable button
+            geocodeBtn.disabled = false;
+            geocodeBtn.innerHTML = '<i class="fas fa-map-marker-alt me-1"></i>Get Coordinates';
+        });
+    });
+    
+    function showGeocodeStatus(message, type) {
+        geocodeStatus.innerHTML = `<div class="alert alert-${type} alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>`;
+        geocodeStatus.style.display = 'block';
+    }
+    
+    // Helper function to get CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
     }
 });
 </script>

@@ -70,7 +70,7 @@
             </tr>
           </thead>
           <tbody id="payments-table-body">
-            {% for payment in payments %}
+            {% for payment in page_obj.object_list %}
             <tr data-payment-id="{{ payment.id }}">
               <td>
                 <div class="d-flex align-items-center">
@@ -111,42 +111,32 @@
                 </div>
               </td>
               <td>
-                <span class="fw-bold text-success">${{ payment.amount|floatformat:2 }}</span>
+                <span class="fw-bold text-success">Tsh{{ payment.amount|floatformat:2 }}</span>
               </td>
               <td>
                 {% if payment.payment_method == 'cash' %}
                 <span class="badge bg-success">{{ payment.get_payment_method_display }}</span>
-                {% elif payment.payment_method == 'bank_transfer' %}
+                {% elif payment.payment_method == 'online' %}
                 <span class="badge bg-info">{{ payment.get_payment_method_display }}</span>
                 {% elif payment.payment_method == 'mobile_money' %}
                 <span class="badge bg-warning">{{ payment.get_payment_method_display }}</span>
-                {% elif payment.payment_method == 'credit_card' %}
+                {% elif payment.payment_method == 'online' %}
                 <span class="badge bg-primary">{{ payment.get_payment_method_display }}</span>
                 {% else %}
                 <span class="badge bg-secondary">{{ payment.get_payment_method_display }}</span>
                 {% endif %}
               </td>
               <td>
-                {% if use_rent_payments %}
-                  {% if payment.status == 'completed' %}
-                  <span class="badge bg-success">{{ payment.get_status_display }}</span>
-                  {% elif payment.status == 'pending' %}
-                  <span class="badge bg-warning">{{ payment.get_status_display }}</span>
-                  {% elif payment.status == 'failed' %}
-                  <span class="badge bg-danger">{{ payment.get_status_display }}</span>
-                  {% else %}
-                  <span class="badge bg-secondary">{{ payment.get_status_display }}</span>
-                  {% endif %}
+                {% if payment.status == 'completed' %}
+                <span class="badge bg-success">{{ payment.get_status_display }}</span>
+                {% elif payment.status == 'pending' %}
+                <span class="badge bg-warning">{{ payment.get_status_display }}</span>
+                {% elif payment.status == 'failed' %}
+                <span class="badge bg-danger">{{ payment.get_status_display }}</span>
+                {% elif payment.status == 'cancelled' %}
+                <span class="badge bg-secondary">{{ payment.get_status_display }}</span>
                 {% else %}
-                  {% if payment.status == 'successful' %}
-                  <span class="badge bg-success">{{ payment.get_status_display }}</span>
-                  {% elif payment.status == 'pending' %}
-                  <span class="badge bg-warning">{{ payment.get_status_display }}</span>
-                  {% elif payment.status == 'failed' %}
-                  <span class="badge bg-danger">{{ payment.get_status_display }}</span>
-                  {% else %}
-                  <span class="badge bg-secondary">{{ payment.get_status_display }}</span>
-                  {% endif %}
+                <span class="badge bg-info">{{ payment.get_status_display }}</span>
                 {% endif %}
               </td>
               <td>
@@ -166,15 +156,18 @@
                     <i class="fas fa-ellipsis-v"></i>
                   </button>
                   <ul class="dropdown-menu">
-                    <li><a class="dropdown-item" href="#" onclick="openPaymentViewModal({{ payment.id }})">
+                    <li><a class="dropdown-item" href="#" onclick="openPaymentViewModal({{ payment.id }}); return false;">
                       <i class="fas fa-eye me-2"></i>View Details
                     </a></li>
-                    <li><a class="dropdown-item" href="#" onclick="openPaymentEditModal({{ payment.id }})">
-                      <i class="fas fa-edit me-2"></i>Edit Payment
-                    </a></li>
-                    <li><a class="dropdown-item" href="#" onclick="openPaymentReceiptModal({{ payment.id }})">
+                    <li><a class="dropdown-item" href="#" onclick="openPaymentReceiptModal({{ payment.id }}); return false;">
                       <i class="fas fa-receipt me-2"></i>Generate Receipt
                     </a></li>
+                    {% if payment.status == 'pending' %}
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item text-danger" href="#" onclick="deletePaymentFromList({{ payment.id }}); return false;">
+                      <i class="fas fa-trash me-2"></i>Delete Payment
+                    </a></li>
+                    {% endif %}
                   </ul>
                 </div>
               </td>
@@ -194,51 +187,51 @@
       </div>
       
       <!-- Pagination -->
-      {% if payments.has_other_pages %}
+      {% if page_obj.has_other_pages %}
       <div class="card-footer bg-white border-0 py-3">
         <div class="row align-items-center">
           <div class="col-md-6">
             <div class="text-muted">
-              Showing {{ payments.start_index }} to {{ payments.end_index }} of {{ payments.paginator.count }} entries
+              Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} entries
             </div>
           </div>
           <div class="col-md-6">
             <nav aria-label="Page navigation" class="d-flex justify-content-end">
               <ul class="pagination pagination-sm mb-0">
-                {% if payments.has_previous %}
+                {% if page_obj.has_previous %}
                 <li class="page-item">
                   <a class="page-link" href="#" onclick="loadPage(1); return false;" title="First Page">
                     <i class="fas fa-angle-double-left"></i>
                   </a>
                 </li>
                 <li class="page-item">
-                  <a class="page-link" href="#" onclick="loadPage({{ payments.previous_page_number }}); return false;" title="Previous Page">
+                  <a class="page-link" href="#" onclick="loadPage({{ page_obj.previous_page_number }}); return false;" title="Previous Page">
                     <i class="fas fa-angle-left"></i>
                   </a>
                 </li>
                 {% endif %}
 
                 <!-- Page numbers -->
-                {% for num in payments.paginator.page_range %}
-                  {% if payments.number == num %}
+                {% for num in page_obj.paginator.page_range %}
+                  {% if page_obj.number == num %}
                   <li class="page-item active">
                     <span class="page-link">{{ num }}</span>
                   </li>
-                  {% elif num > payments.number|add:'-3' and num < payments.number|add:'3' %}
+                  {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
                   <li class="page-item">
                     <a class="page-link" href="#" onclick="loadPage({{ num }}); return false;">{{ num }}</a>
                   </li>
                   {% endif %}
                 {% endfor %}
 
-                {% if payments.has_next %}
+                {% if page_obj.has_next %}
                 <li class="page-item">
-                  <a class="page-link" href="#" onclick="loadPage({{ payments.next_page_number }}); return false;" title="Next Page">
+                  <a class="page-link" href="#" onclick="loadPage({{ page_obj.next_page_number }}); return false;" title="Next Page">
                     <i class="fas fa-angle-right"></i>
                   </a>
                 </li>
                 <li class="page-item">
-                  <a class="page-link" href="#" onclick="loadPage({{ payments.paginator.num_pages }}); return false;" title="Last Page">
+                  <a class="page-link" href="#" onclick="loadPage({{ page_obj.paginator.num_pages }}); return false;" title="Last Page">
                     <i class="fas fa-angle-double-right"></i>
                   </a>
                 </li>
@@ -262,9 +255,9 @@
           <div>
             <h6 class="mb-2 text-500">Total Payments</h6>
             <h4 class="mb-0">{{ total_payments }}</h4>
-            <p class="fs--1 mb-0 text-success">
-              <span class="me-1 fas fa-caret-up"></span>
-              +12.5%
+            <p class="fs--1 mb-0 {% if payments_change_percent >= 0 %}text-success{% else %}text-danger{% endif %}">
+              <span class="me-1 fas fa-caret-{% if payments_change_percent >= 0 %}up{% else %}down{% endif %}"></span>
+              {% if payments_change_percent >= 0 %}+{% endif %}{{ payments_change_percent }}%
             </p>
           </div>
           <div class="d-flex align-items-center">
@@ -285,10 +278,10 @@
         <div class="d-flex justify-content-between">
           <div>
             <h6 class="mb-2 text-500">Total Revenue</h6>
-            <h4 class="mb-0">${{ total_revenue|floatformat:2 }}</h4>
-            <p class="fs--1 mb-0 text-success">
-              <span class="me-1 fas fa-caret-up"></span>
-              +8.2%
+            <h4 class="mb-0">Tsh{{ total_revenue|floatformat:2 }}</h4>
+            <p class="fs--1 mb-0 {% if revenue_change_percent >= 0 %}text-success{% else %}text-danger{% endif %}">
+              <span class="me-1 fas fa-caret-{% if revenue_change_percent >= 0 %}up{% else %}down{% endif %}"></span>
+              {% if revenue_change_percent >= 0 %}+{% endif %}{{ revenue_change_percent }}%
             </p>
           </div>
           <div class="d-flex align-items-center">
@@ -334,9 +327,9 @@
           <div>
             <h6 class="mb-2 text-500">Success Rate</h6>
             <h4 class="mb-0">{{ success_rate }}%</h4>
-            <p class="fs--1 mb-0 text-success">
-              <span class="me-1 fas fa-check-circle"></span>
-              Excellent
+            <p class="fs--1 mb-0 {% if success_rate >= 90 %}text-success{% elif success_rate >= 70 %}text-info{% elif success_rate >= 50 %}text-warning{% else %}text-danger{% endif %}">
+              <span class="me-1 fas fa-{% if success_rate >= 70 %}check-circle{% else %}exclamation-circle{% endif %}"></span>
+              {{ success_status }}
             </p>
           </div>
           <div class="d-flex align-items-center">
@@ -470,64 +463,53 @@ function initializePaymentsPage() {
 
 // Payment Modal Functions
 window.openPaymentViewModal = function(paymentId) {
-    console.log('Opening Payment View Modal for payment:', paymentId);
-    // Try properties endpoint first (for Payment model)
-    $.ajax({
-        url: '/properties/api/payment/' + paymentId + '/view-details/',
-        type: 'GET',
-        success: function(data) {
-            // Create modal if it doesn't exist
-            if ($('#paymentViewModal').length === 0) {
-                $('body').append('<div class="modal fade" id="paymentViewModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Payment Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="paymentViewContent"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>');
-            }
-            $('#paymentViewContent').html(data);
-            $('#paymentViewModal').modal('show');
-        },
-        error: function() {
-            alert('Payment details not available. This payment may be from a different system.');
-        }
-    });
-};
-
-window.openPaymentEditModal = function(paymentId) {
-    console.log('Opening Payment Edit Modal for payment:', paymentId);
-    // Try properties endpoint first (for Payment model)
-    $.ajax({
-        url: '/properties/api/payment/' + paymentId + '/edit/',
-        type: 'GET',
-        success: function(data) {
-            // Create modal if it doesn't exist
-            if ($('#paymentEditModal').length === 0) {
-                $('body').append('<div class="modal fade" id="paymentEditModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Edit Payment</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="paymentEditContent"></div></div></div></div>');
-            }
-            $('#paymentEditContent').html(data);
-            $('#paymentEditModal').modal('show');
-        },
-        error: function() {
-            alert('Payment edit not available. This payment may be from a different system.');
-        }
-    });
+    viewPayment(paymentId);
 };
 
 window.openPaymentReceiptModal = function(paymentId) {
-    console.log('Opening Payment Receipt Modal for payment:', paymentId);
-    // Try properties endpoint first (for Payment model)
-    $.ajax({
-        url: '/properties/api/payment/' + paymentId + '/generate-receipt/',
-        type: 'GET',
-        success: function(data) {
-            // Create modal if it doesn't exist
-            if ($('#paymentReceiptModal').length === 0) {
-                $('body').append('<div class="modal fade" id="paymentReceiptModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Payment Receipt</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="paymentReceiptContent"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button><a href="/properties/api/payment/' + paymentId + '/download-receipt/" class="btn btn-primary" target="_blank"><i class="fas fa-download me-2"></i>Download PDF</a></div></div></div></div>');
-            }
-            $('#paymentReceiptContent').html(data);
-            $('#paymentReceiptModal').modal('show');
-        },
-        error: function() {
-            alert('Receipt generation not available. This payment may be from a different system.');
-        }
-    });
+    generateReceipt(paymentId);
 };
+
+// Payment Action Functions
+function viewPayment(paymentId) {
+    $.get('/payments/api/payment/' + paymentId + '/view-details/', function(data) {
+        if ($('#paymentViewModal').length === 0) {
+            $('body').append('<div class="modal fade" id="paymentViewModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Payment Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="paymentViewContent"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>');
+        }
+        $('#paymentViewContent').html(data);
+        $('#paymentViewModal').modal('show');
+    }).fail(function() {
+        alert('Failed to load payment details.');
+    });
+}
+
+
+function generateReceipt(paymentId) {
+    $.get('/payments/api/payment/' + paymentId + '/generate-receipt/', function(data) {
+        if ($('#paymentReceiptModal').length === 0) {
+            $('body').append('<div class="modal fade" id="paymentReceiptModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Payment Receipt</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="paymentReceiptContent"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>');
+        }
+        $('#paymentReceiptContent').html(data);
+        $('#paymentReceiptModal').modal('show');
+    }).fail(function() {
+        alert('Failed to generate receipt.');
+    });
+}
+
+// Delete payment function
+function deletePaymentFromList(paymentId) {
+    if (!confirm('Are you sure you want to delete this payment?')) return;
+    
+    $.get('/payments/api/payment/' + paymentId + '/delete/', function(data) {
+        if ($('#paymentDeleteModal').length === 0) {
+            $('body').append('<div class="modal fade" id="paymentDeleteModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Delete Payment</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="paymentDeleteContent"></div></div></div></div>');
+        }
+        $('#paymentDeleteContent').html(data);
+        $('#paymentDeleteModal').modal('show');
+    }).fail(function() {
+        alert('Failed to load delete confirmation.');
+    });
+}
 
 // Start the initialization
 waitForJQuery();

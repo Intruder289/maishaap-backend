@@ -4,6 +4,8 @@ from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q, Avg
 from django.utils import timezone
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 
 from complaints.models import Complaint, ComplaintResponse, Feedback
 from complaints.serializers import (
@@ -92,6 +94,20 @@ class ComplaintViewSet(viewsets.ModelViewSet):
                     serializer.validated_data.pop(field)
         serializer.save()
     
+    @swagger_auto_schema(
+        method='post',
+        operation_description="Add a response to a complaint. Staff only. Creates a ComplaintResponse record.",
+        operation_summary="Add Complaint Response",
+        tags=['Complaints'],
+        request_body=ComplaintResponseSerializer,
+        responses={
+            201: ComplaintResponseSerializer,
+            400: "Validation error",
+            403: "Permission denied (staff only)",
+            401: "Authentication required"
+        },
+        security=[{'Bearer': []}]
+    )
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def add_response(self, request, pk=None):
         """Add a response to a complaint"""
@@ -113,6 +129,20 @@ class ComplaintViewSet(viewsets.ModelViewSet):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+    @swagger_auto_schema(
+        method='patch',
+        operation_description="Update complaint status. Staff only. Allows updating status, resolved_by, and resolution_notes.",
+        operation_summary="Update Complaint Status",
+        tags=['Complaints'],
+        request_body=ComplaintStatusUpdateSerializer,
+        responses={
+            200: ComplaintSerializer,
+            400: "Validation error",
+            403: "Permission denied (staff only)",
+            401: "Authentication required"
+        },
+        security=[{'Bearer': []}]
+    )
     @action(detail=True, methods=['patch'], permission_classes=[permissions.IsAuthenticated])
     def update_status(self, request, pk=None):
         """Update complaint status (staff only)"""
@@ -135,6 +165,17 @@ class ComplaintViewSet(viewsets.ModelViewSet):
             return Response(ComplaintSerializer(complaint).data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+    @swagger_auto_schema(
+        method='get',
+        operation_description="Get all complaints for the current user. Returns only complaints created by the current user.",
+        operation_summary="Get My Complaints",
+        tags=['Complaints'],
+        responses={
+            200: ComplaintSerializer(many=True),
+            401: "Authentication required"
+        },
+        security=[{'Bearer': []}]
+    )
     @action(detail=False, methods=['get'])
     def my_complaints(self, request):
         """Get current user's complaints"""
@@ -147,6 +188,32 @@ class ComplaintViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(complaints, many=True)
         return Response(serializer.data)
     
+    @swagger_auto_schema(
+        method='get',
+        operation_description="Get complaint statistics including counts by status, category, and priority. Staff only.",
+        operation_summary="Get Complaint Statistics",
+        tags=['Complaints'],
+        responses={
+            200: openapi.Response(
+                description="Complaint statistics",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'total_complaints': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'pending': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'in_progress': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'resolved': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'closed': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'by_category': openapi.Schema(type=openapi.TYPE_OBJECT),
+                        'by_priority': openapi.Schema(type=openapi.TYPE_OBJECT),
+                    }
+                )
+            ),
+            403: "Permission denied (staff only)",
+            401: "Authentication required"
+        },
+        security=[{'Bearer': []}]
+    )
     @action(detail=False, methods=['get'])
     def statistics(self, request):
         """Get complaint statistics (staff only)"""
@@ -223,6 +290,17 @@ class FeedbackViewSet(viewsets.ModelViewSet):
         """Set user when creating feedback"""
         serializer.save(user=self.request.user)
     
+    @swagger_auto_schema(
+        method='get',
+        operation_description="Get all feedback submitted by the current user. Returns only feedback created by the current user.",
+        operation_summary="Get My Feedback",
+        tags=['Feedback'],
+        responses={
+            200: FeedbackSerializer(many=True),
+            401: "Authentication required"
+        },
+        security=[{'Bearer': []}]
+    )
     @action(detail=False, methods=['get'])
     def my_feedback(self, request):
         """Get current user's feedback"""
@@ -235,6 +313,29 @@ class FeedbackViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(feedback, many=True)
         return Response(serializer.data)
     
+    @swagger_auto_schema(
+        method='get',
+        operation_description="Get feedback statistics including average rating, counts by type and rating. Staff only.",
+        operation_summary="Get Feedback Statistics",
+        tags=['Feedback'],
+        responses={
+            200: openapi.Response(
+                description="Feedback statistics",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'total_feedback': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'average_rating': openapi.Schema(type=openapi.TYPE_NUMBER),
+                        'by_type': openapi.Schema(type=openapi.TYPE_OBJECT),
+                        'by_rating': openapi.Schema(type=openapi.TYPE_OBJECT),
+                    }
+                )
+            ),
+            403: "Permission denied (staff only)",
+            401: "Authentication required"
+        },
+        security=[{'Bearer': []}]
+    )
     @action(detail=False, methods=['get'])
     def statistics(self, request):
         """Get feedback statistics (staff only)"""
@@ -268,7 +369,16 @@ class FeedbackViewSet(viewsets.ModelViewSet):
 
 class ComplaintResponseViewSet(viewsets.ModelViewSet):
     """
-    API ViewSet for Complaint Responses (staff only)
+    API ViewSet for Complaint Response management
+    
+    list: Get all complaint responses (filtered by user permissions)
+    retrieve: Get a specific complaint response
+    create: Create a new complaint response (staff only)
+    update: Update a complaint response (staff only)
+    partial_update: Partially update a complaint response (staff only)
+    destroy: Delete a complaint response (staff only)
+    
+    Note: Only staff can create responses. Regular users can only view responses to their own complaints.
     """
     queryset = ComplaintResponse.objects.select_related('complaint', 'responder').all()
     serializer_class = ComplaintResponseSerializer

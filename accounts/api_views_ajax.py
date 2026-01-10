@@ -310,11 +310,12 @@ def user_delete_api(request, user_id):
         
         user = User.objects.get(id=user_id)
         
-        # Prevent deleting superusers
-        if user.is_superuser:
+        # Prevent deleting superusers (unless current user is also superuser)
+        # Allow superusers to delete other accounts, but prevent non-superusers from deleting superusers
+        if user.is_superuser and not request.user.is_superuser:
             return JsonResponse({
                 'success': False,
-                'message': 'Cannot delete superuser accounts'
+                'message': 'Cannot delete superuser accounts. Only superusers can delete other superuser accounts.'
             }, status=403)
         
         # Prevent deleting self

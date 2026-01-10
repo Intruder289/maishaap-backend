@@ -58,19 +58,15 @@ class Payment(models.Model):
     """
     STATUS_CHOICES = [
         ('pending', 'Pending'),
-        ('successful', 'Successful'),
+        ('completed', 'Completed'),
         ('failed', 'Failed'),
-        ('completed', 'Completed'),  # Added for rent payments compatibility
-        ('cancelled', 'Cancelled'),  # Added for rent payments compatibility
+        ('cancelled', 'Cancelled'),
     ]
     
     PAYMENT_METHOD_CHOICES = [
         ('cash', 'Cash'),
-        ('bank_transfer', 'Bank Transfer'),
-        ('check', 'Check'),
-        ('credit_card', 'Credit Card'),
-        ('mobile_money', 'Mobile Money'),
-        ('online', 'Online Payment'),
+        ('mobile_money', 'Mobile Money (AZAM Pay)'),
+        ('online', 'Online Payment (AZAM Pay)'),
     ]
 
     # Payment can be linked to one of these (only one should be set)
@@ -83,6 +79,22 @@ class Payment(models.Model):
     provider = models.ForeignKey(PaymentProvider, on_delete=models.SET_NULL, blank=True, null=True, related_name='payments')
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES, default='cash')
+    
+    # Mobile Money Provider (for mobile_money payments only)
+    MOBILE_MONEY_PROVIDER_CHOICES = [
+        ('AIRTEL', 'AIRTEL'),
+        ('TIGO', 'TIGO'),
+        ('MPESA', 'MPESA (Vodacom)'),
+        ('HALOPESA', 'HALOPESA'),
+    ]
+    mobile_money_provider = models.CharField(
+        max_length=20,
+        choices=MOBILE_MONEY_PROVIDER_CHOICES,
+        blank=True,
+        null=True,
+        help_text='Mobile money provider (required for mobile_money payments)'
+    )
+    
     paid_date = models.DateField(blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     transaction_ref = models.CharField(max_length=100, blank=True, null=True)
@@ -93,6 +105,15 @@ class Payment(models.Model):
     processor_response = models.JSONField(null=True, blank=True)
     
     notes = models.TextField(blank=True, null=True)
+    
+    # Receipt for cash payments (web portal only)
+    receipt = models.FileField(
+        upload_to='payment_receipts/%Y/%m/',
+        blank=True,
+        null=True,
+        help_text='Receipt/proof of payment (for cash payments only)'
+    )
+    
     recorded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

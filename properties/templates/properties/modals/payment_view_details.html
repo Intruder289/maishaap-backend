@@ -30,18 +30,14 @@
         <div class="mb-3">
             <label class="form-label fw-bold">Payment Method</label>
             <p class="mb-0">
-                {% if payment.payment_method == 'bank_transfer' %}
-                    <span class="badge bg-success">Bank Transfer</span>
-                {% elif payment.payment_method == 'cash' %}
+                {% if payment.payment_method == 'cash' %}
                     <span class="badge bg-primary">Cash</span>
                 {% elif payment.payment_method == 'mobile_money' %}
-                    <span class="badge bg-info">Mobile Money</span>
-                {% elif payment.payment_method == 'check' %}
-                    <span class="badge bg-warning">Check</span>
-                {% elif payment.payment_method == 'card' %}
-                    <span class="badge bg-secondary">Card</span>
+                    <span class="badge bg-info">Mobile Money (AZAM Pay)</span>
+                {% elif payment.payment_method == 'online' %}
+                    <span class="badge bg-success">Online Payment (AZAM Pay)</span>
                 {% else %}
-                    <span class="badge bg-light text-dark">{{ payment.payment_method|title }}</span>
+                    <span class="badge bg-light text-dark">{{ payment.get_payment_method_display|default:payment.payment_method|title }}</span>
                 {% endif %}
             </p>
         </div>

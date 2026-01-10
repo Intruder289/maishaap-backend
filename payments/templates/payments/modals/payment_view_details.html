@@ -1,0 +1,155 @@
+<div class="payment-details">
+  <div class="row mb-3">
+    <div class="col-md-6">
+      <h6 class="text-500 mb-2">Payment Information</h6>
+      <table class="table table-sm table-borderless">
+        <tr>
+          <td class="text-600">Payment ID:</td>
+          <td><strong>#{{ payment.id }}</strong></td>
+        </tr>
+        <tr>
+          <td class="text-600">Amount:</td>
+          <td><strong class="text-success">Tsh{{ payment.amount|floatformat:2 }}</strong></td>
+        </tr>
+        <tr>
+          <td class="text-600">Status:</td>
+          <td>
+            {% if payment.status == 'completed' %}
+            <span class="badge bg-success">Completed</span>
+            {% elif payment.status == 'pending' %}
+            <span class="badge bg-warning">Pending</span>
+            {% elif payment.status == 'failed' %}
+            <span class="badge bg-danger">Failed</span>
+            {% else %}
+            <span class="badge bg-secondary">{{ payment.get_status_display }}</span>
+            {% endif %}
+          </td>
+        </tr>
+        <tr>
+          <td class="text-600">Payment Method:</td>
+          <td>{{ payment.get_payment_method_display }}</td>
+        </tr>
+        {% if payment.provider %}
+        <tr>
+          <td class="text-600">Provider:</td>
+          <td>{{ payment.provider.name }}</td>
+        </tr>
+        {% endif %}
+        {% if payment.transaction_ref %}
+        <tr>
+          <td class="text-600">Transaction Ref:</td>
+          <td><code>{{ payment.transaction_ref }}</code></td>
+        </tr>
+        {% endif %}
+      </table>
+    </div>
+    <div class="col-md-6">
+      <h6 class="text-500 mb-2">Tenant Information</h6>
+      <table class="table table-sm table-borderless">
+        <tr>
+          <td class="text-600">Name:</td>
+          <td><strong>{{ payment.tenant.get_full_name|default:payment.tenant.username }}</strong></td>
+        </tr>
+        <tr>
+          <td class="text-600">Email:</td>
+          <td>{{ payment.tenant.email|default:"N/A" }}</td>
+        </tr>
+        <tr>
+          <td class="text-600">Username:</td>
+          <td>{{ payment.tenant.username }}</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+  
+  {% if payment.invoice %}
+  <div class="row mb-3">
+    <div class="col-12">
+      <h6 class="text-500 mb-2">Invoice Information</h6>
+      <table class="table table-sm table-borderless">
+        <tr>
+          <td class="text-600">Invoice ID:</td>
+          <td><strong>#{{ payment.invoice.id }}</strong></td>
+        </tr>
+        <tr>
+          <td class="text-600">Invoice Amount:</td>
+          <td><strong>Tsh{{ payment.invoice.amount|floatformat:2 }}</strong></td>
+        </tr>
+        <tr>
+          <td class="text-600">Due Date:</td>
+          <td>{{ payment.invoice.due_date|date:"M d, Y" }}</td>
+        </tr>
+        <tr>
+          <td class="text-600">Invoice Status:</td>
+          <td>
+            {% if payment.invoice.status == 'paid' %}
+            <span class="badge bg-success">Paid</span>
+            {% else %}
+            <span class="badge bg-warning">Unpaid</span>
+            {% endif %}
+          </td>
+        </tr>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+  
+  {% if transactions %}
+  <div class="row">
+    <div class="col-12">
+      <h6 class="text-500 mb-2">Transaction History</h6>
+      <div class="table-responsive">
+        <table class="table table-sm">
+          <thead>
+            <tr>
+              <th>Transaction ID</th>
+              <th>Status</th>
+              <th>Gateway ID</th>
+              <th>AZAM Reference</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for transaction in transactions %}
+            <tr>
+              <td>#{{ transaction.id }}</td>
+              <td>
+                {% if transaction.status == 'successful' %}
+                <span class="badge bg-success">{{ transaction.status|title }}</span>
+                {% elif transaction.status == 'pending' %}
+                <span class="badge bg-warning">{{ transaction.status|title }}</span>
+                {% else %}
+                <span class="badge bg-secondary">{{ transaction.status|title }}</span>
+                {% endif %}
+              </td>
+              <td><code class="small">{{ transaction.gateway_transaction_id|default:"-" }}</code></td>
+              <td><code class="small">{{ transaction.azam_reference|default:"-" }}</code></td>
+              <td>{{ transaction.created_at|date:"M d, Y H:i" }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="5" class="text-center text-muted">No transactions found</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+  
+  <div class="row mt-3">
+    <div class="col-12">
+      <div class="d-flex justify-content-between">
+        <div>
+          <small class="text-muted">Created: {{ payment.created_at|date:"M d, Y H:i" }}</small>
+        </div>
+        {% if payment.paid_date %}
+        <div>
+          <small class="text-muted">Paid: {{ payment.paid_date|date:"M d, Y" }}</small>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>

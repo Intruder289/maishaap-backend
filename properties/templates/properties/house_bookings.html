@@ -1052,8 +1052,8 @@ function processCheckOut() {
 }
 
 function addNewPayment() {
-    // Open a new payment modal or redirect to payment page
-    window.open(`/properties/bookings/${currentBookingId}/payment/`, '_blank');
+    // Redirect to payment page in the same tab
+    window.location.href = `/properties/bookings/${currentBookingId}/payment/`;
 }
 
 function downloadInvoice() {

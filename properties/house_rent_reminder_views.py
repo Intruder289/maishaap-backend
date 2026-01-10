@@ -15,7 +15,18 @@ from datetime import timedelta, datetime
 import json
 
 from properties.models import Property, Booking, Customer, HouseRentReminderSettings, HouseRentReminder, HouseRentReminderTemplate, HouseRentReminderLog, HouseRentReminderSchedule
-from properties.utils import validate_property_id
+
+
+def validate_property_id(property_id):
+    """Helper function to validate property ID and handle 'all' case"""
+    if property_id == 'all':
+        return None
+    elif property_id:
+        try:
+            return int(property_id)
+        except (ValueError, TypeError):
+            return None
+    return None
 
 
 @login_required

@@ -137,7 +137,7 @@
                                         <div class="fw-medium">Monthly Rent</div>
                                         <small class="text-muted">{{ invoice.period_start|date:"F Y" }}</small>
                                     </td>
-                                    <td class="py-3 text-end fw-medium">${{ invoice.base_rent|floatformat:2|intcomma }}</td>
+                                    <td class="py-3 text-end fw-medium">Tsh{{ invoice.base_rent|floatformat:2|intcomma }}</td>
                                 </tr>
                                 {% if invoice.late_fee > 0 %}
                                 <tr>
@@ -145,7 +145,7 @@
                                         <div class="fw-medium text-danger">Late Fee</div>
                                         <small class="text-muted">Payment overdue charge</small>
                                     </td>
-                                    <td class="py-3 text-end fw-medium text-danger">${{ invoice.late_fee|floatformat:2|intcomma }}</td>
+                                    <td class="py-3 text-end fw-medium text-danger">Tsh{{ invoice.late_fee|floatformat:2|intcomma }}</td>
                                 </tr>
                                 {% endif %}
                                 {% if invoice.other_charges > 0 %}
@@ -154,7 +154,7 @@
                                         <div class="fw-medium">Other Charges</div>
                                         <small class="text-muted">Additional fees</small>
                                     </td>
-                                    <td class="py-3 text-end fw-medium">${{ invoice.other_charges|floatformat:2|intcomma }}</td>
+                                    <td class="py-3 text-end fw-medium">Tsh{{ invoice.other_charges|floatformat:2|intcomma }}</td>
                                 </tr>
                                 {% endif %}
                                 {% if invoice.discount > 0 %}
@@ -163,7 +163,7 @@
                                         <div class="fw-medium text-success">Discount</div>
                                         <small class="text-muted">Applied discount</small>
                                     </td>
-                                    <td class="py-3 text-end fw-medium text-success">-${{ invoice.discount|floatformat:2|intcomma }}</td>
+                                    <td class="py-3 text-end fw-medium text-success">-Tsh{{ invoice.discount|floatformat:2|intcomma }}</td>
                                 </tr>
                                 {% endif %}
                             </tbody>
@@ -179,7 +179,7 @@
                                 </tr>
                                 <tr class="bg-light">
                                     <td class="py-3"><strong>Balance Due</strong></td>
-                                    <td class="py-3 text-end"><strong class="fs-5 {% if invoice.balance_due > 0 %}text-danger{% else %}text-success{% endif %}">${{ invoice.balance_due|floatformat:2|intcomma }}</strong></td>
+                                    <td class="py-3 text-end"><strong class="fs-5 {% if invoice.balance_due > 0 %}text-danger{% else %}text-success{% endif %}">Tsh{{ invoice.balance_due|floatformat:2|intcomma }}</strong></td>
                                 </tr>
                                 {% endif %}
                             </tfoot>

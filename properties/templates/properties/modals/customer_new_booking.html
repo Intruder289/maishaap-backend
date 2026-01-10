@@ -2,9 +2,9 @@
     {% csrf_token %}
     <div class="row g-3">
         <div class="col-12">
-            <div class="alert alert-info">
-                <i class="fas fa-info-circle me-2"></i>
-                Creating a new booking for <strong>{{ customer.full_name }}</strong>
+            <div class="alert alert-light border">
+                <i class="fas fa-info-circle me-2 text-primary"></i>
+                <span class="text-dark">Creating a new booking for <strong>{{ customer.full_name }}</strong></span>
             </div>
         </div>
         
@@ -39,17 +39,17 @@
         </div>
         
         <div class="col-12">
-            <div class="alert alert-info">
-                <i class="fas fa-calculator me-2"></i>
-                <strong>Payment Calculation:</strong><br>
-                <span id="calculation-display">Select dates to see total amount</span>
+            <div class="alert alert-light border">
+                <i class="fas fa-calculator me-2 text-primary"></i>
+                <strong class="text-dark">Payment Calculation:</strong><br>
+                <span class="text-dark" id="calculation-display">Select dates to see total amount</span>
             </div>
         </div>
         
         <div class="col-12">
-            <div class="alert alert-warning">
-                <i class="fas fa-exclamation-triangle me-2"></i>
-                <strong>Note:</strong> The booking will be created with "Pending" status. You can update the status and payment information after creation.
+            <div class="alert alert-light border">
+                <i class="fas fa-exclamation-triangle me-2 text-warning"></i>
+                <span class="text-dark"><strong>Note:</strong> The booking will be created with "Pending" status. You can update the status and payment information after creation.</span>
             </div>
         </div>
     </div>

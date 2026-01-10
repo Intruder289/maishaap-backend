@@ -1,0 +1,94 @@
+<!-- AJAX Payment Methods Transactions Table Content -->
+<div class="table-responsive">
+  <table class="table table-sm">
+    <thead>
+      <tr>
+        <th>Transaction ID</th>
+        <th>Provider</th>
+        <th>Amount</th>
+        <th>Status</th>
+        <th>Date</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for transaction in page_obj %}
+      <tr>
+        <td>
+          <span class="fw-bold">#{{ transaction.id }}</span>
+        </td>
+        <td>
+          <span class="text-600">{{ transaction.provider.name|default:"N/A" }}</span>
+        </td>
+        <td>
+          <span class="fw-bold">Tsh{{ transaction.payment.amount|floatformat:2 }}</span>
+        </td>
+        <td>
+          {% if transaction.status == 'successful' %}
+          <span class="badge bg-success-subtle text-success">Completed</span>
+          {% elif transaction.status == 'pending' %}
+          <span class="badge bg-warning-subtle text-warning">Pending</span>
+          {% else %}
+          <span class="badge bg-danger-subtle text-danger">Failed</span>
+          {% endif %}
+        </td>
+        <td>
+          <span class="text-600">{{ transaction.created_at|date:"M j, Y g:i A" }}</span>
+        </td>
+        <td>
+          <div class="dropdown">
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+              <i class="fas fa-ellipsis-v"></i>
+            </button>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="#" onclick="viewTransaction({{ transaction.id }}); return false;">
+                <i class="fas fa-eye me-2"></i>View Details
+              </a></li>
+              <li><a class="dropdown-item" href="#" onclick="viewPayment({{ transaction.payment.id }}); return false;">
+                <i class="fas fa-credit-card me-2"></i>View Payment
+              </a></li>
+            </ul>
+          </div>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="6" class="text-center py-3">
+          <span class="text-500">No transactions found</span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Pagination -->
+{% if page_obj.has_other_pages %}
+<div class="card-footer bg-white border-0 py-3">
+  <nav aria-label="Page navigation">
+    <ul class="pagination pagination-sm justify-content-center mb-0">
+      {% if page_obj.has_previous %}
+      <li class="page-item">
+        <a class="page-link" href="#" onclick="loadMethodsTransactionsPage(1); return false;">First</a>
+      </li>
+      <li class="page-item">
+        <a class="page-link" href="#" onclick="loadMethodsTransactionsPage({{ page_obj.previous_page_number }}); return false;">Previous</a>
+      </li>
+      {% endif %}
+      
+      <li class="page-item active">
+        <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+      </li>
+      
+      {% if page_obj.has_next %}
+      <li class="page-item">
+        <a class="page-link" href="#" onclick="loadMethodsTransactionsPage({{ page_obj.next_page_number }}); return false;">Next</a>
+      </li>
+      <li class="page-item">
+        <a class="page-link" href="#" onclick="loadMethodsTransactionsPage({{ page_obj.paginator.num_pages }}); return false;">Last</a>
+      </li>
+      {% endif %}
+    </ul>
+  </nav>
+</div>
+{% endif %}

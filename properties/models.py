@@ -435,7 +435,7 @@ class PropertyVisitPayment(models.Model):
     """
     STATUS_CHOICES = [
         ('pending', 'Pending'),
-        ('successful', 'Successful'),
+        ('completed', 'Completed'),
         ('failed', 'Failed'),
     ]
     
@@ -600,25 +600,132 @@ class Booking(models.Model):
         return self.booking_status == 'checked_out'
     
     @property
+    def base_rate(self):
+        """Get the base rate from property (rent_amount)"""
+        if not self.property_obj:
+            return 0
+        return self.property_obj.rent_amount or 0
+    
+    @property
+    def rent_period(self):
+        """Get rent period from property (month/day/week/year)"""
+        if not self.property_obj:
+            return 'day'  # Default fallback
+        return self.property_obj.rent_period or 'day'  # Default to 'day' if not set
+    
+    @property
     def monthly_rate(self):
-        """Get the monthly rate for this property"""
-        return self.property_obj.rent_amount
+        """
+        DEPRECATED: Use base_rate instead.
+        Kept for backward compatibility with templates.
+        Returns base_rate for monthly properties, or calculates approximate monthly rate for others.
+        """
+        if self.rent_period == 'month':
+            return self.base_rate
+        elif self.rent_period == 'day':
+            # Approximate: daily_rate × 30
+            return self.base_rate * 30
+        elif self.rent_period == 'week':
+            # Approximate: weekly_rate × 4
+            return self.base_rate * 4
+        elif self.rent_period == 'year':
+            # Approximate: yearly_rate / 12
+            return self.base_rate / 12
+        return self.base_rate
     
     @property
     def duration_months(self):
         """Calculate the number of months for this booking"""
-        from dateutil.relativedelta import relativedelta
-        delta = relativedelta(self.check_out_date, self.check_in_date)
-        months = delta.years * 12 + delta.months
-        # If there are remaining days, count as additional month
-        if delta.days > 0:
-            months += 1
-        return max(1, months)  # Minimum 1 month
+        try:
+            from dateutil.relativedelta import relativedelta
+            delta = relativedelta(self.check_out_date, self.check_in_date)
+            months = delta.years * 12 + delta.months
+            # If there are remaining days, count as additional month
+            if delta.days > 0:
+                months += 1
+            return max(1, months)  # Minimum 1 month
+        except ImportError:
+            # Fallback calculation if dateutil is not available
+            from datetime import timedelta
+            days = self.duration_days
+            # Approximate: 30 days per month
+            months = max(1, (days + 29) // 30)  # Round up
+            return months
+        except Exception:
+            # Fallback to 1 month if calculation fails
+            return 1
     
     @property
     def calculated_total_amount(self):
-        """Calculate total amount based on monthly rate × number of months"""
-        return self.monthly_rate * self.duration_months
+        """
+        Calculate total amount based on property rent_period:
+        - 'day': base_rate × duration_days (hotels, lodges)
+        - 'month': base_rate × duration_months (houses)
+        - 'week': base_rate × weeks (weekly rentals)
+        - 'year': base_rate × years (yearly rentals)
+        """
+        try:
+            base_rate = self.base_rate or 0
+            duration_days = self.duration_days or 0
+            
+            if duration_days <= 0:
+                return base_rate  # Return base rate if invalid duration
+            
+            if self.rent_period == 'day':
+                # Hotels, Lodges, Venues: daily_rate × nights
+                return base_rate * duration_days
+            elif self.rent_period == 'month':
+                # Houses: monthly_rate × months
+                try:
+                    duration_months = self.duration_months
+                    return base_rate * duration_months
+                except Exception:
+                    # Fallback to daily calculation if months calculation fails
+                    return base_rate * duration_days
+            elif self.rent_period == 'week':
+                # Weekly rentals
+                weeks = max(1, duration_days // 7)
+                if duration_days % 7 > 0:
+                    weeks += 1  # Round up partial weeks
+                return base_rate * weeks
+            elif self.rent_period == 'year':
+                # Yearly rentals
+                try:
+                    duration_months = self.duration_months
+                    years = max(1, duration_months // 12)
+                    if duration_months % 12 > 0:
+                        years += 1  # Round up partial years
+                    return base_rate * years
+                except Exception:
+                    # Fallback to daily calculation if months calculation fails
+                    return base_rate * duration_days
+            else:
+                # Fallback to daily calculation
+                return base_rate * duration_days
+        except Exception:
+            # Ultimate fallback: return the stored total_amount if calculation fails
+            return self.total_amount if hasattr(self, 'total_amount') else 0
+    
+    @property
+    def daily_rate(self):
+        """
+        Calculate daily rate for display purposes.
+        For daily rentals, this is the base_rate.
+        For other periods, calculate average daily rate.
+        """
+        if self.rent_period == 'day':
+            return self.base_rate
+        elif self.duration_days > 0:
+            return self.calculated_total_amount / self.duration_days
+        else:
+            # Fallback calculation
+            if self.rent_period == 'month':
+                return self.base_rate / 30  # Approximate daily from monthly
+            elif self.rent_period == 'week':
+                return self.base_rate / 7
+            elif self.rent_period == 'year':
+                return self.base_rate / 365
+            return self.base_rate
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
@@ -694,9 +801,13 @@ class Booking(models.Model):
     
     def update_payment_status(self):
         """Update payment status based on paid amount"""
-        if self.paid_amount >= self.total_amount:
+        # Use calculated_total_amount if available, otherwise use total_amount
+        total = self.calculated_total_amount if self.calculated_total_amount and self.calculated_total_amount > 0 else (self.total_amount or 0)
+        paid = self.paid_amount or 0
+        
+        if total > 0 and paid >= total:
             self.payment_status = 'paid'
-        elif self.paid_amount > 0:
+        elif paid > 0:
             self.payment_status = 'partial'
         else:
             self.payment_status = 'pending'
@@ -711,11 +822,8 @@ class Payment(models.Model):
     """Model for booking payments"""
     PAYMENT_METHOD_CHOICES = [
         ('cash', 'Cash'),
-        ('card', 'Card'),
-        ('bank_transfer', 'Bank Transfer'),
-        ('mobile_money', 'Mobile Money'),
-        ('check', 'Check'),
-        ('other', 'Other'),
+        ('mobile_money', 'Mobile Money (AZAM Pay)'),
+        ('online', 'Online Payment (AZAM Pay)'),
     ]
     
     PAYMENT_TYPE_CHOICES = [

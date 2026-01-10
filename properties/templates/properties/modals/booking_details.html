@@ -73,7 +73,12 @@
                 </div>
                 <div class="row mb-3">
                     <div class="col-sm-4"><strong>Duration:</strong></div>
-                    <div class="col-sm-8">{{ booking.duration_months }} month{{ booking.duration_months|pluralize }} ({{ booking.duration_days }} days)</div>
+                    <div class="col-sm-8">
+                        {% if booking.duration_months %}
+                            {{ booking.duration_months }} month{{ booking.duration_months|pluralize }} 
+                        {% endif %}
+                        ({{ booking.duration_days|default:0 }} days)
+                    </div>
                 </div>
                 <div class="row mb-3">
                     <div class="col-sm-4"><strong>Guests:</strong></div>
@@ -95,15 +100,15 @@
             <div class="card-body">
                 <div class="row mb-3">
                     <div class="col-sm-4"><strong>Name:</strong></div>
-                    <div class="col-sm-8">{{ booking.customer.full_name }}</div>
+                    <div class="col-sm-8">{{ booking.customer.full_name|default:"N/A" }}</div>
                 </div>
                 <div class="row mb-3">
                     <div class="col-sm-4"><strong>Email:</strong></div>
-                    <div class="col-sm-8">{{ booking.customer.email }}</div>
+                    <div class="col-sm-8">{{ booking.customer.email|default:"N/A" }}</div>
                 </div>
                 <div class="row mb-3">
                     <div class="col-sm-4"><strong>Phone:</strong></div>
-                    <div class="col-sm-8">{{ booking.customer.phone }}</div>
+                    <div class="col-sm-8">{{ booking.customer.phone|default:"N/A" }}</div>
                 </div>
             </div>
         </div>
@@ -119,15 +124,15 @@
             <div class="card-body">
                 <div class="row mb-3">
                     <div class="col-sm-4"><strong>Property:</strong></div>
-                    <div class="col-sm-8">{{ booking.property_obj.title }}</div>
+                    <div class="col-sm-8">{{ booking.property_obj.title|default:"N/A" }}</div>
                 </div>
                 <div class="row mb-3">
                     <div class="col-sm-4"><strong>Address:</strong></div>
-                    <div class="col-sm-8">{{ booking.property_obj.address }}</div>
+                    <div class="col-sm-8">{{ booking.property_obj.address|default:"N/A" }}</div>
                 </div>
                 <div class="row mb-3">
                     <div class="col-sm-4"><strong>Type:</strong></div>
-                    <div class="col-sm-8">{{ booking.property_obj.property_type.name }}</div>
+                    <div class="col-sm-8">{% if booking.property_obj.property_type %}{{ booking.property_obj.property_type.name }}{% else %}N/A{% endif %}</div>
                 </div>
             </div>
         </div>
@@ -143,34 +148,75 @@
                 </h6>
             </div>
             <div class="card-body">
-                <div class="row mb-3">
-                    <div class="col-sm-4"><strong>Monthly Rate:</strong></div>
-                    <div class="col-sm-8">Tsh {{ booking.monthly_rate|floatformat:0 }}</div>
-                </div>
-                <div class="row mb-3">
-                    <div class="col-sm-4"><strong>Duration:</strong></div>
-                    <div class="col-sm-8">{{ booking.duration_months }} month{{ booking.duration_months|pluralize }}</div>
-                </div>
-                <div class="row mb-3">
-                    <div class="col-sm-4"><strong>Calculation:</strong></div>
-                    <div class="col-sm-8">{{ booking.monthly_rate|floatformat:0 }} × {{ booking.duration_months }} = Tsh {{ booking.calculated_total_amount|floatformat:0 }}</div>
-                </div>
+                {% if booking.rent_period == 'day' %}
+                    <div class="row mb-3">
+                        <div class="col-sm-4"><strong>Daily Rate:</strong></div>
+                        <div class="col-sm-8">Tsh {{ booking.base_rate|default:0|floatformat:0 }} per night</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-sm-4"><strong>Duration:</strong></div>
+                        <div class="col-sm-8">{{ booking.duration_days|default:0 }} night{{ booking.duration_days|pluralize }}</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-sm-4"><strong>Calculation:</strong></div>
+                        <div class="col-sm-8">Tsh {{ booking.base_rate|default:0|floatformat:0 }} × {{ booking.duration_days|default:0 }} night{{ booking.duration_days|pluralize }} = Tsh {{ booking.calculated_total_amount|default:booking.total_amount|floatformat:0 }}</div>
+                    </div>
+                {% elif booking.property_obj.rent_period == 'month' %}
+                    <div class="row mb-3">
+                        <div class="col-sm-4"><strong>Monthly Rate:</strong></div>
+                        <div class="col-sm-8">Tsh {{ booking.base_rate|default:0|floatformat:0 }} per month</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-sm-4"><strong>Duration:</strong></div>
+                        <div class="col-sm-8">{{ booking.duration_months|default:1 }} month{{ booking.duration_months|pluralize }}</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-sm-4"><strong>Calculation:</strong></div>
+                        <div class="col-sm-8">Tsh {{ booking.base_rate|default:0|floatformat:0 }} × {{ booking.duration_months|default:1 }} month{{ booking.duration_months|pluralize }} = Tsh {{ booking.calculated_total_amount|default:booking.total_amount|floatformat:0 }}</div>
+                    </div>
+                {% elif booking.rent_period == 'week' %}
+                    <div class="row mb-3">
+                        <div class="col-sm-4"><strong>Weekly Rate:</strong></div>
+                        <div class="col-sm-8">Tsh {{ booking.base_rate|default:0|floatformat:0 }} per week</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-sm-4"><strong>Duration:</strong></div>
+                        <div class="col-sm-8">{{ booking.duration_days|default:0 }} day{{ booking.duration_days|pluralize }}</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-sm-4"><strong>Total Amount:</strong></div>
+                        <div class="col-sm-8">Tsh {{ booking.calculated_total_amount|default:booking.total_amount|floatformat:0 }}</div>
+                    </div>
+                {% else %}
+                    <div class="row mb-3">
+                        <div class="col-sm-4"><strong>Base Rate:</strong></div>
+                        <div class="col-sm-8">Tsh {{ booking.base_rate|default:0|floatformat:0 }} {% if booking.rent_period %}({{ booking.rent_period }}){% endif %}</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-sm-4"><strong>Duration:</strong></div>
+                        <div class="col-sm-8">{{ booking.duration_days|default:0 }} day{{ booking.duration_days|pluralize }}</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-sm-4"><strong>Total Amount:</strong></div>
+                        <div class="col-sm-8">Tsh {{ booking.calculated_total_amount|default:booking.total_amount|floatformat:0 }}</div>
+                    </div>
+                {% endif %}
                 <div class="row mb-3">
                     <div class="col-sm-4"><strong>Total Amount:</strong></div>
                     <div class="col-sm-8">
-                        Tsh {{ booking.total_amount|floatformat:0 }}
-                        {% if booking.total_amount != booking.calculated_total_amount %}
+                        Tsh {{ booking.total_amount|default:0|floatformat:0 }}
+                        {% if booking.calculated_total_amount and booking.total_amount != booking.calculated_total_amount %}
                             <span class="badge bg-warning ms-2">Needs Update</span>
                         {% endif %}
                     </div>
                 </div>
                 <div class="row mb-3">
                     <div class="col-sm-4"><strong>Paid Amount:</strong></div>
-                    <div class="col-sm-8">Tsh {{ booking.paid_amount|floatformat:0 }}</div>
+                    <div class="col-sm-8">Tsh {{ booking.paid_amount|default:0|floatformat:0 }}</div>
                 </div>
                 <div class="row mb-3">
                     <div class="col-sm-4"><strong>Balance:</strong></div>
-                    <div class="col-sm-8">Tsh {{ booking.remaining_amount|floatformat:0 }}</div>
+                    <div class="col-sm-8">Tsh {{ booking.remaining_amount|default:0|floatformat:0 }}</div>
                 </div>
                 <div class="row mb-3">
                     <div class="col-sm-4"><strong>Payment Status:</strong></div>
@@ -186,10 +232,10 @@
                         {% endif %}
                     </div>
                 </div>
-                {% if booking.total_amount != booking.calculated_total_amount %}
+                {% if booking.calculated_total_amount and booking.total_amount != booking.calculated_total_amount %}
                 <div class="alert alert-warning mt-3">
                     <i class="fas fa-exclamation-triangle me-2"></i>
-                    <strong>Amount Mismatch:</strong> The stored total amount (Tsh {{ booking.total_amount|floatformat:0 }}) doesn't match the calculated amount (Tsh {{ booking.calculated_total_amount|floatformat:0 }}). 
+                    <strong>Amount Mismatch:</strong> The stored total amount (Tsh {{ booking.total_amount|default:0|floatformat:0 }}) doesn't match the calculated amount (Tsh {{ booking.calculated_total_amount|floatformat:0 }}). 
                     <button class="btn btn-sm btn-warning ms-2" onclick="updateBookingTotal({{ booking.id }})">Update Total</button>
                 </div>
                 {% endif %}

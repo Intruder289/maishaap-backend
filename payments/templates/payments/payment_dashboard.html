@@ -31,7 +31,7 @@
         <div class="d-flex justify-content-between">
           <div>
             <h6 class="mb-2 text-500">Total Revenue</h6>
-            <h4 class="mb-0">${{ total_revenue|default:0|floatformat:2 }}</h4>
+            <h4 class="mb-0">Tsh{{ total_revenue|default:0|floatformat:2 }}</h4>
             <p class="fs--1 mb-0 text-success">
               <span class="me-1" data-feather="trending-up"></span>
               This month
@@ -226,78 +226,27 @@
   <div class="col-md-6">
     <div class="card h-100">
       <div class="card-header">
-        <h5 class="mb-0">Recent Payments</h5>
-      </div>
-      <div class="card-body">
-        {% if recent_payments %}
-        <div class="table-responsive">
-          <table class="table table-sm table-striped table-hover mb-0">
-            <thead class="bg-200">
-              <tr>
-                <th class="border-0">Payment</th>
-                <th class="border-0">Amount</th>
-                <th class="border-0">Status</th>
-                <th class="border-0">Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for payment in recent_payments %}
-              <tr>
-                <td>
-                  <div class="d-flex align-items-center">
-                    <div class="avatar avatar-sm me-3">
-                      <div class="avatar-name rounded-circle bg-primary-subtle text-primary">
-                        <span class="fw-bold">#{{ payment.id }}</span>
-                      </div>
-                    </div>
-                    <div>
-                      <h6 class="mb-0">{{ payment.tenant.get_full_name|default:payment.tenant.username }}</h6>
-                      <small class="text-600">{{ payment.property.name }}</small>
-                    </div>
-                  </div>
-                </td>
-                <td>
-                  <span class="fw-bold text-success">${{ payment.amount|floatformat:2 }}</span>
-                </td>
-                <td>
-                  {% if payment.status == 'completed' %}
-                  <span class="badge bg-success-subtle text-success">
-                    <span class="fas fa-check me-1"></span>
-                    Completed
-                  </span>
-                  {% elif payment.status == 'pending' %}
-                  <span class="badge bg-warning-subtle text-warning">
-                    <span class="fas fa-clock me-1"></span>
-                    Pending
-                  </span>
-                  {% else %}
-                  <span class="badge bg-secondary-subtle text-secondary">
-                    {{ payment.get_status_display }}
-                  </span>
-                  {% endif %}
-                </td>
-                <td>
-                  <div class="d-flex flex-column">
-                    <span class="fw-bold">{{ payment.created_at|naturalday }}</span>
-                    <small class="text-600">{{ payment.created_at|time:"H:i" }}</small>
-                  </div>
-                </td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-        {% else %}
-        <div class="text-center py-4">
-          <div class="avatar avatar-3xl mb-3">
-            <div class="avatar-name rounded-circle bg-200">
-              <span class="fas fa-credit-card text-600"></span>
+        <div class="row flex-between-center">
+          <div class="col-auto">
+            <h5 class="mb-0">Recent Payments</h5>
+          </div>
+          <div class="col-auto">
+            <div class="search-box">
+              <div class="position-relative">
+                <input class="form-control form-control-sm search-input" type="search" 
+                       id="recent-payments-search-input"
+                       placeholder="Search..." 
+                       value="{{ recent_payments_search|default:'' }}">
+                <span class="fas fa-search search-box-icon"></span>
+              </div>
             </div>
           </div>
-          <h5 class="mb-2">No Recent Payments</h5>
-          <p class="text-600 mb-0">No payment activity to display.</p>
         </div>
-        {% endif %}
+      </div>
+      <div class="card-body p-0">
+        <div id="recent-payments-table-container">
+          {% include 'payments/recent_payments_table.html' %}
+        </div>
       </div>
     </div>
   </div>
@@ -306,7 +255,7 @@
 <!-- ============================================-->
 <!--                Payment Records Table-->
 <!-- ============================================-->
-<div class="card">
+<div class="card mb-6">
   <div class="card-header">
     <div class="row flex-between-center">
       <div class="col-auto">
@@ -316,189 +265,34 @@
         <div class="d-flex gap-2">
           <!-- Search -->
           <div class="search-box">
-            <form class="position-relative" method="get">
-              <input class="form-control search-input fuzzy-search" type="search" 
-                     placeholder="Search payments..." name="search" 
-                     value="{{ request.GET.search|default:'' }}">
+            <div class="position-relative">
+              <input class="form-control search-input" type="search" 
+                     id="dashboard-search-input"
+                     placeholder="Search payments..." 
+                     value="{{ search_query|default:'' }}">
               <span class="fas fa-search search-box-icon"></span>
-            </form>
+            </div>
           </div>
           <!-- Status Filter -->
-          <select class="form-select form-select-sm" name="status" onchange="this.form.submit()">
+          <select class="form-select form-select-sm" id="dashboard-status-filter">
             <option value="">All Status</option>
             {% for value, label in status_choices %}
-            <option value="{{ value }}" {% if request.GET.status == value %}selected{% endif %}>
+            <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>
               {{ label }}
             </option>
             {% endfor %}
           </select>
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearDashboardFilters()">
+            <i class="fas fa-times"></i> Clear
+          </button>
         </div>
       </div>
     </div>
   </div>
   <div class="card-body p-0">
-    <div class="table-responsive">
-      <table class="table table-hover mb-0">
-        <thead class="table-light">
-          <tr>
-            <th>Payment</th>
-            <th>Tenant</th>
-            <th>Amount</th>
-            <th>Status</th>
-            <th>Payment Method</th>
-            <th>Due Date</th>
-            <th>Paid Date</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for payment in page_obj.object_list %}
-          <tr data-payment-id="{{ payment.id }}">
-            <td>
-              <div class="d-flex align-items-center">
-                <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3 fw-bold">
-                  #{{ payment.id }}
-                </div>
-                <div>
-                  <strong>Payment #{{ payment.id }}</strong>
-                  {% if payment.transaction_ref %}
-                  <div class="text-muted small">Ref: {{ payment.transaction_ref }}</div>
-                  {% endif %}
-                </div>
-              </div>
-            </td>
-            <td>
-              <div class="d-flex align-items-center">
-                <i class="fas fa-user text-muted me-2"></i>
-                <div>
-                  <div class="fw-bold">{{ payment.tenant.get_full_name|default:payment.tenant.username }}</div>
-                  <div class="text-muted small">{{ payment.tenant.email }}</div>
-                </div>
-              </div>
-            </td>
-            <td>
-              <span class="fw-bold text-success">${{ payment.amount|floatformat:2 }}</span>
-            </td>
-            <td>
-              {% if payment.status == 'successful' %}
-              <span class="badge bg-success-subtle text-success">
-                <span class="fas fa-check me-1"></span>
-                Successful
-              </span>
-              {% elif payment.status == 'pending' %}
-              <span class="badge bg-warning-subtle text-warning">
-                <span class="fas fa-clock me-1"></span>
-                Pending
-              </span>
-              {% elif payment.status == 'failed' %}
-              <span class="badge bg-danger-subtle text-danger">
-                <span class="fas fa-times me-1"></span>
-                Failed
-              </span>
-              {% else %}
-              <span class="badge bg-secondary-subtle text-secondary">
-                {{ payment.get_status_display }}
-              </span>
-              {% endif %}
-            </td>
-            <td>
-              {% if payment.provider %}
-              <div class="d-flex align-items-center">
-                <i class="fas fa-credit-card text-muted me-2"></i>
-                <div>
-                  <div class="fw-bold">{{ payment.provider.name }}</div>
-                </div>
-              </div>
-              {% else %}
-              <span class="text-muted">Not specified</span>
-              {% endif %}
-            </td>
-            <td>
-              {% if payment.invoice %}
-              <div class="d-flex flex-column">
-                <span class="fw-bold {% if payment.invoice.due_date < today and payment.invoice.status == 'unpaid' %}text-danger{% endif %}">
-                  {{ payment.invoice.due_date|naturalday }}
-                </span>
-                {% if payment.invoice.due_date < today and payment.invoice.status == 'unpaid' %}
-                <small class="text-danger">Overdue</small>
-                {% endif %}
-              </div>
-              {% else %}
-              <span class="text-muted">N/A</span>
-              {% endif %}
-            </td>
-            <td>
-              {% if payment.paid_date %}
-              <div class="d-flex flex-column">
-                <span class="fw-bold">{{ payment.paid_date|naturalday }}</span>
-                <small class="text-600">{{ payment.created_at|time:"H:i" }}</small>
-              </div>
-              {% else %}
-              <span class="text-muted">Not paid</span>
-              {% endif %}
-            </td>
-            <td>
-              <div class="btn-group" role="group">
-                <button class="btn btn-outline-primary btn-sm" onclick="viewPayment({{ payment.id }})">
-                  <i class="fas fa-eye"></i>
-                </button>
-                {% if payment.status == 'pending' %}
-                <button class="btn btn-outline-success btn-sm" onclick="processPayment({{ payment.id }})">
-                  <i class="fas fa-check"></i>
-                </button>
-                {% endif %}
-              </div>
-            </td>
-          </tr>
-          {% empty %}
-          <tr>
-            <td colspan="8" class="text-center py-4">
-              <div class="avatar avatar-3xl mb-3">
-                <div class="avatar-name rounded-circle bg-200">
-                  <span class="fas fa-credit-card text-600"></span>
-                </div>
-              </div>
-              <h5 class="mb-2">No Payment Records</h5>
-              <p class="text-600 mb-0">No payment records found.</p>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <div id="dashboard-table-container">
+      {% include 'payments/payment_dashboard_table.html' %}
     </div>
-    
-    <!-- Pagination -->
-    {% if page_obj.has_other_pages %}
-    <div class="card-footer">
-      <nav aria-label="Payment records pagination">
-        <ul class="pagination pagination-sm mb-0">
-          {% if page_obj.has_previous %}
-          <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}">Previous</a>
-          </li>
-          {% endif %}
-          
-          {% for num in page_obj.paginator.page_range %}
-          {% if page_obj.number == num %}
-          <li class="page-item active">
-            <span class="page-link">{{ num }}</span>
-          </li>
-          {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-          <li class="page-item">
-            <a class="page-link" href="?page={{ num }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}">{{ num }}</a>
-          </li>
-          {% endif %}
-          {% endfor %}
-          
-          {% if page_obj.has_next %}
-          <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}">Next</a>
-          </li>
-          {% endif %}
-        </ul>
-      </nav>
-    </div>
-    {% endif %}
   </div>
 </div>
 
@@ -513,156 +307,250 @@
       </div>
       <div class="col-auto">
         <div class="d-flex gap-2">
+          <!-- Search -->
+          <div class="search-box">
+            <div class="position-relative">
+              <input class="form-control form-control-sm search-input" type="search" 
+                     id="invoice-search-input"
+                     placeholder="Search invoices..." 
+                     value="{{ invoice_search_query|default:'' }}">
+              <span class="fas fa-search search-box-icon"></span>
+            </div>
+          </div>
           <!-- Status Filter -->
-          <select class="form-select form-select-sm" name="invoice_status" onchange="this.form.submit()">
+          <select class="form-select form-select-sm" id="invoice-status-filter">
             <option value="">All Status</option>
             {% for value, label in invoice_status_choices %}
-            <option value="{{ value }}" {% if request.GET.invoice_status == value %}selected{% endif %}>
+            <option value="{{ value }}" {% if invoice_status_filter == value %}selected{% endif %}>
               {{ label }}
             </option>
             {% endfor %}
           </select>
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearInvoiceFilters()">
+            <i class="fas fa-times"></i> Clear
+          </button>
         </div>
       </div>
     </div>
   </div>
   <div class="card-body p-0">
-    <div class="table-responsive">
-      <table class="table table-hover mb-0">
-        <thead class="table-light">
-          <tr>
-            <th>Invoice</th>
-            <th>Tenant</th>
-            <th>Amount</th>
-            <th>Status</th>
-            <th>Due Date</th>
-            <th>Created</th>
-            <th>Remaining</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for invoice in all_invoices %}
-          <tr data-invoice-id="{{ invoice.id }}">
-            <td>
-              <div class="d-flex align-items-center">
-                <div class="avatar-sm bg-info text-white rounded-circle d-flex align-items-center justify-content-center me-3 fw-bold">
-                  #{{ invoice.id }}
-                </div>
-                <div>
-                  <strong>Invoice #{{ invoice.id }}</strong>
-                  {% if invoice.lease_id %}
-                  <div class="text-muted small">Lease: {{ invoice.lease_id }}</div>
-                  {% endif %}
-                </div>
-              </div>
-            </td>
-            <td>
-              <div class="d-flex align-items-center">
-                <i class="fas fa-user text-muted me-2"></i>
-                <div>
-                  <div class="fw-bold">{{ invoice.tenant.get_full_name|default:invoice.tenant.username }}</div>
-                  <div class="text-muted small">{{ invoice.tenant.email }}</div>
-                </div>
-              </div>
-            </td>
-            <td>
-              <span class="fw-bold text-primary">${{ invoice.amount|floatformat:2 }}</span>
-            </td>
-            <td>
-              {% if invoice.status == 'paid' %}
-              <span class="badge bg-success-subtle text-success">
-                <span class="fas fa-check me-1"></span>
-                Paid
-              </span>
-              {% elif invoice.status == 'unpaid' %}
-              <span class="badge bg-warning-subtle text-warning">
-                <span class="fas fa-clock me-1"></span>
-                Unpaid
-              </span>
-              {% elif invoice.status == 'cancelled' %}
-              <span class="badge bg-danger-subtle text-danger">
-                <span class="fas fa-times me-1"></span>
-                Cancelled
-              </span>
-              {% else %}
-              <span class="badge bg-secondary-subtle text-secondary">
-                {{ invoice.get_status_display }}
-              </span>
-              {% endif %}
-            </td>
-            <td>
-              <div class="d-flex flex-column">
-                <span class="fw-bold {% if invoice.due_date < today and invoice.status == 'unpaid' %}text-danger{% endif %}">
-                  {{ invoice.due_date|naturalday }}
-                </span>
-                {% if invoice.due_date < today and invoice.status == 'unpaid' %}
-                <small class="text-danger">Overdue</small>
-                {% endif %}
-              </div>
-            </td>
-            <td>
-              <div class="d-flex flex-column">
-                <span class="fw-bold">{{ invoice.created_at|naturalday }}</span>
-                <small class="text-600">{{ invoice.created_at|time:"H:i" }}</small>
-              </div>
-            </td>
-            <td>
-              {% if invoice.status == 'unpaid' %}
-              <span class="fw-bold text-danger">${{ invoice.amount|floatformat:2 }}</span>
-              {% else %}
-              <span class="fw-bold text-success">$0.00</span>
-              {% endif %}
-            </td>
-            <td>
-              <div class="btn-group" role="group">
-                <button class="btn btn-outline-primary btn-sm" onclick="viewInvoice({{ invoice.id }})">
-                  <i class="fas fa-eye"></i>
-                </button>
-                {% if invoice.status == 'unpaid' %}
-                <button class="btn btn-outline-success btn-sm" onclick="createPayment({{ invoice.id }})">
-                  <i class="fas fa-plus"></i>
-                </button>
-                {% endif %}
-              </div>
-            </td>
-          </tr>
-          {% empty %}
-          <tr>
-            <td colspan="8" class="text-center py-4">
-              <div class="avatar avatar-3xl mb-3">
-                <div class="avatar-name rounded-circle bg-200">
-                  <span class="fas fa-file-invoice text-600"></span>
-                </div>
-              </div>
-              <h5 class="mb-2">No Invoice Records</h5>
-              <p class="text-600 mb-0">No invoice records found.</p>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <div id="invoice-table-container">
+      {% include 'payments/invoice_dashboard_table.html' %}
     </div>
   </div>
 </div>
 
 <script>
+// Wait for jQuery
+function waitForJQuery() {
+    if (typeof $ !== 'undefined') {
+        initializeDashboard();
+    } else {
+        setTimeout(waitForJQuery, 100);
+    }
+}
+
+function initializeDashboard() {
+    // AJAX function to load Payment Records table
+    function loadDashboardTable(page = 1) {
+        var search = $('#dashboard-search-input').val() || '';
+        var status = $('#dashboard-status-filter').val() || '';
+        
+        $('#dashboard-table-container').html('<div class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">Loading...</p></div>');
+        
+        $.ajax({
+            url: '{% url "payments:payment_dashboard" %}',
+            type: 'GET',
+            data: {
+                'search': search,
+                'status': status,
+                'page': page,
+                'table_type': 'payments'
+            },
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(data) {
+                $('#dashboard-table-container').html(data);
+            },
+            error: function(xhr, status, error) {
+                $('#dashboard-table-container').html('<div class="text-center py-5"><p class="text-danger">Error loading data: ' + error + '</p></div>');
+            }
+        });
+    }
+    
+    // AJAX function to load Recent Payments table
+    function loadRecentPaymentsTable(page = 1) {
+        var search = $('#recent-payments-search-input').val() || '';
+        
+        $('#recent-payments-table-container').html('<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary" role="status"></div></div>');
+        
+        $.ajax({
+            url: '{% url "payments:payment_dashboard" %}',
+            type: 'GET',
+            data: {
+                'recent_payments_search': search,
+                'recent_payments_page': page,
+                'table_type': 'recent_payments'
+            },
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(data) {
+                $('#recent-payments-table-container').html(data);
+            },
+            error: function(xhr, status, error) {
+                $('#recent-payments-table-container').html('<div class="text-center py-3"><p class="text-danger small">Error loading data</p></div>');
+            }
+        });
+    }
+    
+    // AJAX function to load Invoice Records table
+    function loadInvoiceTable(page = 1) {
+        var search = $('#invoice-search-input').val() || '';
+        var status = $('#invoice-status-filter').val() || '';
+        
+        $('#invoice-table-container').html('<div class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">Loading...</p></div>');
+        
+        $.ajax({
+            url: '{% url "payments:payment_dashboard" %}',
+            type: 'GET',
+            data: {
+                'invoice_search': search,
+                'invoice_status': status,
+                'invoice_page': page,
+                'table_type': 'invoices'
+            },
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(data) {
+                $('#invoice-table-container').html(data);
+            },
+            error: function(xhr, status, error) {
+                $('#invoice-table-container').html('<div class="text-center py-5"><p class="text-danger">Error loading data: ' + error + '</p></div>');
+            }
+        });
+    }
+    
+    // Payment Records Table - Search input handler
+    var searchTimeout;
+    $('#dashboard-search-input').on('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(function() {
+            loadDashboardTable(1);
+        }, 500);
+    });
+    
+    // Payment Records Table - Status filter handler
+    $('#dashboard-status-filter').on('change', function() {
+        loadDashboardTable(1);
+    });
+    
+    // Recent Payments Table - Search input handler
+    var recentPaymentsSearchTimeout;
+    $('#recent-payments-search-input').on('input', function() {
+        clearTimeout(recentPaymentsSearchTimeout);
+        recentPaymentsSearchTimeout = setTimeout(function() {
+            loadRecentPaymentsTable(1);
+        }, 500);
+    });
+    
+    // Invoice Records Table - Search input handler
+    var invoiceSearchTimeout;
+    $('#invoice-search-input').on('input', function() {
+        clearTimeout(invoiceSearchTimeout);
+        invoiceSearchTimeout = setTimeout(function() {
+            loadInvoiceTable(1);
+        }, 500);
+    });
+    
+    // Invoice Records Table - Status filter handler
+    $('#invoice-status-filter').on('change', function() {
+        loadInvoiceTable(1);
+    });
+    
+    // Global pagination functions
+    window.loadDashboardPage = function(page) {
+        loadDashboardTable(page);
+    };
+    
+    window.loadRecentPaymentsPage = function(page) {
+        loadRecentPaymentsTable(page);
+    };
+    
+    window.loadInvoicePage = function(page) {
+        loadInvoiceTable(page);
+    };
+    
+    // Clear filters functions
+    window.clearDashboardFilters = function() {
+        $('#dashboard-search-input').val('');
+        $('#dashboard-status-filter').val('');
+        loadDashboardTable(1);
+    };
+    
+    window.clearInvoiceFilters = function() {
+        $('#invoice-search-input').val('');
+        $('#invoice-status-filter').val('');
+        loadInvoiceTable(1);
+    };
+}
+
+// Payment Action Functions
 function viewPayment(paymentId) {
-    alert('View payment details for ID: ' + paymentId);
+    $.get('/payments/api/payment/' + paymentId + '/view-details/', function(data) {
+        if ($('#paymentViewModal').length === 0) {
+            $('body').append('<div class="modal fade" id="paymentViewModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Payment Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="paymentViewContent"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>');
+        }
+        $('#paymentViewContent').html(data);
+        $('#paymentViewModal').modal('show');
+    }).fail(function() {
+        alert('Failed to load payment details.');
+    });
+}
+
+
+function deletePayment(paymentId) {
+    $.get('/payments/api/payment/' + paymentId + '/delete/', function(data) {
+        if ($('#paymentDeleteModal').length === 0) {
+            $('body').append('<div class="modal fade" id="paymentDeleteModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Delete Payment</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="paymentDeleteContent"></div></div></div></div>');
+        }
+        $('#paymentDeleteContent').html(data);
+        $('#paymentDeleteModal').modal('show');
+    }).fail(function() {
+        alert('Failed to load delete confirmation.');
+    });
+}
+
+function generateReceipt(paymentId) {
+    $.get('/payments/api/payment/' + paymentId + '/generate-receipt/', function(data) {
+        if ($('#paymentReceiptModal').length === 0) {
+            $('body').append('<div class="modal fade" id="paymentReceiptModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Payment Receipt</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="paymentReceiptContent"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>');
+        }
+        $('#paymentReceiptContent').html(data);
+        $('#paymentReceiptModal').modal('show');
+    }).fail(function() {
+        alert('Failed to generate receipt.');
+    });
 }
 
 function processPayment(paymentId) {
     if (confirm('Mark this payment as successful?')) {
-        alert('Processing payment ID: ' + paymentId);
+        // TODO: Implement payment processing
+        alert('Payment processing not yet implemented.');
     }
 }
 
 function viewInvoice(invoiceId) {
-    alert('View invoice details for ID: ' + invoiceId);
+    window.location.href = '/payments/invoices/' + invoiceId + '/';
 }
 
 function createPayment(invoiceId) {
-    alert('Create payment for invoice ID: ' + invoiceId);
+    window.location.href = '/payments/invoices/' + invoiceId + '/';
 }
+
+// Start initialization
+waitForJQuery();
 </script>
 {% endblock %}

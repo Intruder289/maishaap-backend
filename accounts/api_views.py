@@ -41,6 +41,18 @@ class SearchRateThrottle(UserRateThrottle):
     rate = '30/minute'
 
 
+@swagger_auto_schema(
+    method='get',
+    operation_description="API root endpoint - returns available endpoints and API information",
+    operation_summary="API Root",
+    tags=['API Info'],
+    responses={
+        200: openapi.Response(
+            description="API information",
+            schema=openapi.Schema(type=openapi.TYPE_OBJECT)
+        )
+    }
+)
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def api_root(request):
@@ -70,6 +82,18 @@ def api_root(request):
     })
 
 
+@swagger_auto_schema(
+    method='get',
+    operation_description="Simple test endpoint to verify API is working",
+    operation_summary="API Test",
+    tags=['API Info'],
+    responses={
+        200: openapi.Response(
+            description="API test response",
+            schema=openapi.Schema(type=openapi.TYPE_OBJECT)
+        )
+    }
+)
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def api_test(request):
@@ -387,6 +411,24 @@ def forgot_password(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@swagger_auto_schema(
+    method='post',
+    operation_description="Logout user and blacklist refresh token",
+    operation_summary="User Logout",
+    tags=['Authentication'],
+    request_body=openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        properties={
+            'refresh': openapi.Schema(type=openapi.TYPE_STRING, description='Refresh token to blacklist')
+        }
+    ),
+    responses={
+        200: "Logout successful",
+        400: "Logout failed",
+        401: "Authentication required"
+    },
+    security=[{'Bearer': []}]
+)
 @csrf_exempt
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -413,6 +455,18 @@ def tenant_logout(request):
         }, status=status.HTTP_400_BAD_REQUEST)
 
 
+@swagger_auto_schema(
+    method='get',
+    operation_description="Get current authenticated user's profile information",
+    operation_summary="Get User Profile",
+    tags=['Profile'],
+    responses={
+        200: UserProfileSerializer,
+        401: "Authentication required",
+        500: "Internal server error"
+    },
+    security=[{'Bearer': []}]
+)
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def tenant_profile(request):
@@ -569,6 +623,34 @@ def change_password(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@swagger_auto_schema(
+    method='post',
+    operation_description="Refresh JWT access token using refresh token. Old refresh token will be blacklisted and new tokens issued.",
+    operation_summary="Refresh Token",
+    tags=['Authentication'],
+    request_body=openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        required=['refresh'],
+        properties={
+            'refresh': openapi.Schema(type=openapi.TYPE_STRING, description='Refresh token')
+        }
+    ),
+    responses={
+        200: openapi.Response(
+            description="Token refreshed successfully",
+            schema=openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                    'access': openapi.Schema(type=openapi.TYPE_STRING),
+                    'refresh': openapi.Schema(type=openapi.TYPE_STRING)
+                }
+            )
+        ),
+        400: "Token refresh failed"
+    }
+)
 @csrf_exempt
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -633,6 +715,29 @@ def refresh_token(request):
         }, status=status.HTTP_400_BAD_REQUEST)
 
 
+@swagger_auto_schema(
+    method='post',
+    operation_description="Verify JWT token validity",
+    operation_summary="Verify Token",
+    tags=['Authentication'],
+    responses={
+        200: openapi.Response(
+            description="Token is valid",
+            schema=openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                    'user_id': openapi.Schema(type=openapi.TYPE_INTEGER),
+                    'username': openapi.Schema(type=openapi.TYPE_STRING)
+                }
+            )
+        ),
+        400: "Token verification failed",
+        401: "Authentication required"
+    },
+    security=[{'Bearer': []}]
+)
 @csrf_exempt
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -712,6 +817,27 @@ def pending_users(request):
 
 
 @csrf_exempt
+@swagger_auto_schema(
+    method='post',
+    operation_description="Approve or reject a pending user. Admin access required.",
+    operation_summary="Approve/Reject User",
+    tags=['Admin'],
+    request_body=openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        required=['user_id', 'action'],
+        properties={
+            'user_id': openapi.Schema(type=openapi.TYPE_INTEGER, description='ID of user to approve/reject'),
+            'action': openapi.Schema(type=openapi.TYPE_STRING, enum=['approve', 'reject'], description='Action to take')
+        }
+    ),
+    responses={
+        200: "User action completed successfully",
+        400: "Invalid request",
+        403: "Admin access required",
+        404: "User not found"
+    },
+    security=[{'Bearer': []}]
+)
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def approve_user(request):

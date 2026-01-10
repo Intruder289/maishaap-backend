@@ -162,23 +162,81 @@ BASE_URL=https://yourdomain.com  # Your production domain
 
 ## Getting AZAM Pay Credentials
 
-1. **Register for Sandbox:**
-   - Visit https://sandbox.azampay.co.tz/
-   - Create a developer account
-   - Complete KYC documentation
+### Step 1: Get Credentials from Dashboard
 
-2. **Register Your Application:**
-   - Log in to the sandbox dashboard
-   - Register your application
-   - You'll receive:
-     - Client ID
-     - Client Secret
-     - API Key
+1. **Log in to AZAM Pay Dashboard:**
+   - Sandbox: https://sandbox.azampay.co.tz/
+   - Production: https://developers.azampay.co.tz/
 
-3. **Configure Webhook:**
-   - In the AZAM Pay dashboard, set your webhook URL to:
-     `https://yourdomain.com/api/v1/payments/webhook/azam-pay/`
-   - Copy the webhook secret
+2. **Navigate to Your App Settings:**
+   - Go to "My Apps" or "Applications"
+   - Click on your registered app
+
+3. **Copy the Visible Credentials:**
+   - **Client ID** → Use for `AZAM_PAY_CLIENT_ID`
+     - Example: `43a4545a-e1c3-479e-a07e-9bb7c9`
+   - **Client Secret Key** → Use for `AZAM_PAY_CLIENT_SECRET`
+     - Example: `S8E4EnDja5VC7MYNnDvNAODfvFIC9r`
+     - ⚠️ **IMPORTANT:** This is only shown once! Copy and save it securely.
+   - **Token** → This is a temporary access token (expires). You don't need to save this - the code automatically fetches new tokens.
+
+### Step 2: API Key and Webhook Secret (Sandbox Mode)
+
+**For Sandbox Mode (Testing):**
+
+According to AZAM Pay documentation, for sandbox testing you only need:
+- ✅ **Client ID**
+- ✅ **Client Secret Key**
+
+The code automatically handles:
+- **API Key**: If not provided, it will use your Client ID (for sandbox mode)
+- **Webhook Secret**: If not provided, it will use your Client Secret (for sandbox mode)
+
+**You don't need to set `AZAM_PAY_API_KEY` or `AZAM_PAY_WEBHOOK_SECRET` for sandbox testing!**
+
+### Step 3: Configure Webhook URL (Optional for Testing)
+
+1. **In the Callback URL section:**
+   - Set your webhook URL: `https://yourdomain.com/api/v1/payments/webhook/azam-pay/`
+   - Replace `yourdomain.com` with your actual domain
+   - For local testing, use ngrok: `https://abc123.ngrok.io/api/v1/payments/webhook/azam-pay/`
+   - Click "Update"
+
+2. **Note:** In sandbox mode, the webhook secret will automatically use your Client Secret if not provided separately.
+
+### Step 4: Add to Environment Variables
+
+**For Sandbox Mode (Minimum Required):**
+
+Based on what you see in your dashboard, add to your `.env` file:
+
+```bash
+# Required - From Dashboard
+AZAM_PAY_CLIENT_ID=43a4545a-e1c3-479e-a07e-9bb7c9
+AZAM_PAY_CLIENT_SECRET=S8E4EnDja5VC7MYNnDvNAODfvFIC9r
+
+# Optional - Code will use Client ID/Secret if not provided (sandbox only)
+# AZAM_PAY_API_KEY=43a4545a-e1c3-479e-a07e-9bb7c9  # Optional in sandbox
+# AZAM_PAY_WEBHOOK_SECRET=your_webhook_secret_here  # Optional in sandbox
+
+# Other settings
+AZAM_PAY_APP_NAME=Maisha Property Management
+AZAM_PAY_SANDBOX=True  # Set to False for production
+AZAM_PAY_BASE_URL=https://sandbox.azampay.co.tz
+AZAM_PAY_PRODUCTION_URL=https://api.azampay.co.tz
+BASE_URL=https://yourdomain.com  # Your actual domain
+```
+
+**That's it!** For sandbox testing, you only need `AZAM_PAY_CLIENT_ID` and `AZAM_PAY_CLIENT_SECRET`. The code automatically uses Client ID as API Key and Client Secret as Webhook Secret in sandbox mode.
+
+### Step 5: Test and Troubleshoot
+
+1. **Restart your Django server** to load new environment variables
+2. **Test payment initiation** - Check logs for authentication errors
+3. **If API Key error occurs:**
+   - Try using Client ID as API Key
+   - Check AZAM Pay API documentation for correct header name
+   - Contact support if needed
 
 4. **Get Production Credentials:**
    - After testing in sandbox, request production credentials

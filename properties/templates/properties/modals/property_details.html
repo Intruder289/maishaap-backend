@@ -5,19 +5,19 @@
                 <h6 class="mb-0"><i class="fas fa-home me-2"></i>Property Information</h6>
             </div>
             <div class="card-body">
-                <h5 class="card-title">{{ property.title }}</h5>
-                <p class="text-muted mb-3">{{ property.address }}</p>
+                <h5 class="card-title">{{ property.title|default:"N/A" }}</h5>
+                <p class="text-muted mb-3">{{ property.address|default:"No address provided" }}</p>
                 
                 <div class="row">
                     <div class="col-6">
                         <div class="text-center">
-                            <div class="fw-bold text-primary">Tsh{{ property.rent_amount|floatformat:0 }}</div>
+                            <div class="fw-bold text-primary">Tsh{{ property.rent_amount|default:0|floatformat:0 }}</div>
                             <small class="text-muted">Monthly Rent</small>
                         </div>
                     </div>
                     <div class="col-6">
                         <div class="text-center">
-                            <div class="fw-bold text-success">{{ property.bedrooms }}</div>
+                            <div class="fw-bold text-success">{{ property.bedrooms|default:0 }}</div>
                             <small class="text-muted">Bedrooms</small>
                         </div>
                     </div>
@@ -38,27 +38,27 @@
                 <h6 class="mb-0"><i class="fas fa-user me-2"></i>Current Tenant</h6>
             </div>
             <div class="card-body">
-                {% if current_booking %}
+                {% if current_booking and current_booking.customer %}
                     <div class="d-flex align-items-center mb-3">
                         <div class="avatar-sm bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3 fw-bold">
-                            {{ current_booking.customer.full_name|first|upper }}
+                            {% if current_booking.customer.full_name %}{{ current_booking.customer.full_name|first|upper }}{% else %}?{% endif %}
                         </div>
                         <div>
-                            <h6 class="mb-0">{{ current_booking.customer.full_name }}</h6>
-                            <small class="text-muted">{{ current_booking.customer.email }}</small>
+                            <h6 class="mb-0">{{ current_booking.customer.full_name|default:"N/A" }}</h6>
+                            <small class="text-muted">{{ current_booking.customer.email|default:"No email" }}</small>
                         </div>
                     </div>
                     
                     <div class="row">
                         <div class="col-6">
                             <div class="text-center">
-                                <div class="fw-bold text-primary">{{ current_booking.check_in_date|date:"M d, Y" }}</div>
+                                <div class="fw-bold text-primary">{% if current_booking.check_in_date %}{{ current_booking.check_in_date|date:"M d, Y" }}{% else %}N/A{% endif %}</div>
                                 <small class="text-muted">Move-in Date</small>
                             </div>
                         </div>
                         <div class="col-6">
                             <div class="text-center">
-                                <div class="fw-bold text-success">{{ current_booking.check_out_date|date:"M d, Y" }}</div>
+                                <div class="fw-bold text-success">{% if current_booking.check_out_date %}{{ current_booking.check_out_date|date:"M d, Y" }}{% else %}N/A{% endif %}</div>
                                 <small class="text-muted">Lease End</small>
                             </div>
                         </div>
@@ -71,7 +71,7 @@
                         {% elif current_booking.booking_status == 'checked_in' %}
                             <span class="badge bg-primary fs-6">Checked In</span>
                         {% else %}
-                            <span class="badge bg-warning fs-6">{{ current_booking.booking_status|title }}</span>
+                            <span class="badge bg-warning fs-6">{{ current_booking.booking_status|default:"N/A"|title }}</span>
                         {% endif %}
                     </div>
                 {% else %}
@@ -92,32 +92,36 @@
                 <div class="row">
                     <div class="col-6">
                         <strong>Property Type:</strong><br>
-                        <span class="text-muted">{{ property.property_type.name|title }}</span>
+                        <span class="text-muted">{% if property.property_type %}{{ property.property_type.name|title }}{% else %}N/A{% endif %}</span>
                     </div>
                     <div class="col-6">
                         <strong>Owner:</strong><br>
-                        <span class="text-muted">{{ property.owner.get_full_name|default:property.owner.username }}</span>
+                        <span class="text-muted">{% if property.owner %}{{ property.owner.get_full_name|default:property.owner.username }}{% else %}N/A{% endif %}</span>
                     </div>
                 </div>
                 
-                {% if property.bathrooms %}
+                {% if property.bathrooms or property.bedrooms %}
                 <hr>
                 <div class="row">
                     <div class="col-6">
                         <strong>Bedrooms:</strong><br>
-                        <span class="text-muted">{{ property.bedrooms }}</span>
+                        <span class="text-muted">{{ property.bedrooms|default:0 }}</span>
                     </div>
                     <div class="col-6">
                         <strong>Bathrooms:</strong><br>
-                        <span class="text-muted">{{ property.bathrooms }}</span>
+                        <span class="text-muted">{{ property.bathrooms|default:0 }}</span>
                     </div>
                 </div>
                 {% endif %}
                 
-                {% if property.amenities %}
+                {% if property.amenities.all %}
                 <hr>
                 <strong>Amenities:</strong><br>
-                <span class="text-muted">{{ property.amenities }}</span>
+                <span class="text-muted">
+                    {% for amenity in property.amenities.all %}
+                        {{ amenity.name }}{% if not forloop.last %}, {% endif %}
+                    {% endfor %}
+                </span>
                 {% endif %}
             </div>
         </div>

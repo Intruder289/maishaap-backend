@@ -23,10 +23,10 @@
         <div class="d-flex justify-content-between">
           <div>
             <h6 class="mb-2 text-500">Total Invoices</h6>
-            <h4 class="mb-0">{{ invoices|length|default:0 }}</h4>
-            <p class="fs--1 mb-0 text-success">
-              <span class="me-1 fas fa-caret-up"></span>
-              +18% this month
+            <h4 class="mb-0">{{ total_invoices|default:0 }}</h4>
+            <p class="fs--1 mb-0 {% if invoices_change_percent >= 0 %}text-success{% else %}text-danger{% endif %}">
+              <span class="me-1 fas fa-caret-{% if invoices_change_percent >= 0 %}up{% else %}down{% endif %}"></span>
+              {% if invoices_change_percent >= 0 %}+{% endif %}{{ invoices_change_percent }}% this month
             </p>
           </div>
           <div class="d-flex align-items-center">
@@ -50,7 +50,7 @@
             <h4 class="mb-0">{{ paid_invoices|default:0 }}</h4>
             <p class="fs--1 mb-0 text-success">
               <span class="me-1 fas fa-check-circle"></span>
-              85% payment rate
+              {{ payment_rate }}% payment rate
             </p>
           </div>
           <div class="d-flex align-items-center">
@@ -115,150 +115,130 @@
 </div>
 
 <!-- Invoices Table -->
-{% include 'components/table_components.html' with table_id='invoice-table' search_placeholder='Search invoices...' %}
-
-{% block table_header %}
-<thead class="bg-200">
-  <tr>
-    <th class="border-0">Invoice ID</th>
-    <th class="border-0">Tenant</th>
-    <th class="border-0">Amount</th>
-    <th class="border-0">Due Date</th>
-    <th class="border-0">Days Remaining</th>
-    <th class="border-0">Status</th>
-    <th class="border-0">Property</th>
-    <th class="border-0">Actions</th>
-  </tr>
-</thead>
-{% endblock %}
-
-{% block table_rows %}
-<tbody>
-  {% for invoice in invoices %}
-  <tr>
-    <td>
-      <div class="d-flex align-items-center">
-        <div class="avatar avatar-sm me-3">
-          <div class="avatar-name rounded-circle bg-primary-subtle text-primary">
-            <span class="fw-bold">#{{ invoice.id }}</span>
-          </div>
-        </div>
-        <div>
-          <h6 class="mb-0">Invoice #{{ invoice.id }}</h6>
-          <small class="text-600">{{ invoice.created_at|date:"M j, Y" }}</small>
+<div class="card">
+  <div class="card-header">
+    <div class="row flex-between-center">
+      <div class="col-auto">
+        <h5 class="mb-0">Invoices</h5>
+      </div>
+      <div class="col-auto">
+        <div class="d-flex gap-2">
+          <input type="text" id="invoices-search-input" class="form-control form-control-sm" placeholder="Search invoices..." value="{{ search_query|default:'' }}">
+          <select id="invoices-status-filter" class="form-select form-select-sm">
+            <option value="">All Status</option>
+            {% for value, label in status_choices %}
+            <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearInvoicesFilters()">
+            <i class="fas fa-times"></i> Clear
+          </button>
         </div>
       </div>
-    </td>
-    <td>
-      <div class="d-flex align-items-center">
-        {% if invoice.tenant.profile_photo %}
-        <img src="{{ invoice.tenant.profile_photo.url }}" alt="{{ invoice.tenant.get_username }}" class="rounded-circle me-2" width="32" height="32">
-        {% else %}
-        <div class="bg-200 rounded-circle me-2 d-flex align-items-center justify-content-center">
-          <span class="fas fa-user text-600"></span>
-        </div>
-        {% endif %}
-        <div>
-          <h6 class="mb-0">{{ invoice.tenant.get_full_name|default:invoice.tenant.username }}</h6>
-          <small class="text-600">{{ invoice.tenant.email|default:"No email" }}</small>
-        </div>
-      </div>
-    </td>
-    <td>
-      <span class="fw-bold text-success">{{ invoice.amount|currency_tzs }}</span>
-    </td>
-    <td>
-      <span class="text-600">{{ invoice.due_date|date:"M j, Y" }}</span>
-    </td>
-    <td>
-      {% now "Y-m-d" as today %}
-      {% with days_diff=invoice.due_date|timeuntil %}
-        {% if invoice.due_date < today|date:"Y-m-d"|date %}
-          <span class="badge bg-danger-subtle text-danger">
-            <span class="fas fa-exclamation-triangle me-1"></span>
-            {{ invoice.due_date|timesince }} overdue
-          </span>
-        {% elif days_diff == "0 days" %}
-          <span class="badge bg-warning-subtle text-warning">
-            <span class="fas fa-clock me-1"></span>
-            Due today
-          </span>
-        {% else %}
-          <span class="badge bg-success-subtle text-success">
-            <span class="fas fa-calendar-check me-1"></span>
-            {{ days_diff }}
-          </span>
-        {% endif %}
-      {% endwith %}
-    </td>
-    <td>
-      {% now "Y-m-d" as today %}
-      {% if invoice.status == 'paid' %}
-      <span class="badge bg-success-subtle text-success">
-        <span class="fas fa-check-circle me-1"></span>
-        Paid
-      </span>
-      {% elif invoice.status == 'cancelled' %}
-      <span class="badge bg-secondary-subtle text-secondary">
-        <span class="fas fa-ban me-1"></span>
-        Cancelled
-      </span>
-      {% elif invoice.due_date < today|date:"Y-m-d"|date %}
-      <span class="badge bg-danger-subtle text-danger">
-        <span class="fas fa-exclamation-triangle me-1"></span>
-        Overdue
-      </span>
-      {% else %}
-      <span class="badge bg-warning-subtle text-warning">
-        <span class="fas fa-clock me-1"></span>
-        Unpaid
-      </span>
-      {% endif %}
-    </td>
-    <td>
-      <span class="text-600">
-        {% if invoice.lease_id %}
-          Lease #{{ invoice.lease_id }}
-        {% elif invoice.booking_id %}
-          Booking #{{ invoice.booking_id }}
-        {% else %}
-          Direct Invoice
-        {% endif %}
-      </span>
-    </td>
-    <td>
-      {% include 'components/dropdown_actions.html' with 
-         view_url="/payments/invoices/"|add:invoice.id|add:"/"
-         edit_url="/payments/invoices/"|add:invoice.id|add:"/edit/"
-         delete_url="/payments/invoices/"|add:invoice.id|add:"/delete/"
-         item_id=invoice.id 
-         item_name="Invoice #"|add:invoice.id|stringformat:"s" %}
-    </td>
-  </tr>
-  {% empty %}
-  <tr>
-    <td colspan="8" class="text-center py-4">
-      <div class="text-600">
-        <span class="fas fa-file-invoice-dollar fs-3 mb-3 d-block"></span>
-        <p class="mb-0">No invoices found</p>
-        <small>Invoice records will appear here</small>
-      </div>
-    </td>
-  </tr>
-  {% endfor %}
-</tbody>
-{% endblock %}
-
-{% block table_empty_message %}
-<tr>
-  <td colspan="8" class="text-center py-4">
-    <div class="text-600">
-      <span class="fas fa-file-invoice-dollar fs-3 mb-3 d-block"></span>
-      <p class="mb-0">No invoices found</p>
-      <small>Invoice records will appear here</small>
     </div>
-  </td>
-</tr>
-{% endblock %}
+  </div>
+  <div class="card-body p-0">
+    <div id="invoices-table-container">
+      {% include 'payments/invoice_list_table.html' %}
+    </div>
+  </div>
+</div>
+
+<script>
+// Wait for jQuery
+function waitForJQuery() {
+    if (typeof $ !== 'undefined') {
+        initializeInvoices();
+    } else {
+        setTimeout(waitForJQuery, 100);
+    }
+}
+
+function initializeInvoices() {
+    // AJAX function to load invoices table
+    function loadInvoicesTable(page = 1) {
+        var search = $('#invoices-search-input').val() || '';
+        var status = $('#invoices-status-filter').val() || '';
+        
+        $('#invoices-table-container').html('<div class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">Loading...</p></div>');
+        
+        $.ajax({
+            url: '{% url "payments:invoice_list" %}',
+            type: 'GET',
+            data: {
+                'search': search,
+                'status': status,
+                'page': page
+            },
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(data) {
+                $('#invoices-table-container').html(data);
+            },
+            error: function(xhr, status, error) {
+                $('#invoices-table-container').html('<div class="text-center py-5"><p class="text-danger">Error loading data: ' + error + '</p></div>');
+            }
+        });
+    }
+    
+    // Search input handler
+    var searchTimeout;
+    $('#invoices-search-input').on('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(function() {
+            loadInvoicesTable(1);
+        }, 500);
+    });
+    
+    // Status filter handler
+    $('#invoices-status-filter').on('change', function() {
+        loadInvoicesTable(1);
+    });
+    
+    // Global pagination function
+    window.loadInvoicesPage = function(page) {
+        loadInvoicesTable(page);
+    };
+    
+    // Clear filters function
+    window.clearInvoicesFilters = function() {
+        $('#invoices-search-input').val('');
+        $('#invoices-status-filter').val('');
+        loadInvoicesTable(1);
+    };
+}
+
+// Invoice Delete Function
+function deleteInvoice(invoiceId) {
+    if (!confirm('Are you sure you want to delete this invoice?')) return;
+    
+    $.ajax({
+        url: '/payments/invoices/' + invoiceId + '/delete/',
+        type: 'POST',
+        headers: {
+            'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val() || $('meta[name=csrf-token]').attr('content'),
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        success: function(response) {
+            if (response.success) {
+                alert(response.message || 'Invoice deleted successfully');
+                location.reload();
+            } else {
+                alert(response.message || 'Failed to delete invoice');
+            }
+        },
+        error: function() {
+            // Try non-AJAX delete
+            if (confirm('Delete this invoice?')) {
+                window.location.href = '/payments/invoices/' + invoiceId + '/delete/';
+            }
+        }
+    });
+}
+
+// Start initialization
+waitForJQuery();
+</script>
 
 {% endblock %}

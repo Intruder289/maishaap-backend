@@ -55,20 +55,41 @@ class RentPaymentSerializer(serializers.ModelSerializer):
 
 class RentPaymentCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating rent payments (using unified Payment model)"""
-    rent_invoice = serializers.PrimaryKeyRelatedField(queryset=RentInvoice.objects.all())
+    rent_invoice = serializers.PrimaryKeyRelatedField(
+        queryset=RentInvoice.objects.all(),
+        required=False,
+        allow_null=True
+    )
     
     class Meta:
         model = Payment
         fields = [
             'rent_invoice', 'amount', 'payment_method', 'reference_number', 
-            'transaction_id', 'notes'
+            'transaction_id', 'notes', 'lease', 'tenant'
         ]
     
     def create(self, validated_data):
-        # Set lease and tenant from rent_invoice
-        rent_invoice = validated_data['rent_invoice']
-        validated_data['lease'] = rent_invoice.lease
-        validated_data['tenant'] = rent_invoice.tenant
+        # If rent_invoice is provided, use it to set lease and tenant
+        rent_invoice = validated_data.pop('rent_invoice', None)
+        if rent_invoice:
+            validated_data['lease'] = rent_invoice.lease
+            validated_data['tenant'] = rent_invoice.tenant
+        
+        # Ensure required fields are set
+        if 'lease' not in validated_data or not validated_data.get('lease'):
+            raise serializers.ValidationError({
+                'lease': 'Lease is required when rent_invoice is not provided.'
+            })
+        if 'tenant' not in validated_data or not validated_data.get('tenant'):
+            # Try to get tenant from lease if not provided
+            lease = validated_data.get('lease')
+            if lease and hasattr(lease, 'tenant'):
+                validated_data['tenant'] = lease.tenant
+            else:
+                raise serializers.ValidationError({
+                    'tenant': 'Tenant is required when rent_invoice is not provided.'
+                })
+        
         validated_data['paid_date'] = timezone.now().date()
         validated_data['status'] = 'completed'
         validated_data['recorded_by'] = self.context['request'].user

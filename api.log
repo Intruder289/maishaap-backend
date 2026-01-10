@@ -2,3 +2,30 @@ New tenant registered: testuser_20251027203126 (test_20251027203126@example.com)
 Tenant logged in: api_test_user (api_test@example.com)
 New tenant registered: testuser_20251027204850 (test_20251027204850@example.com) - Pending approval
 INFO 2025-11-15 10:21:41,136 api_views 4356 21632 Password reset request from mobile app: testuser@example.com
+INFO 2025-12-19 09:08:54,657 api_views 38388 48312 Tenant logged in: admin_user (admin@maisha.com)
+INFO 2026-01-08 13:11:28,974 api_views 20344 26176 Tenant logged in: admin_user (admin@maisha.com)
+INFO 2026-01-08 14:38:50,959 api_views 24388 26508 Tenant logged in: admin_user (admin@maisha.com)
+INFO 2026-01-09 08:16:37,754 api_views 25976 7088 Tenant logged in: admin_user (admin@maisha.com)
+INFO 2026-01-09 08:16:38,168 api_views 25976 2460 Property Owner logged in: july (july@maisha.com)
+INFO 2026-01-09 08:16:38,563 api_views 25976 9080 Tenant logged in: property_manager1 (manager@maisha.com)
+INFO 2026-01-09 13:53:30,473 api_views 20648 14232 AzamPay webhook received
+INFO 2026-01-09 13:53:30,474 api_views 20648 14232 Headers: {'Content-Length': '449', 'Content-Type': 'application/json; charset=utf-8', 'Host': 'unperceivably-brutalitarian-krystyna.ngrok-free.dev', 'Accept': 'application/json', 'Traceparent': '00-ed93c42de7fa2df3eebddd9469f12c79-b273e08e5fe02a3b-00', 'X-Forwarded-For': '102.221.117.18', 'X-Forwarded-Host': 'unperceivably-brutalitarian-krystyna.ngrok-free.dev', 'X-Forwarded-Proto': 'https', 'Accept-Encoding': 'gzip'}
+INFO 2026-01-09 13:53:30,475 api_views 20648 14232 Webhook payload: {'message': 'success', 'user': None, 'password': None, 'clientId': None, 'transactionstatus': 'success', 'operator': 'Mpesa', 'reference': '5aae72e0e5974f0e8319394167d7708f', 'externalreference': '5aae72e0e5974f0e8319394167d7708f', 'utilityref': 'BOOKING-HSE-000009-1767956005', 'amount': '60000', 'transid': '5aae72e0e5974f0e8319394167d7708f', 'msisdn': '255758285812', 'mnoreference': 'a068932f-09a8-4ff4-82c0-6efa13def8d5', 'submerchantAcc': None, 'additionalProperties': {}}
+INFO 2026-01-09 13:53:30,478 api_views 20648 14232 Parsed webhook data: {'transaction_id': None, 'reference': '5aae72e0e5974f0e8319394167d7708f', 'status': '', 'amount': Decimal('60000'), 'payment_id': None}
+INFO 2026-01-09 13:53:30,478 api_views 20648 14232 Looking for payment - payment_id: None, transaction_id: None
+ERROR 2026-01-09 13:53:30,478 api_views 20648 14232 Could not find payment - payment_id: None, transaction_id: None
+INFO 2026-01-09 13:59:09,423 api_views 3492 28244 AzamPay webhook received
+INFO 2026-01-09 13:59:09,428 api_views 3492 28244 Headers: {'Content-Length': '449', 'Content-Type': 'application/json; charset=utf-8', 'Host': 'unperceivably-brutalitarian-krystyna.ngrok-free.dev', 'Accept': 'application/json', 'Traceparent': '00-203e4260aad5867f5e3a3df49eb103a6-1974db72499e7b39-00', 'X-Forwarded-For': '102.221.117.18', 'X-Forwarded-Host': 'unperceivably-brutalitarian-krystyna.ngrok-free.dev', 'X-Forwarded-Proto': 'https', 'Accept-Encoding': 'gzip'}
+INFO 2026-01-09 13:59:09,432 api_views 3492 28244 Webhook payload: {'message': 'success', 'user': None, 'password': None, 'clientId': None, 'transactionstatus': 'success', 'operator': 'Mpesa', 'reference': 'c5ddb1e0d10148988f0657ed24110077', 'externalreference': 'c5ddb1e0d10148988f0657ed24110077', 'utilityref': 'BOOKING-HSE-000009-1767956345', 'amount': '70000', 'transid': 'c5ddb1e0d10148988f0657ed24110077', 'msisdn': '255758285812', 'mnoreference': '809a85d1-1cf9-433f-a8bf-4007fab1c3ea', 'submerchantAcc': None, 'additionalProperties': {}}
+INFO 2026-01-09 13:59:09,434 api_views 3492 28244 Parsed webhook data: {'transaction_id': 'c5ddb1e0d10148988f0657ed24110077', 'reference': 'c5ddb1e0d10148988f0657ed24110077', 'status': 'success', 'amount': Decimal('70000'), 'payment_id': None}
+INFO 2026-01-09 13:59:09,435 api_views 3492 28244 After direct extraction: {'transaction_id': 'c5ddb1e0d10148988f0657ed24110077', 'reference': 'c5ddb1e0d10148988f0657ed24110077', 'status': 'success', 'amount': '70000', 'payment_id': None, 'utilityref': 'BOOKING-HSE-000009-1767956345'}
+INFO 2026-01-09 13:59:09,437 api_views 3492 28244 Looking for payment - payment_id: None, transaction_id: c5ddb1e0d10148988f0657ed24110077, utilityref: BOOKING-HSE-000009-1767956345
+WARNING 2026-01-09 13:59:09,526 api_views 3492 28244 Transaction with ID c5ddb1e0d10148988f0657ed24110077 not found
+INFO 2026-01-09 13:59:09,546 api_views 3492 28244 Trying to find payment by utilityref: BOOKING-HSE-000009-1767956345
+INFO 2026-01-09 13:59:09,558 api_views 3492 28244 Trying booking reference variations: ['HSE-000009', 'HSE-000009', 'HSE']
+INFO 2026-01-09 13:59:09,588 api_views 3492 28244 Found booking with reference containing: HSE-000009
+INFO 2026-01-09 13:59:09,596 api_views 3492 28244 Found payment 67 by booking reference
+INFO 2026-01-09 13:59:09,621 api_views 3492 28244 Created new transaction record: 12
+INFO 2026-01-09 13:59:09,621 api_views 3492 28244 Webhook status: success
+INFO 2026-01-09 13:59:09,626 api_views 3492 28244 Payment 67 marked as completed
+INFO 2026-01-09 13:59:09,655 api_views 3492 28244 Transaction 12 and Payment 67 updated successfully

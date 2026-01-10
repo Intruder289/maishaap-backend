@@ -702,6 +702,53 @@
               </li>
               {% endif %}
               
+              <!-- Payments -->
+              {% if user.is_superuser or user.is_staff %}
+              <li class="nav-item">
+                            <div class="nav-item-wrapper">
+                                <a class="nav-link dropdown-indicator label-1" href="#" role="button" data-bs-toggle="collapse" data-bs-target="#nv-payments" aria-expanded="false" aria-controls="nv-payments">
+                  <div class="d-flex align-items-center">
+                                        <div class="dropdown-indicator-icon"><span class="fas fa-caret-right"></span></div>
+                                        <span class="nav-link-icon">
+                                            <i class="fas fa-credit-card"></i>
+                                        </span>
+                    <span class="nav-link-text">Payments</span>
+                  </div>
+                </a>
+                                <div class="parent-wrapper label-1">
+                                    <ul class="nav collapse parent" data-bs-parent="#navbarVerticalCollapse" id="nv-payments">
+                                        <li class="collapsed-nav-item-title d-none">Payments</li>
+                  <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'payment_dashboard' %}active{% endif %}" href="{% url 'payments:payment_dashboard' %}">
+                                                <div class="d-flex align-items-center"><span class="nav-link-text">Dashboard</span></div>
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'payment_list' %}active{% endif %}" href="{% url 'payments:payment_list' %}">
+                                                <div class="d-flex align-items-center"><span class="nav-link-text">Payment List</span></div>
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'payment_transactions' %}active{% endif %}" href="{% url 'payments:payment_transactions' %}">
+                                                <div class="d-flex align-items-center"><span class="nav-link-text">Transactions</span></div>
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'payment_methods' %}active{% endif %}" href="{% url 'payments:payment_methods' %}">
+                                                <div class="d-flex align-items-center"><span class="nav-link-text">Payment Methods</span></div>
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'invoice_list' %}active{% endif %}" href="{% url 'payments:invoice_list' %}">
+                                                <div class="d-flex align-items-center"><span class="nav-link-text">Invoices</span></div>
+                    </a>
+                  </li>
+                </ul>
+                                </div>
+                            </div>
+              </li>
+              {% endif %}
+              
               <!-- Notifications -->
               {% if user.is_superuser or user.is_staff %}
               <li class="nav-item">

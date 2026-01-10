@@ -30,6 +30,23 @@
                     <p class="text-muted mb-0">Lodge: <strong>{{ selected_property.title }}</strong></p>
                 </div>
                 <div class="card-body">
+                    <!-- Property Availability Information -->
+                    <div id="availability-info" class="card border mb-4" style="display: none;">
+                        <div class="card-body">
+                            <h6 class="card-title mb-3">
+                                <i class="fas fa-calendar-check me-2"></i>Property Availability Status
+                            </h6>
+                            <div id="availability-content">
+                                <div class="text-center">
+                                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <span class="ms-2">Loading availability information...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <form method="post">
                         {% csrf_token %}
                         
@@ -121,9 +138,8 @@
                                 <select class="form-control" name="payment_method">
                                     <option value="">Select Payment Method</option>
                                     <option value="cash">Cash</option>
-                                    <option value="card">Credit/Debit Card</option>
-                                    <option value="bank_transfer">Bank Transfer</option>
-                                    <option value="mobile_money">Mobile Money</option>
+                                    <option value="mobile_money">Mobile Money (AZAM Pay)</option>
+                                    <option value="online">Online Payment (AZAM Pay)</option>
                                 </select>
                             </div>
                         </div>
@@ -152,19 +168,209 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const propertyId = {{ selected_property.id }};
+    const availabilityInfo = document.getElementById('availability-info');
+    const availabilityContent = document.getElementById('availability-content');
+    const checkInInput = document.querySelector('input[name="check_in_date"]');
+    const checkOutInput = document.querySelector('input[name="check_out_date"]');
+    
+    // Fetch property availability
+    function loadAvailability() {
+        fetch(`/properties/api/property/${propertyId}/availability/`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    displayAvailability(data);
+                    // Set minimum date based on next available date
+                    if (data.next_available_date) {
+                        checkInInput.min = data.next_available_date;
+                        checkOutInput.min = data.next_available_date;
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error loading availability:', error);
+            });
+    }
+    
+    function displayAvailability(data) {
+        let html = '';
+        
+        // Show property status with subtle styling
+        if (!data.is_available) {
+            html += '<div class="alert alert-warning mb-3 border">';
+            html += '<strong class="text-dark"><i class="fas fa-exclamation-triangle me-2"></i>Property is currently OCCUPIED</strong>';
+            html += '</div>';
+        } else {
+            html += '<div class="alert alert-light mb-3 border">';
+            html += '<strong class="text-dark"><i class="fas fa-check-circle me-2 text-success"></i>Property is currently AVAILABLE</strong>';
+            html += '</div>';
+        }
+        
+        // Show exact occupied dates with clean table styling
+        if (data.has_active_bookings || data.has_active_leases) {
+            html += '<div class="mb-3">';
+            html += '<h6 class="mb-2 text-dark"><i class="fas fa-calendar-times me-2"></i>Occupied Periods (Please avoid these dates):</h6>';
+            html += '<div class="table-responsive">';
+            html += '<table class="table table-sm table-bordered table-hover">';
+            html += '<thead class="table-light">';
+            html += '<tr>';
+            html += '<th class="text-dark">Booking Reference</th>';
+            html += '<th class="text-dark">Occupied From</th>';
+            html += '<th class="text-dark">Occupied Until</th>';
+            html += '<th class="text-dark">Status</th>';
+            html += '</tr>';
+            html += '</thead>';
+            html += '<tbody>';
+            
+            // Add bookings
+            if (data.current_bookings && data.current_bookings.length > 0) {
+                data.current_bookings.forEach(booking => {
+                    const checkIn = new Date(booking.check_in + 'T00:00:00');
+                    const checkOut = new Date(booking.check_out + 'T00:00:00');
+                    const checkInFormatted = checkIn.toLocaleDateString('en-US', { 
+                        weekday: 'short', 
+                        year: 'numeric', 
+                        month: 'short', 
+                        day: 'numeric' 
+                    });
+                    const checkOutFormatted = checkOut.toLocaleDateString('en-US', { 
+                        weekday: 'short', 
+                        year: 'numeric', 
+                        month: 'short', 
+                        day: 'numeric' 
+                    });
+                    
+                    let statusBadge = '';
+                    if (booking.status === 'confirmed') {
+                        statusBadge = '<span class="badge bg-success">Confirmed</span>';
+                    } else if (booking.status === 'checked_in') {
+                        statusBadge = '<span class="badge bg-primary">Checked In</span>';
+                    } else {
+                        statusBadge = '<span class="badge bg-secondary">' + booking.status + '</span>';
+                    }
+                    
+                    html += '<tr>';
+                    html += '<td class="text-dark"><strong>' + (booking.booking_reference || 'N/A') + '</strong></td>';
+                    html += '<td class="text-dark"><strong>' + checkInFormatted + '</strong></td>';
+                    html += '<td class="text-dark"><strong>' + checkOutFormatted + '</strong></td>';
+                    html += '<td>' + statusBadge + '</td>';
+                    html += '</tr>';
+                });
+            }
+            
+            // Add leases from booked_dates if they exist
+            if (data.booked_dates && data.booked_dates.length > 0) {
+                data.booked_dates.forEach(booking => {
+                    if (booking.status === 'lease') {
+                        const checkIn = new Date(booking.check_in + 'T00:00:00');
+                        const checkOut = new Date(booking.check_out + 'T00:00:00');
+                        const checkInFormatted = checkIn.toLocaleDateString('en-US', { 
+                            weekday: 'short', 
+                            year: 'numeric', 
+                            month: 'short', 
+                            day: 'numeric' 
+                        });
+                        const checkOutFormatted = checkOut.toLocaleDateString('en-US', { 
+                            weekday: 'short', 
+                            year: 'numeric', 
+                            month: 'short', 
+                            day: 'numeric' 
+                        });
+                        
+                        html += '<tr>';
+                        html += '<td class="text-dark"><strong>' + (booking.booking_reference || 'Lease') + '</strong></td>';
+                        html += '<td class="text-dark"><strong>' + checkInFormatted + '</strong></td>';
+                        html += '<td class="text-dark"><strong>' + checkOutFormatted + '</strong></td>';
+                        html += '<td><span class="badge bg-secondary">Active Lease</span></td>';
+                        html += '</tr>';
+                    }
+                });
+            }
+            
+            html += '</tbody>';
+            html += '</table>';
+            html += '</div>';
+            html += '</div>';
+        }
+        
+        // Show next available date with subtle styling
+        if (data.next_available_date) {
+            const nextDate = new Date(data.next_available_date + 'T00:00:00');
+            const nextDateFormatted = nextDate.toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            });
+            html += '<div class="alert alert-light border mb-0">';
+            html += '<strong class="text-dark"><i class="fas fa-calendar-check me-2 text-success"></i>Next Available Date: ' + nextDateFormatted + '</strong>';
+            html += '<br><small class="text-muted">Please select your check-in date on or after this date to avoid conflicts.</small>';
+            html += '</div>';
+        } else if (!data.has_active_bookings && !data.has_active_leases) {
+            html += '<div class="alert alert-light border mb-0">';
+            html += '<strong class="text-dark"><i class="fas fa-check-circle me-2 text-success"></i>Property is available immediately</strong>';
+            html += '<br><small class="text-muted">No current bookings or leases. You can select any future date.</small>';
+            html += '</div>';
+        }
+        
+        availabilityContent.innerHTML = html;
+        availabilityInfo.style.display = 'block';
+    }
+    
+    // Load availability on page load
+    loadAvailability();
+    
     // Set minimum date to today
     const today = new Date().toISOString().split('T')[0];
-    document.querySelector('input[name="check_in_date"]').min = today;
-    document.querySelector('input[name="check_out_date"]').min = today;
+    if (!checkInInput.min) {
+        checkInInput.min = today;
+    }
+    if (!checkOutInput.min) {
+        checkOutInput.min = today;
+    }
     
     // Update check-out date minimum when check-in date changes
-    document.querySelector('input[name="check_in_date"]').addEventListener('change', function() {
-        const checkOutInput = document.querySelector('input[name="check_out_date"]');
+    checkInInput.addEventListener('change', function() {
         checkOutInput.min = this.value;
         if (checkOutInput.value && checkOutInput.value <= this.value) {
             checkOutInput.value = '';
         }
+        
+        // Validate against availability
+        validateDates(this.value, checkOutInput.value);
     });
+    
+    checkOutInput.addEventListener('change', function() {
+        validateDates(checkInInput.value, this.value);
+    });
+    
+    function validateDates(checkIn, checkOut) {
+        if (!checkIn || !checkOut) return;
+        
+        fetch(`/properties/api/property/${propertyId}/availability/`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.booked_dates) {
+                    const checkInDate = new Date(checkIn);
+                    const checkOutDate = new Date(checkOut);
+                    
+                    const conflict = data.booked_dates.some(booking => {
+                        const bookingStart = new Date(booking.check_in);
+                        const bookingEnd = new Date(booking.check_out);
+                        return (checkInDate < bookingEnd && checkOutDate > bookingStart);
+                    });
+                    
+                    if (conflict) {
+                        checkInInput.setCustomValidity('Selected dates conflict with existing bookings. Please choose different dates.');
+                        checkOutInput.setCustomValidity('Selected dates conflict with existing bookings. Please choose different dates.');
+                    } else {
+                        checkInInput.setCustomValidity('');
+                        checkOutInput.setCustomValidity('');
+                    }
+                }
+            });
+    }
     
     // Auto-calculate total amount based on room type and duration
     const roomTypeSelect = document.querySelector('select[name="room_type"]');

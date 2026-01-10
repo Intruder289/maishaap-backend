@@ -1,0 +1,175 @@
+{% load humanize %}
+<!-- AJAX Invoice Dashboard Table Content -->
+<div class="table-responsive">
+  <table class="table table-hover mb-0">
+    <thead class="table-light">
+      <tr>
+        <th>Invoice</th>
+        <th>Tenant</th>
+        <th>Amount</th>
+        <th>Status</th>
+        <th>Due Date</th>
+        <th>Created</th>
+        <th>Remaining</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for invoice in invoice_page_obj.object_list %}
+      <tr data-invoice-id="{{ invoice.id }}">
+        <td>
+          <div class="d-flex align-items-center">
+            <div class="avatar-sm bg-info text-white rounded-circle d-flex align-items-center justify-content-center me-3 fw-bold">
+              #{{ invoice.id }}
+            </div>
+            <div>
+              <strong>Invoice #{{ invoice.id }}</strong>
+              {% if invoice.lease_id %}
+              <div class="text-muted small">Lease: {{ invoice.lease_id }}</div>
+              {% endif %}
+            </div>
+          </div>
+        </td>
+        <td>
+          <div class="d-flex align-items-center">
+            <i class="fas fa-user text-muted me-2"></i>
+            <div>
+              <div class="fw-bold">{{ invoice.tenant.get_full_name|default:invoice.tenant.username }}</div>
+              <div class="text-muted small">{{ invoice.tenant.email }}</div>
+            </div>
+          </div>
+        </td>
+        <td>
+          <span class="fw-bold text-primary">Tsh{{ invoice.amount|floatformat:2 }}</span>
+        </td>
+        <td>
+          {% if invoice.status == 'paid' %}
+          <span class="badge bg-success-subtle text-success">
+            <span class="fas fa-check me-1"></span>
+            Paid
+          </span>
+          {% elif invoice.status == 'unpaid' %}
+          <span class="badge bg-warning-subtle text-warning">
+            <span class="fas fa-clock me-1"></span>
+            Unpaid
+          </span>
+          {% elif invoice.status == 'cancelled' %}
+          <span class="badge bg-danger-subtle text-danger">
+            <span class="fas fa-times me-1"></span>
+            Cancelled
+          </span>
+          {% else %}
+          <span class="badge bg-secondary-subtle text-secondary">
+            {{ invoice.get_status_display }}
+          </span>
+          {% endif %}
+        </td>
+        <td>
+          <div class="d-flex flex-column">
+            <span class="fw-bold {% if invoice.due_date < today and invoice.status == 'unpaid' %}text-danger{% endif %}">
+              {{ invoice.due_date|naturalday }}
+            </span>
+            {% if invoice.due_date < today and invoice.status == 'unpaid' %}
+            <small class="text-danger">Overdue</small>
+            {% endif %}
+          </div>
+        </td>
+        <td>
+          <div class="d-flex flex-column">
+            <span class="fw-bold">{{ invoice.created_at|naturalday }}</span>
+            <small class="text-600">{{ invoice.created_at|time:"H:i" }}</small>
+          </div>
+        </td>
+        <td>
+          {% if invoice.status == 'unpaid' %}
+          <span class="fw-bold text-danger">Tsh{{ invoice.amount|floatformat:2 }}</span>
+          {% else %}
+          <span class="fw-bold text-success">Tsh0.00</span>
+          {% endif %}
+        </td>
+        <td>
+          <div class="btn-group" role="group">
+            <button class="btn btn-outline-primary btn-sm" onclick="viewInvoice({{ invoice.id }})">
+              <i class="fas fa-eye"></i>
+            </button>
+            {% if invoice.status == 'unpaid' %}
+            <button class="btn btn-outline-success btn-sm" onclick="createPayment({{ invoice.id }})">
+              <i class="fas fa-plus"></i>
+            </button>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="8" class="text-center py-4">
+          <div class="avatar avatar-3xl mb-3">
+            <div class="avatar-name rounded-circle bg-200">
+              <span class="fas fa-file-invoice text-600"></span>
+            </div>
+          </div>
+          <h5 class="mb-2">No Invoice Records</h5>
+          <p class="text-600 mb-0">No invoice records found matching your criteria.</p>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Pagination -->
+{% if invoice_page_obj.has_other_pages %}
+<div class="card-footer bg-white border-0 py-3">
+  <div class="row align-items-center">
+    <div class="col-md-6">
+      <div class="text-muted">
+        Showing {{ invoice_page_obj.start_index }} to {{ invoice_page_obj.end_index }} of {{ invoice_page_obj.paginator.count }} entries
+      </div>
+    </div>
+    <div class="col-md-6">
+      <nav aria-label="Page navigation" class="d-flex justify-content-end">
+        <ul class="pagination pagination-sm mb-0">
+          {% if invoice_page_obj.has_previous %}
+          <li class="page-item">
+            <a class="page-link" href="#" onclick="loadInvoicePage(1); return false;" title="First Page">
+              <i class="fas fa-angle-double-left"></i>
+            </a>
+          </li>
+          <li class="page-item">
+            <a class="page-link" href="#" onclick="loadInvoicePage({{ invoice_page_obj.previous_page_number }}); return false;" title="Previous Page">
+              <i class="fas fa-angle-left"></i>
+            </a>
+          </li>
+          {% endif %}
+
+          <!-- Page numbers -->
+          {% for num in invoice_page_obj.paginator.page_range %}
+            {% if invoice_page_obj.number == num %}
+            <li class="page-item active">
+              <span class="page-link">{{ num }}</span>
+            </li>
+            {% elif num > invoice_page_obj.number|add:'-3' and num < invoice_page_obj.number|add:'3' %}
+            <li class="page-item">
+              <a class="page-link" href="#" onclick="loadInvoicePage({{ num }}); return false;">{{ num }}</a>
+            </li>
+            {% endif %}
+          {% endfor %}
+
+          {% if invoice_page_obj.has_next %}
+          <li class="page-item">
+            <a class="page-link" href="#" onclick="loadInvoicePage({{ invoice_page_obj.next_page_number }}); return false;" title="Next Page">
+              <i class="fas fa-angle-right"></i>
+            </a>
+          </li>
+          <li class="page-item">
+            <a class="page-link" href="#" onclick="loadInvoicePage({{ invoice_page_obj.paginator.num_pages }}); return false;" title="Last Page">
+              <i class="fas fa-angle-double-right"></i>
+            </a>
+          </li>
+          {% endif %}
+        </ul>
+      </nav>
+    </div>
+  </div>
+</div>
+{% endif %}

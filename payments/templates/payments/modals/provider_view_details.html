@@ -1,0 +1,126 @@
+<div class="provider-details">
+  <div class="row mb-3">
+    <div class="col-md-6">
+      <h6 class="text-500 mb-2">Provider Information</h6>
+      <table class="table table-sm table-borderless">
+        <tr>
+          <td class="text-600" style="width: 40%;">Provider Name:</td>
+          <td><strong>{{ provider.name }}</strong></td>
+        </tr>
+        <tr>
+          <td class="text-600">Type:</td>
+          <td><span class="badge bg-info-subtle text-info">{{ provider.get_provider_type_display }}</span></td>
+        </tr>
+        <tr>
+          <td class="text-600">Status:</td>
+          <td>
+            {% if provider.is_active %}
+            <span class="badge bg-success">Active</span>
+            {% else %}
+            <span class="badge bg-danger">Inactive</span>
+            {% endif %}
+          </td>
+        </tr>
+        <tr>
+          <td class="text-600">Transaction Fee:</td>
+          <td><strong>{{ provider.transaction_fee }}%</strong></td>
+        </tr>
+        <tr>
+          <td class="text-600">Created:</td>
+          <td>{{ provider.created_at|date:"M d, Y H:i:s" }}</td>
+        </tr>
+        <tr>
+          <td class="text-600">Last Updated:</td>
+          <td>{{ provider.updated_at|date:"M d, Y H:i:s" }}</td>
+        </tr>
+      </table>
+    </div>
+    <div class="col-md-6">
+      <h6 class="text-500 mb-2">Statistics</h6>
+      <table class="table table-sm table-borderless">
+        <tr>
+          <td class="text-600" style="width: 50%;">Total Transactions:</td>
+          <td><strong>{{ transaction_count }}</strong></td>
+        </tr>
+        <tr>
+          <td class="text-600">Successful:</td>
+          <td><span class="badge bg-success">{{ successful_count }}</span></td>
+        </tr>
+        <tr>
+          <td class="text-600">Failed:</td>
+          <td><span class="badge bg-danger">{{ failed_count }}</span></td>
+        </tr>
+        <tr>
+          <td class="text-600">Pending:</td>
+          <td><span class="badge bg-warning">{{ pending_count }}</span></td>
+        </tr>
+        <tr>
+          <td class="text-600">Total Revenue:</td>
+          <td><strong class="text-success">Tsh{{ total_revenue|floatformat:2 }}</strong></td>
+        </tr>
+        {% if transaction_count > 0 %}
+        <tr>
+          <td class="text-600">Success Rate:</td>
+          <td>
+            {% widthratio successful_count transaction_count 100 as success_rate %}
+            <strong>{{ success_rate }}%</strong>
+          </td>
+        </tr>
+        {% endif %}
+      </table>
+    </div>
+  </div>
+  
+  {% if provider.description %}
+  <div class="row mb-3">
+    <div class="col-12">
+      <h6 class="text-500 mb-2">Description</h6>
+      <p class="text-600">{{ provider.description }}</p>
+    </div>
+  </div>
+  {% endif %}
+  
+  {% if recent_transactions %}
+  <div class="row">
+    <div class="col-12">
+      <h6 class="text-500 mb-2">Recent Transactions</h6>
+      <div class="table-responsive">
+        <table class="table table-sm">
+          <thead>
+            <tr>
+              <th>Transaction ID</th>
+              <th>Payment</th>
+              <th>Amount</th>
+              <th>Status</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for transaction in recent_transactions %}
+            <tr>
+              <td>#{{ transaction.id }}</td>
+              <td>
+                <a href="#" class="text-decoration-none" onclick="viewPayment({{ transaction.payment.id }}); return false;">
+                  Payment #{{ transaction.payment.id }}
+                </a>
+              </td>
+              <td><strong>Tsh{{ transaction.payment.amount|floatformat:2 }}</strong></td>
+              <td>
+                {% if transaction.status == 'successful' %}
+                <span class="badge bg-success">{{ transaction.status|title }}</span>
+                {% elif transaction.status == 'failed' %}
+                <span class="badge bg-danger">{{ transaction.status|title }}</span>
+                {% else %}
+                <span class="badge bg-warning">{{ transaction.status|title }}</span>
+                {% endif %}
+              </td>
+              <td>{{ transaction.created_at|date:"M d, Y H:i" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>

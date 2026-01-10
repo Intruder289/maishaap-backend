@@ -115,31 +115,31 @@
                         <div class="card-body">
                             <div class="row">
                                 <div class="col-md-2">
-                                    <a href="{% url 'properties:lodge_bookings' %}" class="btn btn-outline-primary w-100 mb-2">
+                                    <a href="{% url 'properties:lodge_bookings' %}{% if selected_property %}?property_id={{ selected_property.id }}{% endif %}" class="btn btn-outline-primary w-100 mb-2">
                                         <i class="fas fa-calendar-alt d-block mb-2"></i>
                                         View Bookings
                                     </a>
                                 </div>
                                 <div class="col-md-2">
-                                    <a href="{% url 'properties:add_lodge_room' %}" class="btn btn-outline-success w-100 mb-2">
+                                    <a href="{% url 'properties:add_lodge_room' %}{% if selected_property %}?property_id={{ selected_property.id }}{% endif %}" class="btn btn-outline-success w-100 mb-2">
                                         <i class="fas fa-plus d-block mb-2"></i>
                                         Add Room
                                     </a>
                                 </div>
                                 <div class="col-md-2">
-                                    <a href="{% url 'properties:lodge_customers' %}" class="btn btn-outline-info w-100 mb-2">
+                                    <a href="{% url 'properties:lodge_customers' %}{% if selected_property %}?property_id={{ selected_property.id }}{% endif %}" class="btn btn-outline-info w-100 mb-2">
                                         <i class="fas fa-users d-block mb-2"></i>
                                         Customers
                                     </a>
                                 </div>
                                 <div class="col-md-2">
-                                    <a href="{% url 'properties:lodge_payments' %}" class="btn btn-outline-warning w-100 mb-2">
+                                    <a href="{% url 'properties:lodge_payments' %}{% if selected_property %}?property_id={{ selected_property.id }}{% endif %}" class="btn btn-outline-warning w-100 mb-2">
                                         <i class="fas fa-money-bill-wave d-block mb-2"></i>
                                         Payments
                                     </a>
                                 </div>
                                 <div class="col-md-2">
-                                    <a href="{% url 'properties:lodge_reports' %}" class="btn btn-outline-secondary w-100 mb-2">
+                                    <a href="{% url 'properties:lodge_reports' %}{% if selected_property %}?property_id={{ selected_property.id }}{% endif %}" class="btn btn-outline-secondary w-100 mb-2">
                                         <i class="fas fa-chart-bar d-block mb-2"></i>
                                         Reports
                                     </a>
@@ -327,28 +327,28 @@
                             <div class="mb-3">
                                 <div class="d-flex justify-content-between">
                                     <span>Available</span>
-                                    <span class="badge bg-success">12</span>
+                                    <span class="badge bg-success">{{ available_rooms|default:0 }}</span>
                                 </div>
                                 <div class="progress mt-1" style="height: 8px;">
-                                    <div class="progress-bar bg-success" style="width: 75%"></div>
+                                    <div class="progress-bar bg-success" style="width: {{ available_percentage|default:0 }}%"></div>
                                 </div>
                             </div>
                             <div class="mb-3">
                                 <div class="d-flex justify-content-between">
                                     <span>Occupied</span>
-                                    <span class="badge bg-warning">4</span>
+                                    <span class="badge bg-warning">{{ occupied_rooms|default:0 }}</span>
                                 </div>
                                 <div class="progress mt-1" style="height: 8px;">
-                                    <div class="progress-bar bg-warning" style="width: 25%"></div>
+                                    <div class="progress-bar bg-warning" style="width: {{ occupied_percentage|default:0 }}%"></div>
                                 </div>
                             </div>
                             <div class="mb-3">
                                 <div class="d-flex justify-content-between">
                                     <span>Maintenance</span>
-                                    <span class="badge bg-danger">0</span>
+                                    <span class="badge bg-danger">{{ maintenance_rooms|default:0 }}</span>
                                 </div>
                                 <div class="progress mt-1" style="height: 8px;">
-                                    <div class="progress-bar bg-danger" style="width: 0%"></div>
+                                    <div class="progress-bar bg-danger" style="width: {{ maintenance_percentage|default:0 }}%"></div>
                                 </div>
                             </div>
                         </div>

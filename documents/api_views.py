@@ -10,6 +10,8 @@ from documents.serializers import (
     LeaseSerializer, BookingSerializer, DocumentSerializer,
     LeaseCreateSerializer, BookingCreateSerializer
 )
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 
 
 class LeaseViewSet(viewsets.ModelViewSet):
@@ -64,6 +66,17 @@ class LeaseViewSet(viewsets.ModelViewSet):
         # Tenants see only their own leases
         return self.queryset.filter(tenant=user)
     
+    @swagger_auto_schema(
+        method='get',
+        operation_description="Get all leases for the current user (tenant). Returns only leases where the current user is the tenant.",
+        operation_summary="Get My Leases",
+        tags=['Leases'],
+        responses={
+            200: LeaseSerializer(many=True),
+            401: "Authentication required"
+        },
+        security=[{'Bearer': []}]
+    )
     @action(detail=False, methods=['get'])
     def my_leases(self, request):
         """Get current user's leases"""
@@ -71,6 +84,17 @@ class LeaseViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(leases, many=True)
         return Response(serializer.data)
     
+    @swagger_auto_schema(
+        method='get',
+        operation_description="Get all active leases. Returns leases with status 'active' filtered by user role.",
+        operation_summary="Get Active Leases",
+        tags=['Leases'],
+        responses={
+            200: LeaseSerializer(many=True),
+            401: "Authentication required"
+        },
+        security=[{'Bearer': []}]
+    )
     @action(detail=False, methods=['get'])
     def active_leases(self, request):
         """Get all active leases"""
@@ -94,6 +118,18 @@ class LeaseViewSet(viewsets.ModelViewSet):
             tenant = serializer.validated_data.get('tenant', user)
             serializer.save(tenant=tenant)
     
+    @swagger_auto_schema(
+        method='get',
+        operation_description="Get all pending lease requests. Admin/staff only.",
+        operation_summary="Get Pending Leases",
+        tags=['Leases'],
+        responses={
+            200: LeaseSerializer(many=True),
+            403: "Permission denied (admin/staff only)",
+            401: "Authentication required"
+        },
+        security=[{'Bearer': []}]
+    )
     @action(detail=False, methods=['get'])
     def pending_leases(self, request):
         """Get all pending lease requests (admin only)"""
@@ -106,6 +142,28 @@ class LeaseViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(leases, many=True)
         return Response(serializer.data)
     
+    @swagger_auto_schema(
+        method='post',
+        operation_description="Approve a pending lease request. Changes lease status to 'active'. Admin/staff only.",
+        operation_summary="Approve Lease",
+        tags=['Leases'],
+        responses={
+            200: openapi.Response(
+                description="Lease approved successfully",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'message': openapi.Schema(type=openapi.TYPE_STRING),
+                        'lease': LeaseSerializer
+                    }
+                )
+            ),
+            400: "Lease is not pending",
+            403: "Permission denied (admin/staff only)",
+            401: "Authentication required"
+        },
+        security=[{'Bearer': []}]
+    )
     @action(detail=True, methods=['post'])
     def approve(self, request, pk=None):
         """Approve a pending lease request (admin only)"""
@@ -128,6 +186,35 @@ class LeaseViewSet(viewsets.ModelViewSet):
             'lease': serializer.data
         })
     
+    @swagger_auto_schema(
+        method='post',
+        operation_description="Reject a pending lease request. Changes lease status to 'rejected'. Admin/staff only.",
+        operation_summary="Reject Lease",
+        tags=['Leases'],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'reason': openapi.Schema(type=openapi.TYPE_STRING, description='Rejection reason (optional)')
+            }
+        ),
+        responses={
+            200: openapi.Response(
+                description="Lease rejected",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'message': openapi.Schema(type=openapi.TYPE_STRING),
+                        'reason': openapi.Schema(type=openapi.TYPE_STRING),
+                        'lease': LeaseSerializer
+                    }
+                )
+            ),
+            400: "Lease is not pending",
+            403: "Permission denied (admin/staff only)",
+            401: "Authentication required"
+        },
+        security=[{'Bearer': []}]
+    )
     @action(detail=True, methods=['post'])
     def reject(self, request, pk=None):
         """Reject a pending lease request (admin only)"""
@@ -152,6 +239,17 @@ class LeaseViewSet(viewsets.ModelViewSet):
             'lease': serializer.data
         })
     
+    @swagger_auto_schema(
+        method='post',
+        operation_description="Terminate a lease. Changes lease status to 'terminated'.",
+        operation_summary="Terminate Lease",
+        tags=['Leases'],
+        responses={
+            200: LeaseSerializer,
+            401: "Authentication required"
+        },
+        security=[{'Bearer': []}]
+    )
     @action(detail=True, methods=['post'])
     def terminate(self, request, pk=None):
         """Terminate a lease"""
@@ -214,6 +312,17 @@ class BookingViewSet(viewsets.ModelViewSet):
         # Tenants see only their own bookings
         return self.queryset.filter(tenant=user)
     
+    @swagger_auto_schema(
+        method='get',
+        operation_description="Get all bookings for the current user (tenant). Returns only bookings where the current user is the tenant.",
+        operation_summary="Get My Bookings",
+        tags=['Bookings'],
+        responses={
+            200: BookingSerializer(many=True),
+            401: "Authentication required"
+        },
+        security=[{'Bearer': []}]
+    )
     @action(detail=False, methods=['get'])
     def my_bookings(self, request):
         """Get current user's bookings"""
@@ -251,6 +360,17 @@ class BookingViewSet(viewsets.ModelViewSet):
             tenant = serializer.validated_data.get('tenant', user)
             serializer.save(tenant=tenant)
     
+    @swagger_auto_schema(
+        method='get',
+        operation_description="Get all pending bookings. Returns bookings with status 'pending' filtered by user role.",
+        operation_summary="Get Pending Bookings",
+        tags=['Bookings'],
+        responses={
+            200: BookingSerializer(many=True),
+            401: "Authentication required"
+        },
+        security=[{'Bearer': []}]
+    )
     @action(detail=False, methods=['get'])
     def pending_bookings(self, request):
         """Get all pending bookings"""
@@ -258,6 +378,17 @@ class BookingViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(bookings, many=True)
         return Response(serializer.data)
     
+    @swagger_auto_schema(
+        method='post',
+        operation_description="Confirm a booking. Changes booking status to 'confirmed'.",
+        operation_summary="Confirm Booking",
+        tags=['Bookings'],
+        responses={
+            200: BookingSerializer,
+            401: "Authentication required"
+        },
+        security=[{'Bearer': []}]
+    )
     @action(detail=True, methods=['post'])
     def confirm(self, request, pk=None):
         """Confirm a booking"""
@@ -267,6 +398,17 @@ class BookingViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(booking)
         return Response(serializer.data)
     
+    @swagger_auto_schema(
+        method='post',
+        operation_description="Cancel a booking. Changes booking status to 'cancelled'.",
+        operation_summary="Cancel Booking",
+        tags=['Bookings'],
+        responses={
+            200: BookingSerializer,
+            401: "Authentication required"
+        },
+        security=[{'Bearer': []}]
+    )
     @action(detail=True, methods=['post'])
     def cancel(self, request, pk=None):
         """Cancel a booking"""
@@ -313,6 +455,17 @@ class DocumentViewSet(viewsets.ModelViewSet):
             models.Q(booking__tenant=user)
         ).distinct()
     
+    @swagger_auto_schema(
+        method='get',
+        operation_description="Get all documents uploaded by the current user.",
+        operation_summary="Get My Documents",
+        tags=['Documents'],
+        responses={
+            200: DocumentSerializer(many=True),
+            401: "Authentication required"
+        },
+        security=[{'Bearer': []}]
+    )
     @action(detail=False, methods=['get'])
     def my_documents(self, request):
         """Get current user's documents"""
@@ -320,6 +473,21 @@ class DocumentViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(documents, many=True)
         return Response(serializer.data)
     
+    @swagger_auto_schema(
+        method='get',
+        operation_description="Get all documents associated with a specific lease. Requires 'lease_id' query parameter.",
+        operation_summary="Get Lease Documents",
+        tags=['Documents'],
+        manual_parameters=[
+            openapi.Parameter('lease_id', openapi.IN_QUERY, description="Lease ID", type=openapi.TYPE_INTEGER, required=True)
+        ],
+        responses={
+            200: DocumentSerializer(many=True),
+            400: "lease_id parameter is required",
+            401: "Authentication required"
+        },
+        security=[{'Bearer': []}]
+    )
     @action(detail=False, methods=['get'])
     def lease_documents(self, request):
         """Get documents for a specific lease"""
@@ -333,6 +501,21 @@ class DocumentViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(documents, many=True)
         return Response(serializer.data)
     
+    @swagger_auto_schema(
+        method='get',
+        operation_description="Get all documents associated with a specific booking. Requires 'booking_id' query parameter.",
+        operation_summary="Get Booking Documents",
+        tags=['Documents'],
+        manual_parameters=[
+            openapi.Parameter('booking_id', openapi.IN_QUERY, description="Booking ID", type=openapi.TYPE_INTEGER, required=True)
+        ],
+        responses={
+            200: DocumentSerializer(many=True),
+            400: "booking_id parameter is required",
+            401: "Authentication required"
+        },
+        security=[{'Bearer': []}]
+    )
     @action(detail=False, methods=['get'])
     def booking_documents(self, request):
         """Get documents for a specific booking"""

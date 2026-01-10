@@ -219,7 +219,7 @@ def auto_complete_venue_bookings(user=None):
     if user and user.is_authenticated and not (user.is_staff or user.is_superuser):
         filters['property_obj__owner'] = user
 
-    return Booking.objects.filter(**filters).update(booking_status='completed')
+    return Booking.objects.filter(**filters).update(booking_status='checked_out')
 
 
 def combine_bookings(prop_bookings_query, doc_bookings_query, property_type_name, selected_property=None, search_query='', status_filter='', payment_filter='', user=None):
@@ -506,7 +506,7 @@ def property_detail(request, pk):
         has_visit_access = PropertyVisitPayment.objects.filter(
             property=property_obj,
             user=request.user,
-            status='successful'
+            status='completed'
         ).exists()
     
     # Check if user can see owner contact (admin, owner, or has paid for visit)
@@ -1127,11 +1127,25 @@ def hotel_dashboard(request):
     """Hotel management dashboard"""
     from datetime import date, datetime
     
-    # Get selected property from session or request
-    selected_property_id = request.session.get('selected_hotel_property_id') or request.GET.get('property_id')
+    # Get selected property from request parameter or session
+    # Priority: URL parameter > Session
+    url_property_id = request.GET.get('property_id')
+    session_property_id = request.session.get('selected_hotel_property_id')
+    
+    # Use URL parameter if present, otherwise use session
+    selected_property_id = url_property_id or session_property_id
     
     # Validate selected_property_id - handle 'all' case
     selected_property_id = validate_property_id(selected_property_id)
+    
+    # If no hotel is selected, ensure session is clear and redirect to selection page
+    if not selected_property_id:
+        # Double-check session is clear (in case of stale data)
+        if 'selected_hotel_property_id' in request.session:
+            del request.session['selected_hotel_property_id']
+            request.session.modified = True
+        messages.info(request, 'Please select a hotel to view the dashboard.')
+        return redirect('properties:hotel_select_property')
     
     # Get hotel properties - MULTI-TENANCY: Filter by owner for data isolation
     if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
@@ -1149,8 +1163,11 @@ def hotel_dashboard(request):
                 selected_property = Property.objects.get(id=selected_property_id, property_type__name__iexact='hotel', owner=request.user)
             else:
                 selected_property = Property.objects.get(id=selected_property_id, property_type__name__iexact='hotel')
-            # Store selected property in session
-            request.session['selected_hotel_property_id'] = selected_property_id
+            # Store selected property in session for persistence
+            # Save to session if it came from URL (new selection) or if session doesn't match
+            if url_property_id or request.session.get('selected_hotel_property_id') != selected_property_id:
+                request.session['selected_hotel_property_id'] = selected_property_id
+                request.session.modified = True
             
             # Get stats for selected property
             bookings = Booking.objects.filter(property_obj=selected_property)
@@ -1176,6 +1193,10 @@ def hotel_dashboard(request):
             ).select_related('booking__customer').order_by('-payment_date')[:5]
             
         except Property.DoesNotExist:
+            # Property not found - clear invalid session value
+            if 'selected_hotel_property_id' in request.session:
+                del request.session['selected_hotel_property_id']
+                request.session.modified = True
             selected_property = None
             total_rooms = 0
             total_bookings = 0
@@ -1250,8 +1271,13 @@ def hotel_dashboard(request):
 @login_required
 def hotel_bookings(request):
     """Hotel bookings management"""
-    # Get selected property from session or request
-    selected_property_id = request.session.get('selected_hotel_property_id') or request.GET.get('property_id')
+    # Get selected property from request parameter or session
+    # Priority: URL parameter > Session
+    url_property_id = request.GET.get('property_id')
+    session_property_id = request.session.get('selected_hotel_property_id')
+    
+    # Use URL parameter if present, otherwise use session
+    selected_property_id = url_property_id or session_property_id
     
     # Validate selected_property_id - handle 'all' case
     selected_property_id = validate_property_id(selected_property_id)
@@ -1284,8 +1310,10 @@ def hotel_bookings(request):
                 selected_property = Property.objects.get(id=selected_property_id, property_type__name__iexact='hotel', owner=request.user)
             else:
                 selected_property = Property.objects.get(id=selected_property_id, property_type__name__iexact='hotel')
-            # Store selected property in session
-            request.session['selected_hotel_property_id'] = selected_property_id
+            # Store selected property in session only if it came from URL parameter (new selection)
+            if url_property_id:
+                request.session['selected_hotel_property_id'] = selected_property_id
+                request.session.modified = True
         except Property.DoesNotExist:
             selected_property = None
     
@@ -1336,8 +1364,13 @@ def hotel_rooms(request):
     """Hotel room status management"""
     from django.core.paginator import Paginator
     
-    # Get selected property from session or request
-    selected_property_id = request.session.get('selected_hotel_property_id') or request.GET.get('property_id')
+    # Get selected property from request parameter or session
+    # Priority: URL parameter > Session
+    url_property_id = request.GET.get('property_id')
+    session_property_id = request.session.get('selected_hotel_property_id')
+    
+    # Use URL parameter if present, otherwise use session
+    selected_property_id = url_property_id or session_property_id
     
     # Validate selected_property_id - handle 'all' case
     selected_property_id = validate_property_id(selected_property_id)
@@ -1357,8 +1390,10 @@ def hotel_rooms(request):
             else:
                 selected_property = Property.objects.get(id=selected_property_id, property_type__name__iexact='hotel')
             rooms_queryset = Room.objects.filter(property_obj=selected_property).select_related('property_obj', 'current_booking')
-            # Store selected property in session
-            request.session['selected_hotel_property_id'] = selected_property_id
+            # Store selected property in session only if it came from URL parameter (new selection)
+            if url_property_id:
+                request.session['selected_hotel_property_id'] = selected_property_id
+                request.session.modified = True
         except Property.DoesNotExist:
             selected_property = None
             rooms_queryset = Room.objects.none()
@@ -1459,8 +1494,13 @@ def add_room(request):
 @login_required
 def hotel_customers(request):
     """Hotel customer management"""
-    # Get selected property from session or request
-    selected_property_id = request.session.get('selected_hotel_property_id') or request.GET.get('property_id')
+    # Get selected property from request parameter or session
+    # Priority: URL parameter > Session
+    url_property_id = request.GET.get('property_id')
+    session_property_id = request.session.get('selected_hotel_property_id')
+    
+    # Use URL parameter if present, otherwise use session
+    selected_property_id = url_property_id or session_property_id
     
     # Validate selected_property_id - handle 'all' case
     selected_property_id = validate_property_id(selected_property_id)
@@ -1483,8 +1523,10 @@ def hotel_customers(request):
             customers = Customer.objects.filter(
                 customer_bookings__property_obj=selected_property
             ).distinct().select_related().prefetch_related('customer_bookings')
-            # Store selected property in session
-            request.session['selected_hotel_property_id'] = selected_property_id
+            # Store selected property in session only if it came from URL parameter (new selection)
+            if url_property_id:
+                request.session['selected_hotel_property_id'] = selected_property_id
+                request.session.modified = True
         except Property.DoesNotExist:
             selected_property = None
             customers = Customer.objects.none()
@@ -1546,8 +1588,13 @@ def hotel_customers(request):
 @login_required
 def hotel_payments(request):
     """Hotel payment management"""
-    # Get selected property from session or request
-    selected_property_id = request.session.get('selected_hotel_property_id') or request.GET.get('property_id')
+    # Get selected property from request parameter or session
+    # Priority: URL parameter > Session
+    url_property_id = request.GET.get('property_id')
+    session_property_id = request.session.get('selected_hotel_property_id')
+    
+    # Use URL parameter if present, otherwise use session
+    selected_property_id = url_property_id or session_property_id
     
     # Validate selected_property_id - handle 'all' case
     selected_property_id = validate_property_id(selected_property_id)
@@ -1570,8 +1617,10 @@ def hotel_payments(request):
                 booking__property_obj=selected_property,
                 status='active'  # Only show active payments (exclude refunded)
             ).select_related('booking', 'booking__customer', 'recorded_by').order_by('-payment_date')
-            # Store selected property in session
-            request.session['selected_hotel_property_id'] = selected_property_id
+            # Store selected property in session only if it came from URL parameter (new selection)
+            if url_property_id:
+                request.session['selected_hotel_property_id'] = selected_property_id
+                request.session.modified = True
         except Property.DoesNotExist:
             selected_property = None
             payments = Payment.objects.none()
@@ -1634,11 +1683,25 @@ def hotel_reports(request):
 @login_required
 def lodge_dashboard(request):
     """Lodge management dashboard"""
-    # Get selected property from session or request
-    selected_property_id = request.session.get('selected_lodge_property_id') or request.GET.get('property_id')
+    # Get selected property from request parameter or session
+    # Priority: URL parameter > Session
+    url_property_id = request.GET.get('property_id')
+    session_property_id = request.session.get('selected_lodge_property_id')
+    
+    # Use URL parameter if present, otherwise use session
+    selected_property_id = url_property_id or session_property_id
     
     # Validate selected_property_id - handle 'all' case
     selected_property_id = validate_property_id(selected_property_id)
+    
+    # If no lodge is selected, ensure session is clear and redirect to selection page
+    if not selected_property_id:
+        # Double-check session is clear (in case of stale data)
+        if 'selected_lodge_property_id' in request.session:
+            del request.session['selected_lodge_property_id']
+            request.session.modified = True
+        messages.info(request, 'Please select a lodge to view the dashboard.')
+        return redirect('properties:lodge_select_property')
     
     # Get lodge properties - MULTI-TENANCY: Filter by owner for data isolation
     if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
@@ -1654,8 +1717,10 @@ def lodge_dashboard(request):
                 selected_property = Property.objects.get(id=selected_property_id, property_type__name__iexact='lodge', owner=request.user)
             else:
                 selected_property = Property.objects.get(id=selected_property_id, property_type__name__iexact='lodge')
-            # Store selected property in session
-            request.session['selected_lodge_property_id'] = selected_property_id
+            # Store selected property in session only if it came from URL parameter (new selection)
+            if url_property_id:
+                request.session['selected_lodge_property_id'] = selected_property_id
+                request.session.modified = True
             
             # Get stats for selected property
             total_rooms = selected_property.total_rooms or 0
@@ -1663,6 +1728,23 @@ def lodge_dashboard(request):
             total_bookings = bookings.count()
             active_bookings = bookings.filter(booking_status__in=['confirmed', 'checked_in']).count()
             revenue = sum(booking.total_amount for booking in bookings.filter(payment_status='paid'))
+            
+            # Calculate room counts from Room model
+            from .models import Room
+            property_rooms = Room.objects.filter(property_obj=selected_property, is_active=True)
+            available_rooms = property_rooms.filter(status='available').count()
+            occupied_rooms = property_rooms.filter(status='occupied').count()
+            maintenance_rooms = property_rooms.filter(status='maintenance').count()
+            
+            # Calculate percentages for progress bars
+            if total_rooms > 0:
+                available_percentage = (available_rooms / total_rooms) * 100
+                occupied_percentage = (occupied_rooms / total_rooms) * 100
+                maintenance_percentage = (maintenance_rooms / total_rooms) * 100
+            else:
+                available_percentage = 0
+                occupied_percentage = 0
+                maintenance_percentage = 0
             
             # Get today's check-ins with pagination
             from datetime import date
@@ -1676,6 +1758,12 @@ def lodge_dashboard(request):
             total_bookings = 0
             active_bookings = 0
             revenue = 0
+            available_rooms = 0
+            occupied_rooms = 0
+            maintenance_rooms = 0
+            available_percentage = 0
+            occupied_percentage = 0
+            maintenance_percentage = 0
             todays_checkins_query = Booking.objects.none()
     else:
         selected_property = None
@@ -1688,6 +1776,26 @@ def lodge_dashboard(request):
         total_bookings = bookings.count()
         active_bookings = bookings.filter(booking_status__in=['confirmed', 'checked_in']).count()
         revenue = sum(booking.total_amount for booking in bookings.filter(payment_status='paid'))
+        
+        # Calculate room counts from Room model for all lodges
+        from .models import Room
+        if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
+            property_rooms = Room.objects.filter(property_obj__property_type__name__iexact='lodge', property_obj__owner=request.user, is_active=True)
+        else:
+            property_rooms = Room.objects.filter(property_obj__property_type__name__iexact='lodge', is_active=True)
+        available_rooms = property_rooms.filter(status='available').count()
+        occupied_rooms = property_rooms.filter(status='occupied').count()
+        maintenance_rooms = property_rooms.filter(status='maintenance').count()
+        
+        # Calculate percentages for progress bars
+        if total_rooms > 0:
+            available_percentage = (available_rooms / total_rooms) * 100
+            occupied_percentage = (occupied_rooms / total_rooms) * 100
+            maintenance_percentage = (maintenance_rooms / total_rooms) * 100
+        else:
+            available_percentage = 0
+            occupied_percentage = 0
+            maintenance_percentage = 0
         
         # Get today's check-ins for all lodges with pagination
         from datetime import date
@@ -1723,6 +1831,12 @@ def lodge_dashboard(request):
         'revenue': revenue,
         'is_single_property_mode': bool(selected_property_id),
         'todays_checkins': todays_checkins,
+        'available_rooms': available_rooms,
+        'occupied_rooms': occupied_rooms,
+        'maintenance_rooms': maintenance_rooms,
+        'available_percentage': round(available_percentage, 1),
+        'occupied_percentage': round(occupied_percentage, 1),
+        'maintenance_percentage': round(maintenance_percentage, 1),
     }
     return render(request, 'properties/lodge_dashboard.html', context)
 
@@ -1920,6 +2034,9 @@ def lodge_customers(request):
                 total_spent=Sum('customer_bookings__total_amount'),
                 last_visit=Max('customer_bookings__check_in_date')
             ).select_related().order_by('-last_visit')
+            # Store selected property in session
+            request.session['selected_lodge_property_id'] = selected_property_id
+            request.session.modified = True
             # Store selected property in session
             request.session['selected_lodge_property_id'] = selected_property_id
         except Property.DoesNotExist:
@@ -3045,22 +3162,32 @@ def house_dashboard(request):
     # Get house properties with pagination
     house_properties_query = Property.objects.filter(property_type__name__iexact='house').select_related('property_type', 'region', 'owner').prefetch_related('bookings')
     
-    # Apply search filter if provided
+    # If a property is selected, filter to only show that property
+    if selected_property_id:
+        house_properties_query = house_properties_query.filter(id=selected_property_id)
+    
+    # Apply search filter if provided (only if no specific property is selected)
     search_query = request.GET.get('search', '').strip()
-    if search_query:
+    if search_query and not selected_property_id:
         house_properties_query = house_properties_query.filter(
             Q(title__icontains=search_query) |
             Q(description__icontains=search_query) |
             Q(address__icontains=search_query)
         )
     
-    # Apply status filter if provided
+    # Apply status filter if provided (only if no specific property is selected)
     status_filter = request.GET.get('status', '')
-    if status_filter:
+    if status_filter and not selected_property_id:
         if status_filter == 'occupied':
-            house_properties_query = house_properties_query.filter(bookings__booking_status__in=['confirmed', 'checked_in']).distinct()
+            # Filter properties that have active bookings (confirmed or checked_in)
+            house_properties_query = house_properties_query.filter(
+                property_bookings__booking_status__in=['confirmed', 'checked_in']
+            ).distinct()
         elif status_filter == 'available':
-            house_properties_query = house_properties_query.exclude(bookings__booking_status__in=['confirmed', 'checked_in']).distinct()
+            # Filter properties that don't have active bookings
+            house_properties_query = house_properties_query.exclude(
+                property_bookings__booking_status__in=['confirmed', 'checked_in']
+            ).distinct()
     
     # Pagination
     from django.core.paginator import Paginator
@@ -3096,12 +3223,15 @@ def house_dashboard(request):
             total_bookings = bookings.count()
             active_bookings = bookings.filter(booking_status__in=['confirmed', 'checked_in']).count()
             revenue = sum(booking.total_amount for booking in bookings.filter(payment_status='paid'))
+            # When a property is selected, total_houses should be 1
+            total_houses = 1
         except Property.DoesNotExist:
             selected_property = None
             bedrooms = 0
             total_bookings = 0
             active_bookings = 0
             revenue = 0
+            total_houses = house_properties.count()
     else:
         selected_property = None
         # Get stats for all houses
@@ -3110,9 +3240,8 @@ def house_dashboard(request):
         total_bookings = bookings.count()
         active_bookings = bookings.filter(booking_status__in=['confirmed', 'checked_in']).count()
         revenue = sum(booking.total_amount for booking in bookings.filter(payment_status='paid'))
-    
-    # Calculate additional statistics
-    total_houses = house_properties.count()
+        # Calculate additional statistics for all houses
+        total_houses = house_properties.count()
     
     # Calculate percentages for progress bars
     occupied_percentage = 0
@@ -3132,12 +3261,22 @@ def house_dashboard(request):
     # Try to get upcoming rent due dates if rent system is available
     try:
         from rent.models import RentInvoice
-        upcoming_invoices = RentInvoice.objects.filter(
-            lease__property_ref__property_type__name__iexact='house',
-            due_date__gte=today,
-            due_date__lte=today + timedelta(days=7),
-            status__in=['draft', 'sent']
-        ).select_related('lease__property_ref', 'tenant')[:5]
+        if selected_property:
+            # Filter by selected property
+            upcoming_invoices = RentInvoice.objects.filter(
+                lease__property_ref=selected_property,
+                due_date__gte=today,
+                due_date__lte=today + timedelta(days=7),
+                status__in=['draft', 'sent']
+            ).select_related('lease__property_ref', 'tenant')[:5]
+        else:
+            # Filter for all houses
+            upcoming_invoices = RentInvoice.objects.filter(
+                lease__property_ref__property_type__name__iexact='house',
+                due_date__gte=today,
+                due_date__lte=today + timedelta(days=7),
+                status__in=['draft', 'sent']
+            ).select_related('lease__property_ref', 'tenant')[:5]
         upcoming_due_dates = upcoming_invoices
     except ImportError:
         # Rent system not available, use empty list
@@ -3146,11 +3285,20 @@ def house_dashboard(request):
     # Get overdue invoices
     overdue_invoices = []
     try:
-        overdue_invoices = RentInvoice.objects.filter(
-            lease__property_ref__property_type__name__iexact='house',
-            due_date__lt=today,
-            status__in=['sent', 'overdue']
-        ).select_related('lease__property_ref', 'tenant')[:5]
+        if selected_property:
+            # Filter by selected property
+            overdue_invoices = RentInvoice.objects.filter(
+                lease__property_ref=selected_property,
+                due_date__lt=today,
+                status__in=['sent', 'overdue']
+            ).select_related('lease__property_ref', 'tenant')[:5]
+        else:
+            # Filter for all houses
+            overdue_invoices = RentInvoice.objects.filter(
+                lease__property_ref__property_type__name__iexact='house',
+                due_date__lt=today,
+                status__in=['sent', 'overdue']
+            ).select_related('lease__property_ref', 'tenant')[:5]
     except ImportError:
         overdue_invoices = []
     
@@ -3445,6 +3593,10 @@ def house_payments(request):
     if selected_property_id:
         try:
             selected_property = Property.objects.get(id=selected_property_id, property_type__name__iexact='house')
+        except Property.DoesNotExist:
+            selected_property = None
+        
+        if selected_property:
             # Get booking payments (properties.models.Payment - has booking, recorded_by, NO tenant)
             booking_payments = Payment.objects.filter(
                 booking__property_obj=selected_property
@@ -3486,7 +3638,7 @@ def house_payments(request):
             if status_filter:
                 if status_filter == 'paid':
                     booking_payments = booking_payments.filter(status='active')  # properties.Payment uses 'active' for paid
-                    visit_payments = visit_payments.filter(status='successful')  # payments.Payment uses 'successful'
+                    visit_payments = visit_payments.filter(status='completed')  # payments.Payment uses 'completed'
                 elif status_filter == 'pending':
                     booking_payments = booking_payments.filter(status='active')  # Adjust as needed
                     visit_payments = visit_payments.filter(status='pending')
@@ -3497,17 +3649,11 @@ def house_payments(request):
             elif payment_type_filter and payment_type_filter != 'visit':
                 visit_payments = UnifiedPayment.objects.none()  # Only show booking payments
             
-            # Convert to lists and combine
-            payments_list = list(booking_payments) + list(visit_payments)
-            # Sort by created_at (both models have this field)
-            payments_list.sort(key=lambda p: p.created_at, reverse=True)
-            payments = payments_list
-            
             # Store selected property in session
             request.session['selected_house_property_id'] = selected_property_id
-        except Property.DoesNotExist:
-            selected_property = None
-            payments = Payment.objects.none()
+        else:
+            booking_payments = Payment.objects.none()
+            visit_payments = UnifiedPayment.objects.none()
     else:
         selected_property = None
         # Show all payments for house bookings (properties.models.Payment)
@@ -3551,7 +3697,7 @@ def house_payments(request):
         if status_filter:
             if status_filter == 'paid':
                 booking_payments = booking_payments.filter(status='active')  # properties.Payment uses 'active' for paid
-                visit_payments = visit_payments.filter(status='successful')  # payments.Payment uses 'successful'
+                visit_payments = visit_payments.filter(status='completed')  # payments.Payment uses 'completed'
             elif status_filter == 'pending':
                 booking_payments = booking_payments.filter(status='active')  # Adjust as needed
                 visit_payments = visit_payments.filter(status='pending')
@@ -3561,12 +3707,83 @@ def house_payments(request):
             booking_payments = Payment.objects.none()  # Only show visit payments
         elif payment_type_filter and payment_type_filter != 'visit':
             visit_payments = UnifiedPayment.objects.none()  # Only show booking payments
+    
+    # Group payments by booking to show booking-level payment information (after filtering)
+    from collections import defaultdict
+    from decimal import Decimal
+    
+    # Group booking payments by booking
+    bookings_data = {}
+    for payment in booking_payments:
+        booking = payment.booking
+        if booking.id not in bookings_data:
+            # Calculate actual totals from all payments for this booking
+            from django.db.models import Sum
+            all_payments = Payment.objects.filter(booking=booking).exclude(payment_type='refund')
+            all_refunds = Payment.objects.filter(booking=booking, payment_type='refund')
+            total_paid = all_payments.aggregate(total=Sum('amount'))['total'] or Decimal('0')
+            total_refunded = all_refunds.aggregate(total=Sum('amount'))['total'] or Decimal('0')
+            net_paid = max(Decimal('0'), total_paid - total_refunded)
+            
+            # Get total amount (prefer calculated_total_amount)
+            total_required = booking.calculated_total_amount if booking.calculated_total_amount and booking.calculated_total_amount > 0 else (booking.total_amount or Decimal('0'))
+            remaining = max(Decimal('0'), total_required - net_paid)
+            
+            # Update booking's paid_amount if inconsistent
+            if abs(booking.paid_amount - net_paid) > Decimal('0.01'):
+                booking.paid_amount = net_paid
+                booking.update_payment_status()
+                booking.save()
+            
+            bookings_data[booking.id] = {
+                'booking': booking,
+                'total_required': total_required,
+                'paid_so_far': net_paid,
+                'remaining': remaining,
+                'payment_count': 0,
+                'last_payment_date': None,
+                'last_payment_method': None,
+            }
         
-        # Convert to lists and combine
-        payments_list = list(booking_payments) + list(visit_payments)
-        # Sort by created_at (both models have this field)
-        payments_list.sort(key=lambda p: p.created_at, reverse=True)
-        payments = payments_list
+        bookings_data[booking.id]['payment_count'] += 1
+        if not bookings_data[booking.id]['last_payment_date'] or payment.payment_date > bookings_data[booking.id]['last_payment_date']:
+            bookings_data[booking.id]['last_payment_date'] = payment.payment_date
+            bookings_data[booking.id]['last_payment_method'] = payment.payment_method
+    
+    # Convert to list for display
+    bookings_list = list(bookings_data.values())
+    
+    # Add visit payments as separate entries (they don't have bookings)
+    visit_payments_list = []
+    for payment in visit_payments:
+        visit_payment = payment.property_visit_payments.first() if payment.property_visit_payments.exists() else None
+        if visit_payment:
+            visit_payments_list.append({
+                'booking': None,
+                'visit_payment': payment,
+                'visit_payment_obj': visit_payment,
+                'total_required': visit_payment.amount,
+                'paid_so_far': payment.amount if payment.status == 'completed' else Decimal('0'),
+                'remaining': visit_payment.amount - (payment.amount if payment.status == 'completed' else Decimal('0')),
+                'payment_count': 1,
+                'last_payment_date': visit_payment.paid_at if visit_payment.paid_at else None,
+                'last_payment_method': payment.payment_method,
+            })
+    
+    # Apply status filter at booking level
+    if status_filter:
+        if status_filter == 'paid':
+            bookings_list = [item for item in bookings_list if item['booking'].payment_status == 'paid']
+            visit_payments_list = [item for item in visit_payments_list if item.get('visit_payment_obj') and item['visit_payment_obj'].status == 'completed']
+        elif status_filter == 'partial':
+            bookings_list = [item for item in bookings_list if item['booking'].payment_status == 'partial']
+        elif status_filter == 'pending':
+            bookings_list = [item for item in bookings_list if item['booking'].payment_status == 'pending']
+            visit_payments_list = [item for item in visit_payments_list if item.get('visit_payment_obj') and item['visit_payment_obj'].status == 'pending']
+    
+    # Combine and sort
+    all_payments_data = bookings_list + visit_payments_list
+    all_payments_data.sort(key=lambda x: x['last_payment_date'] or (x['booking'].created_at if x['booking'] else x['visit_payment'].created_at), reverse=True)
     
     # Pagination
     from django.core.paginator import Paginator
@@ -3578,16 +3795,16 @@ def house_payments(request):
     except (ValueError, TypeError):
         page_size = 5
     
-    paginator = Paginator(payments, page_size)
+    paginator = Paginator(all_payments_data, page_size)
     page_number = request.GET.get('page')
     payments_page = paginator.get_page(page_number)
     
-    # Calculate payment statistics (payments is now a list, not a queryset)
-    total_payments = len(payments)
-    total_amount = sum(payment.amount for payment in payments)
-    # Count paid bookings - check status based on payment type
-    paid_bookings = sum(1 for p in payments if (
-        (hasattr(p, 'status') and p.status in ['active', 'completed', 'successful'])
+    # Calculate payment statistics
+    total_payments = len(all_payments_data)
+    total_amount = sum(item['total_required'] for item in all_payments_data)
+    paid_bookings = sum(1 for item in all_payments_data if (
+        item['booking'] and item['booking'].payment_status == 'paid' if item['booking'] else
+        (item.get('visit_payment') and item['visit_payment'].status == 'completed')
     ))
     
     # Get tenants (customers with house bookings) for the payment form
@@ -3609,8 +3826,8 @@ def house_payments(request):
     context = {
         'house_properties': house_properties,
         'selected_property': selected_property,
-        'payments': payments_page,  # Paginated payments
-        'payments_all': payments,  # For stats
+        'payments': payments_page,  # Paginated payment data (booking-level)
+        'payments_all': all_payments_data,  # For stats
         'total_payments': total_payments,
         'total_amount': total_amount,
         'paid_bookings': paid_bookings,
@@ -3808,12 +4025,12 @@ def house_reports_export(request):
     if properties == 'available':
         # Filter for available properties (no active bookings)
         house_properties = house_properties.exclude(
-            bookings__booking_status__in=['confirmed', 'checked_in']
+            property_bookings__booking_status__in=['confirmed', 'checked_in']
         ).distinct()
     elif properties == 'occupied':
         # Filter for occupied properties (with active bookings)
         house_properties = house_properties.filter(
-            bookings__booking_status__in=['confirmed', 'checked_in']
+            property_bookings__booking_status__in=['confirmed', 'checked_in']
         ).distinct()
     elif properties != 'all':
         try:
@@ -4080,10 +4297,28 @@ def hotel_select_property(request):
     """Select a hotel property for management"""
     if request.method == 'POST':
         property_id = request.POST.get('property_id')
-        if property_id:
-            set_property_selection(request, property_id, 'hotel')
-            messages.success(request, 'Hotel property selected successfully!')
+        if property_id and property_id != 'all':
+            # Validate property exists before saving
+            try:
+                property_id_int = int(property_id)
+                # Verify property exists and is a hotel
+                Property.objects.get(id=property_id_int, property_type__name__iexact='hotel')
+                set_property_selection(request, property_id, 'hotel')
+                messages.success(request, 'Hotel property selected successfully!')
+                # Redirect with property_id in URL query parameter to ensure it's immediately available
+                from django.urls import reverse
+                return redirect(f"{reverse('properties:hotel_dashboard')}?property_id={property_id_int}")
+            except (ValueError, Property.DoesNotExist):
+                messages.error(request, 'Selected hotel property not found.')
+                return redirect('properties:hotel_dashboard')
+        elif property_id == 'all':
+            # Clear selection for "all"
+            clear_property_selection(request, 'hotel')
+            messages.info(request, 'Showing all hotels.')
         return redirect('properties:hotel_dashboard')
+    
+    from django.core.paginator import Paginator
+    from django.db.models import Q
     
     # Get all hotel properties - MULTI-TENANCY: Filter by owner for data isolation
     if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
@@ -4091,20 +4326,72 @@ def hotel_select_property(request):
     else:
         hotel_properties = Property.objects.filter(property_type__name__iexact='hotel')
     
+    # Get total count before filtering
+    total_count = hotel_properties.count()
+    
+    # Apply search filter
+    search_query = request.GET.get('search', '').strip()
+    if search_query:
+        hotel_properties = hotel_properties.filter(
+            Q(title__icontains=search_query) |
+            Q(description__icontains=search_query) |
+            Q(address__icontains=search_query) |
+            Q(region__name__icontains=search_query)
+        )
+    
+    # Apply status filter
+    status_filter = request.GET.get('status', '')
+    if status_filter:
+        hotel_properties = hotel_properties.filter(status=status_filter)
+    
+    # Annotate with actual room count from Room model
+    from properties.models import Room
+    from django.db.models import Count
+    hotel_properties = hotel_properties.select_related('property_type', 'region', 'owner').prefetch_related('images').annotate(
+        actual_room_count=Count('property_rooms', distinct=True)
+    ).order_by('title')
+    
+    # Pagination
+    page_size = request.GET.get('page_size', '5')
+    try:
+        page_size = int(page_size)
+        if page_size not in [5, 10, 25, 50]:
+            page_size = 5
+    except (ValueError, TypeError):
+        page_size = 5
+    
+    paginator = Paginator(hotel_properties, page_size)
+    page_number = request.GET.get('page', 1)
+    
+    try:
+        properties_page = paginator.get_page(page_number)
+    except:
+        properties_page = paginator.get_page(1)
+    
     context = {
-        'properties': hotel_properties,
+        'properties': properties_page,
         'property_type': 'hotel',
         'management_type': 'Hotel Management',
+        'search_query': search_query,
+        'status_filter': status_filter,
+        'total_count': total_count,
     }
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return render(request, 'properties/partials/property_selection_table.html', context)
+    
     return render(request, 'properties/property_selection.html', context)
 
 
 @login_required
 def hotel_clear_selection(request):
     """Clear hotel property selection"""
+    # Clear from session using utility function (now uses correct session key format)
     clear_property_selection(request, 'hotel')
-    messages.info(request, 'Hotel property selection cleared.')
-    return redirect('properties:hotel_dashboard')
+    messages.info(request, 'Hotel property selection cleared. Please select a hotel to continue.')
+    # Redirect to selection page (dashboard will redirect here anyway if no hotel selected)
+    return redirect('properties:hotel_select_property')
 
 
 @login_required
@@ -4112,10 +4399,28 @@ def lodge_select_property(request):
     """Select a lodge property for management"""
     if request.method == 'POST':
         property_id = request.POST.get('property_id')
-        if property_id:
-            set_property_selection(request, property_id, 'lodge')
-            messages.success(request, 'Lodge property selected successfully!')
+        if property_id and property_id != 'all':
+            # Validate property exists before saving
+            try:
+                property_id_int = int(property_id)
+                # Verify property exists and is a lodge
+                Property.objects.get(id=property_id_int, property_type__name__iexact='lodge')
+                set_property_selection(request, property_id, 'lodge')
+                messages.success(request, 'Lodge property selected successfully!')
+                # Redirect with property_id in URL query parameter to ensure it's immediately available
+                from django.urls import reverse
+                return redirect(f"{reverse('properties:lodge_dashboard')}?property_id={property_id_int}")
+            except (ValueError, Property.DoesNotExist):
+                messages.error(request, 'Selected lodge property not found.')
+                return redirect('properties:lodge_dashboard')
+        elif property_id == 'all':
+            # Clear selection for "all"
+            clear_property_selection(request, 'lodge')
+            messages.info(request, 'Showing all lodges.')
         return redirect('properties:lodge_dashboard')
+    
+    from django.core.paginator import Paginator
+    from django.db.models import Q
     
     # Get all lodge properties - MULTI-TENANCY: Filter by owner for data isolation
     if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
@@ -4123,10 +4428,63 @@ def lodge_select_property(request):
     else:
         lodge_properties = Property.objects.filter(property_type__name__iexact='lodge')
     
+    # Get total count before filtering
+    total_count = lodge_properties.count()
+    
+    # Apply search filter
+    search_query = request.GET.get('search', '').strip()
+    if search_query:
+        lodge_properties = lodge_properties.filter(
+            Q(title__icontains=search_query) |
+            Q(description__icontains=search_query) |
+            Q(address__icontains=search_query) |
+            Q(region__name__icontains=search_query)
+        )
+    
+    # Apply status filter
+    status_filter = request.GET.get('status', '')
+    if status_filter:
+        lodge_properties = lodge_properties.filter(status=status_filter)
+    
+    # Annotate with actual room count from Room model
+    from properties.models import Room
+    from django.db.models import Count
+    lodge_properties = lodge_properties.select_related('property_type', 'region', 'owner').prefetch_related('images').annotate(
+        actual_room_count=Count('property_rooms', distinct=True)
+    ).order_by('title')
+    
+    # Pagination
+    page_size = request.GET.get('page_size', '5')
+    try:
+        page_size = int(page_size)
+        if page_size not in [5, 10, 25, 50]:
+            page_size = 5
+    except (ValueError, TypeError):
+        page_size = 5
+    
+    paginator = Paginator(lodge_properties, page_size)
+    page_number = request.GET.get('page', 1)
+    
+    try:
+        properties_page = paginator.get_page(page_number)
+    except:
+        properties_page = paginator.get_page(1)
+    
+    # Check if this is an AJAX request (for table updates)
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return render(request, 'properties/partials/property_selection_table.html', {
+            'properties': properties_page,
+            'property_type': 'lodge',
+            'total_count': total_count,
+        })
+    
     context = {
-        'properties': lodge_properties,
+        'properties': properties_page,
         'property_type': 'lodge',
         'management_type': 'Lodge Management',
+        'search_query': search_query,
+        'status_filter': status_filter,
+        'total_count': total_count,
     }
     return render(request, 'properties/property_selection.html', context)
 
@@ -4134,9 +4492,11 @@ def lodge_select_property(request):
 @login_required
 def lodge_clear_selection(request):
     """Clear lodge property selection"""
+    # Clear from session using utility function (now uses correct session key format)
     clear_property_selection(request, 'lodge')
-    messages.info(request, 'Lodge property selection cleared.')
-    return redirect('properties:lodge_dashboard')
+    messages.info(request, 'Lodge property selection cleared. Please select a lodge to continue.')
+    # Redirect to selection page (dashboard will redirect here anyway if no lodge selected)
+    return redirect('properties:lodge_select_property')
 
 
 @login_required
@@ -4176,19 +4536,90 @@ def house_select_property(request):
     """Select a house property for management"""
     if request.method == 'POST':
         property_id = request.POST.get('property_id')
-        if property_id:
-            set_property_selection(request, property_id, 'house')
-            messages.success(request, 'House property selected successfully!')
+        if property_id and property_id != 'all':
+            # Validate property exists before saving
+            try:
+                property_id_int = int(property_id)
+                # Verify property exists and is a house
+                Property.objects.get(id=property_id_int, property_type__name__iexact='house')
+                set_property_selection(request, property_id, 'house')
+                messages.success(request, 'House property selected successfully!')
+                # Redirect with property_id in URL query parameter to ensure it's immediately available
+                from django.urls import reverse
+                return redirect(f"{reverse('properties:house_dashboard')}?property_id={property_id_int}")
+            except (ValueError, Property.DoesNotExist):
+                messages.error(request, 'Selected house property not found.')
+                return redirect('properties:house_dashboard')
+        elif property_id == 'all':
+            # Clear selection for "all"
+            clear_property_selection(request, 'house')
+            messages.info(request, 'Showing all houses.')
         return redirect('properties:house_dashboard')
     
-    # Get all house properties
-    house_properties = Property.objects.filter(property_type__name__iexact='house')
+    from django.core.paginator import Paginator
+    from django.db.models import Q
+    
+    # Get all house properties - MULTI-TENANCY: Filter by owner for data isolation
+    if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
+        house_properties = Property.objects.filter(property_type__name__iexact='house', owner=request.user)
+    else:
+        house_properties = Property.objects.filter(property_type__name__iexact='house')
+    
+    # Get total count before filtering
+    total_count = house_properties.count()
+    
+    # Apply search filter
+    search_query = request.GET.get('search', '').strip()
+    if search_query:
+        house_properties = house_properties.filter(
+            Q(title__icontains=search_query) |
+            Q(description__icontains=search_query) |
+            Q(address__icontains=search_query) |
+            Q(region__name__icontains=search_query)
+        )
+    
+    # Apply status filter
+    status_filter = request.GET.get('status', '')
+    if status_filter:
+        house_properties = house_properties.filter(status=status_filter)
+    
+    # Annotate with actual room count from Room model
+    from properties.models import Room
+    from django.db.models import Count
+    house_properties = house_properties.select_related('property_type', 'region', 'owner').prefetch_related('images').annotate(
+        actual_room_count=Count('property_rooms', distinct=True)
+    ).order_by('title')
+    
+    # Pagination - default 5 per page (consistent with hotel and lodge)
+    page_size = request.GET.get('page_size', '5')
+    try:
+        page_size = int(page_size)
+        if page_size not in [5, 10, 25, 50]:
+            page_size = 5
+    except (ValueError, TypeError):
+        page_size = 5
+    
+    paginator = Paginator(house_properties, page_size)
+    page_number = request.GET.get('page', 1)
+    
+    try:
+        properties_page = paginator.get_page(page_number)
+    except:
+        properties_page = paginator.get_page(1)
     
     context = {
-        'properties': house_properties,
+        'properties': properties_page,
         'property_type': 'house',
         'management_type': 'House Management',
+        'search_query': search_query,
+        'status_filter': status_filter,
+        'total_count': total_count,
     }
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return render(request, 'properties/partials/property_selection_table.html', context)
+    
     return render(request, 'properties/property_selection.html', context)
 
 
@@ -4827,22 +5258,224 @@ def customer_vip_status_modal(request, pk):
 # Payment Management Views
 
 @login_required
-def create_payment(request, booking_id):
-    """Create a payment for a booking"""
+def create_payment(request, booking_id=None, payment_id=None):
+    """Create/record a payment for a booking or visit payment - uniform payment form"""
     from decimal import Decimal
-    booking = get_object_or_404(Booking, pk=booking_id)
+    from payments.models import Payment as UnifiedPayment, PaymentProvider, PaymentTransaction
+    from payments.gateway_service import PaymentGatewayService
+    from .models import PropertyVisitPayment
+    
+    # Determine if this is a booking payment or visit payment
+    is_visit_payment = payment_id is not None
+    booking = None
+    visit_payment = None
+    property_obj = None
+    unified_payment = None
+    
+    if is_visit_payment:
+        # Handle visit payment
+        unified_payment = get_object_or_404(UnifiedPayment, pk=payment_id)
+        visit_payment = PropertyVisitPayment.objects.filter(payment=unified_payment).first()
+        if not visit_payment:
+            messages.error(request, 'This payment is not associated with a property visit.')
+            return redirect('properties:house_payments')
+        property_obj = visit_payment.property
+    else:
+        # Handle booking payment - booking_id should be provided
+        if not booking_id:
+            messages.error(request, 'Booking ID is required.')
+            return redirect('properties:dashboard')
+        booking = get_object_or_404(Booking, pk=booking_id)
     
     if request.method == 'POST':
-        payment_amount = Decimal(request.POST.get('amount', 0))
+        payment_type = request.POST.get('payment_type', '')
+        # For partial payments, use partial_amount if provided, otherwise use amount
+        if payment_type == 'partial' and request.POST.get('partial_amount'):
+            partial_amount_str = request.POST.get('partial_amount', '0').strip()
+            if partial_amount_str:
+                payment_amount = Decimal(partial_amount_str)
+            else:
+                payment_amount = Decimal(request.POST.get('amount', 0))
+        else:
+            payment_amount = Decimal(request.POST.get('amount', 0))
+        payment_method = request.POST.get('payment_method', 'cash')
+        
+        # Debug: Log payment method
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Payment method received: {payment_method}")
+        logger.info(f"Payment method type: {type(payment_method)}")
+        logger.info(f"POST data: {dict(request.POST)}")
         
         # Validate payment amount
         if payment_amount <= 0:
             messages.error(request, 'Payment amount must be greater than zero.')
-            return redirect('properties:create_payment', booking_id=booking.pk)
+            if is_visit_payment:
+                return redirect('properties:create_visit_payment', payment_id=unified_payment.id)
+            else:
+                return redirect('properties:create_payment', booking_id=booking.pk)
+        
+        # Handle visit payment recording
+        if is_visit_payment:
+            from django.utils import timezone
+            
+            # Validate amount doesn't exceed visit payment amount
+            if payment_amount > visit_payment.amount:
+                messages.error(request, f'Payment amount (Tsh{payment_amount:,.0f}) exceeds visit payment amount (Tsh{visit_payment.amount:,.0f}).')
+                return redirect('properties:create_visit_payment', payment_id=unified_payment.id)
+            
+            # Parse paid date
+            paid_date = request.POST.get('paid_date')
+            if paid_date:
+                from django.utils.dateparse import parse_date
+                paid_date_obj = parse_date(paid_date) or timezone.now().date()
+            else:
+                paid_date_obj = timezone.now().date()
+            
+            reference_number = request.POST.get('reference_number', '').strip()
+            transaction_id = request.POST.get('transaction_id', '').strip()
+            notes = request.POST.get('notes', '').strip()
+            
+            # Auto-generate reference number if not provided
+            if not reference_number:
+                from datetime import datetime
+                timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+                random_suffix = str(property_obj.id).zfill(3) + str(unified_payment.id).zfill(3)
+                reference_number = f'VISIT-{property_obj.id}-{timestamp}{random_suffix[-6:]}'
+            
+            # Visit payments always go through AZAMPAY (even cash)
+            # Get or create AZAM Pay provider
+            provider, _ = PaymentProvider.objects.get_or_create(
+                name='AZAM Pay',
+                defaults={'description': 'AZAM Pay Payment Gateway'}
+            )
+            
+            # Get mobile money provider if mobile_money payment
+            mobile_money_provider = None
+            if payment_method == 'mobile_money':
+                mobile_money_provider = request.POST.get('mobile_money_provider', '').strip()
+                if not mobile_money_provider:
+                    messages.error(request, 'Mobile Money Provider is required for mobile money payments. Please select your provider (AIRTEL, TIGO, MPESA, or HALOPESA).')
+                    return redirect('properties:create_visit_payment', payment_id=unified_payment.id)
+            
+            # Get customer user - try to find user by email, otherwise use request.user
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            try:
+                customer_user = User.objects.get(email=visit_payment.user.email)
+            except User.DoesNotExist:
+                customer_user = visit_payment.user
+            
+            # Update unified payment with provider info
+            unified_payment.amount = payment_amount
+            unified_payment.payment_method = payment_method
+            unified_payment.provider = provider
+            unified_payment.mobile_money_provider = mobile_money_provider
+            unified_payment.tenant = customer_user
+            unified_payment.status = 'pending'  # Visit payments go through AZAMPAY
+            unified_payment.notes = notes or unified_payment.notes
+            unified_payment.recorded_by = request.user
+            unified_payment.save()
+            
+            # Initiate AZAMpay payment for visit payments
+            from django.conf import settings
+            callback_url = getattr(settings, 'AZAM_PAY_WEBHOOK_URL', None)
+            if not callback_url:
+                base_domain = getattr(settings, 'BASE_URL', 'https://portal.maishaapp.co.tz')
+                callback_url = f"{base_domain}/api/v1/payments/webhook/azam-pay/"
+            
+            gateway_result = PaymentGatewayService.initiate_payment(
+                payment=unified_payment,
+                provider_name='azam pay',
+                callback_url=callback_url,
+                payment_method='mobile_money' if payment_method == 'mobile_money' else 'mobile_money'
+            )
+            
+            if gateway_result.get('success'):
+                # Create payment transaction
+                PaymentTransaction.objects.create(
+                    payment=unified_payment,
+                    provider=provider,
+                    gateway_transaction_id=gateway_result.get('transaction_id'),
+                    azam_reference=gateway_result.get('reference'),
+                    status='initiated',
+                    request_payload={'visit_payment_id': visit_payment.id}
+                )
+                
+                transaction_id = gateway_result.get('transaction_id')
+                payment_message = gateway_result.get('message', 'Payment initiated successfully')
+                
+                payment_link = gateway_result.get('payment_link')
+                
+                if payment_link:
+                    # Bank/Online payment - redirect to payment page
+                    request.session['payment_link'] = payment_link
+                    request.session['payment_id'] = unified_payment.id
+                    messages.info(request, 'Payment initiated. Please complete payment on AZAM Pay.')
+                    return redirect(payment_link)
+                else:
+                    # MNO payment - no redirect, payment initiated on mobile money network
+                    messages.success(request, f'Payment initiated successfully! Transaction ID: {transaction_id}. The customer will receive a payment prompt on their phone.')
+                    return redirect('properties:house_payments')
+            else:
+                # Payment initiation failed
+                error_msg = gateway_result.get('error', 'Failed to initiate payment')
+                messages.error(request, f'Failed to initiate payment: {error_msg}')
+                return redirect('properties:create_visit_payment', payment_id=unified_payment.id)
+        
+        # Continue with booking payment logic below
+        
+        # Recalculate everything from actual payments to ensure accuracy
+        from django.db.models import Sum
+        from decimal import Decimal
+        
+        # Get actual total paid from all Payment records (exclude refunds)
+        actual_paid = Payment.objects.filter(
+            booking=booking
+        ).exclude(
+            payment_type='refund'
+        ).aggregate(
+            total=Sum('amount')
+        )['total'] or Decimal('0')
+        
+        # Get total refunded
+        total_refunded = Payment.objects.filter(
+            booking=booking,
+            payment_type='refund'
+        ).aggregate(
+            total=Sum('amount')
+        )['total'] or Decimal('0')
+        
+        # Net paid amount = payments - refunds
+        net_paid_amount = actual_paid - total_refunded
+        if net_paid_amount < 0:
+            net_paid_amount = Decimal('0')
+        
+        # Get the correct total amount
+        calculated_total = booking.calculated_total_amount or 0
+        stored_total = booking.total_amount or 0
+        
+        if calculated_total and calculated_total > 0:
+            total_amount = calculated_total
+        else:
+            total_amount = stored_total
+        
+        # Update booking's paid_amount to match actual
+        if booking.paid_amount != net_paid_amount:
+            booking.paid_amount = net_paid_amount
+            booking.save()
+        
+        # Calculate remaining
+        remaining_amount = max(Decimal('0'), Decimal(str(total_amount)) - net_paid_amount)
         
         # Check if booking is already fully paid
-        if booking.payment_status == 'paid':
-            messages.error(request, f'Booking {booking.booking_reference} is already fully paid (Tsh{booking.total_amount:,.0f}). Please start a new booking for additional payments.')
+        if net_paid_amount >= total_amount and total_amount > 0:
+            messages.error(request, f'Booking {booking.booking_reference} is already fully paid. Total: Tsh{total_amount:,.0f}, Paid: Tsh{net_paid_amount:,.0f}, Remaining: Tsh{remaining_amount:,.0f}.')
+            return redirect('properties:create_payment', booking_id=booking.pk)
+        
+        # Validate payment doesn't exceed remaining
+        if payment_amount > remaining_amount:
+            messages.error(request, f'Payment amount (Tsh{payment_amount:,.0f}) exceeds remaining balance (Tsh{remaining_amount:,.0f}). Maximum allowed: Tsh{remaining_amount:,.0f}')
             return redirect('properties:create_payment', booking_id=booking.pk)
         
         # Check if payment exceeds calculated total
@@ -4850,36 +5483,340 @@ def create_payment(request, booking_id):
         if payment_amount > calculated_total:
             messages.warning(request, f'Payment amount (Tsh {payment_amount:,.0f}) exceeds calculated total (Tsh {calculated_total:,.0f}).')
         
-        # Create payment
-        payment = Payment.objects.create(
-            booking=booking,
-            amount=payment_amount,
-            payment_method=request.POST.get('payment_method'),
-            payment_type=request.POST.get('payment_type'),
-            transaction_reference=request.POST.get('transaction_reference'),
-            payment_date=request.POST.get('payment_date'),
-            notes=request.POST.get('notes'),
-            recorded_by=request.user,
-        )
+        # Handle online payment (AZAMpay)
+        if payment_method in ['online', 'mobile_money']:
+            # Get or create AZAM Pay provider
+            provider, _ = PaymentProvider.objects.get_or_create(
+                name='AZAM Pay',
+                defaults={'description': 'AZAM Pay Payment Gateway'}
+            )
+            
+            # Get customer user - try to find user by email, otherwise use request.user
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            try:
+                customer_user = User.objects.get(email=booking.customer.email)
+            except User.DoesNotExist:
+                customer_user = request.user
+            
+            # Get mobile money provider if mobile_money payment
+            mobile_money_provider = None
+            if payment_method == 'mobile_money':
+                mobile_money_provider = request.POST.get('mobile_money_provider', '').strip()
+                if not mobile_money_provider:
+                    messages.error(request, 'Mobile Money Provider is required for mobile money payments. Please select your provider (AIRTEL, TIGO, MPESA, or HALOPESA).')
+                    return redirect('properties:create_payment', booking_id=booking.pk)
+            
+            # Create unified payment record
+            unified_payment = UnifiedPayment.objects.create(
+                booking=booking,
+                tenant=customer_user,
+                provider=provider,
+                amount=payment_amount,
+                payment_method='online' if payment_method == 'online' else 'mobile_money',
+                mobile_money_provider=mobile_money_provider,
+                status='pending',
+                notes=request.POST.get('notes', f'Payment for booking {booking.booking_reference}'),
+                recorded_by=request.user,
+            )
+            
+            # Initiate AZAMpay payment
+            # Use configured webhook URL (production) instead of localhost
+            from django.conf import settings
+            callback_url = getattr(settings, 'AZAM_PAY_WEBHOOK_URL', None)
+            if not callback_url:
+                # Fallback to BASE_URL if webhook URL not configured
+                base_domain = getattr(settings, 'BASE_URL', 'https://portal.maishaapp.co.tz')
+                callback_url = f"{base_domain}/api/v1/payments/webhook/azam-pay/"
+            
+            gateway_result = PaymentGatewayService.initiate_payment(
+                payment=unified_payment,
+                provider_name='azam pay',
+                callback_url=callback_url,
+                payment_method='mobile_money' if payment_method == 'mobile_money' else 'mobile_money'
+            )
+            
+            if gateway_result.get('success'):
+                # Create payment transaction
+                PaymentTransaction.objects.create(
+                    payment=unified_payment,
+                    provider=provider,
+                    gateway_transaction_id=gateway_result.get('transaction_id'),
+                    azam_reference=gateway_result.get('reference'),
+                    status='initiated',
+                    request_payload={'booking_id': booking.id}
+                )
+                
+                transaction_id = gateway_result.get('transaction_id')
+                payment_message = gateway_result.get('message', 'Payment initiated successfully')
+                
+                # For MNO (Mobile Money) payments, there's no redirect URL
+                # Payment is processed directly on the mobile money network
+                payment_link = gateway_result.get('payment_link')
+                
+                if payment_link:
+                    # Bank/Online payment - redirect to payment page
+                    request.session['payment_link'] = payment_link
+                    request.session['payment_id'] = unified_payment.id
+                    messages.info(request, 'Payment initiated. Please complete payment on AZAM Pay.')
+                    return redirect(payment_link)
+                else:
+                    # MNO payment - no redirect, payment initiated on mobile money network
+                    messages.success(request, f'Payment initiated successfully! Transaction ID: {transaction_id}. The customer will receive a payment prompt on their phone.')
+                    # Redirect back to booking or payment list
+                    return redirect('properties:create_payment', booking_id=booking.pk)
+            else:
+                # Payment initiation failed
+                error_msg = gateway_result.get('error', 'Failed to initiate payment')
+                messages.error(request, f'Failed to initiate payment: {error_msg}')
+                unified_payment.delete()  # Clean up failed payment
+                return redirect('properties:create_payment', booking_id=booking.pk)
         
-        # Update booking paid amount and status
-        booking.paid_amount += payment.amount
-        booking.update_payment_status()
-        
-        # Check if stay is over and update booking status
-        if booking.is_stay_over and booking.booking_status != 'checked_out':
-            booking.booking_status = 'checked_out'
-            booking.checked_out_at = timezone.now()
-            booking.save()
-            messages.info(request, 'Stay period has ended. Booking status updated to Checked Out.')
-        
-        messages.success(request, f'Payment of Tsh {payment.amount:,.0f} recorded successfully!')
-        return redirect('properties:booking_detail', pk=booking.pk)
+        else:
+            # Cash payment - handle differently (no AZAMPAY, requires receipt)
+            logger.info(f"Handling cash/offline payment. Payment method: '{payment_method}'")
+            if payment_method and payment_method.strip() == 'cash':
+                # Validate receipt is provided for cash payments
+                if 'receipt' not in request.FILES or not request.FILES.get('receipt'):
+                    messages.error(request, 'Receipt/proof of payment is required for cash payments. Please upload a receipt.')
+                    return redirect('properties:create_payment', booking_id=booking.pk)
+            
+            # Offline payment (cash, card, etc.) - use UnifiedPayment model
+            payment_date = request.POST.get('payment_date')
+            if not payment_date:
+                payment_date = timezone.now()
+            else:
+                from django.utils.dateparse import parse_datetime
+                payment_date = parse_datetime(payment_date) or timezone.now()
+            
+            # Generate transaction reference if not provided
+            transaction_ref = request.POST.get('transaction_reference', '').strip()
+            if not transaction_ref:
+                # Generate auto transaction reference: PAY-BK009017-001
+                booking_ref = booking.booking_reference
+                last_payment = Payment.objects.filter(
+                    booking=booking
+                ).exclude(
+                    transaction_reference__isnull=True
+                ).exclude(
+                    transaction_reference=''
+                ).order_by('-id').first()
+                
+                if last_payment and last_payment.transaction_reference and last_payment.transaction_reference.startswith('PAY-'):
+                    try:
+                        # Extract number from format: PAY-BK009017-001
+                        parts = last_payment.transaction_reference.split('-')
+                        if len(parts) >= 3:
+                            last_num_str = parts[-1]
+                            last_num = int(last_num_str)
+                            next_num = last_num + 1
+                        else:
+                            next_num = 1
+                    except (ValueError, IndexError):
+                        next_num = 1
+                else:
+                    next_num = 1
+                
+                transaction_ref = f'PAY-{booking_ref}-{next_num:03d}'
+            
+            # Recalculate actual paid before creating new payment
+            from django.db.models import Sum
+            current_paid = Payment.objects.filter(
+                booking=booking
+            ).exclude(
+                payment_type='refund'
+            ).aggregate(
+                total=Sum('amount')
+            )['total'] or Decimal('0')
+            
+            total_refunded = Payment.objects.filter(
+                booking=booking,
+                payment_type='refund'
+            ).aggregate(
+                total=Sum('amount')
+            )['total'] or Decimal('0')
+            
+            current_net_paid = current_paid - total_refunded
+            if current_net_paid < 0:
+                current_net_paid = Decimal('0')
+            
+            # Get correct total amount (prefer calculated_total_amount)
+            calculated_total = booking.calculated_total_amount or 0
+            stored_total = booking.total_amount or 0
+            total_amount = calculated_total if calculated_total > 0 else stored_total
+            
+            # Validate payment doesn't exceed remaining
+            remaining = max(Decimal('0'), Decimal(str(total_amount)) - current_net_paid)
+            if payment_amount > remaining:
+                messages.error(request, f'Payment amount (Tsh{payment_amount:,.0f}) exceeds remaining balance (Tsh{remaining:,.0f}). Maximum allowed: Tsh{remaining:,.0f}')
+                return redirect('properties:create_payment', booking_id=booking.pk)
+            
+            # Get customer user - try to find user by email, otherwise use request.user
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            try:
+                customer_user = User.objects.get(email=booking.customer.email)
+            except User.DoesNotExist:
+                customer_user = request.user
+            
+            # Create unified payment record for cash payments (bypasses AZAMPAY)
+            unified_payment = UnifiedPayment.objects.create(
+                booking=booking,
+                tenant=customer_user,
+                amount=payment_amount,
+                payment_method=payment_method,
+                paid_date=payment_date.date() if hasattr(payment_date, 'date') else payment_date,
+                status='completed',  # Cash payments are completed immediately (no AZAMPAY)
+                transaction_ref=transaction_ref,
+                reference_number=transaction_ref,
+                notes=request.POST.get('notes', f'Payment for booking {booking.booking_reference}'),
+                recorded_by=request.user,
+            )
+            
+            # Handle receipt upload for cash payments
+            if payment_method == 'cash' and 'receipt' in request.FILES:
+                receipt_file = request.FILES['receipt']
+                unified_payment.receipt = receipt_file
+                unified_payment.save()
+            
+            # Also create old Payment record for backward compatibility
+            payment = Payment.objects.create(
+                booking=booking,
+                amount=payment_amount,
+                payment_method=payment_method,
+                payment_type=payment_type,
+                transaction_reference=transaction_ref,
+                payment_date=payment_date,
+                notes=request.POST.get('notes'),
+                recorded_by=request.user,
+            )
+            
+            # Recalculate paid_amount from all payments (not just add)
+            new_paid = Payment.objects.filter(
+                booking=booking
+            ).exclude(
+                payment_type='refund'
+            ).aggregate(
+                total=Sum('amount')
+            )['total'] or Decimal('0')
+            
+            new_refunded = Payment.objects.filter(
+                booking=booking,
+                payment_type='refund'
+            ).aggregate(
+                total=Sum('amount')
+            )['total'] or Decimal('0')
+            
+            booking.paid_amount = max(Decimal('0'), new_paid - new_refunded)
+            booking.update_payment_status()
+            
+            # Check if stay is over and update booking status
+            if booking.is_stay_over and booking.booking_status != 'checked_out':
+                booking.booking_status = 'checked_out'
+                booking.checked_out_at = timezone.now()
+                booking.save()
+                messages.info(request, 'Stay period has ended. Booking status updated to Checked Out.')
+            
+            if payment_method == 'cash':
+                messages.success(request, f'Cash payment of Tsh {payment.amount:,.0f} recorded successfully! Receipt uploaded.')
+            else:
+                messages.success(request, f'Payment of Tsh {payment.amount:,.0f} recorded successfully!')
+            return redirect('properties:booking_detail', pk=booking.pk)
+    
+    # Handle GET request - show form
+    # For visit payments, show simpler form
+    if is_visit_payment:
+        context = {
+            'payment': unified_payment,
+            'visit_payment': visit_payment,
+            'property': property_obj,
+            'amount': visit_payment.amount,
+            'is_visit_payment': True,
+        }
+        return render(request, 'properties/create_payment.html', context)
+    
+    # For booking payments, continue with existing logic
+    # Recalculate everything from scratch to ensure consistency
+    from django.db.models import Sum, Q
+    from decimal import Decimal
+    
+    # Get actual total paid from all Payment records (exclude refunds)
+    actual_paid = Payment.objects.filter(
+        booking=booking
+    ).exclude(
+        payment_type='refund'
+    ).aggregate(
+        total=Sum('amount')
+    )['total'] or Decimal('0')
+    
+    # Get total refunded
+    total_refunded = Payment.objects.filter(
+        booking=booking,
+        payment_type='refund'
+    ).aggregate(
+        total=Sum('amount')
+    )['total'] or Decimal('0')
+    
+    # Net paid amount = payments - refunds
+    net_paid_amount = actual_paid - total_refunded
+    
+    # Ensure net_paid_amount is not negative
+    if net_paid_amount < 0:
+        net_paid_amount = Decimal('0')
+    
+    # Get the correct total amount (prefer calculated_total_amount if available)
+    calculated_total = booking.calculated_total_amount or 0
+    stored_total = booking.total_amount or 0
+    
+    # Use calculated_total if it exists and is valid, otherwise use stored_total
+    if calculated_total and calculated_total > 0:
+        total_amount = calculated_total
+    else:
+        total_amount = stored_total
+    
+    # If total_amount is still 0 or invalid, try to calculate it
+    if not total_amount or total_amount <= 0:
+        try:
+            total_amount = booking.calculated_total_amount
+            if total_amount and total_amount > 0:
+                booking.total_amount = total_amount
+                booking.save()
+        except Exception as calc_error:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Could not calculate total for booking {booking.id}: {str(calc_error)}")
+            total_amount = booking.total_amount or 0
+    
+    # Update booking's paid_amount to match actual payments (fix inconsistency)
+    if abs(booking.paid_amount - net_paid_amount) > Decimal('0.01'):  # Allow small rounding differences
+        booking.paid_amount = net_paid_amount
+        booking.save()
+    
+    # Calculate remaining amount (cannot be negative)
+    remaining_amount = max(Decimal('0'), Decimal(str(total_amount)) - net_paid_amount)
+    
+    # Update payment status based on actual amounts
+    booking.update_payment_status()
+    
+    # Log if there's a data inconsistency for debugging
+    if net_paid_amount > total_amount and total_amount > 0:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Booking {booking.id} ({booking.booking_reference}): Paid ({net_paid_amount}) exceeds total ({total_amount}). Possible overpayment or refund issue.")
+    
+    # Calculate difference for display if there's an inconsistency
+    overpayment = 0
+    if net_paid_amount > total_amount and total_amount > 0:
+        overpayment = float(net_paid_amount - total_amount)
     
     context = {
         'booking': booking,
-        'calculated_total': booking.calculated_total_amount,
-        'remaining_amount': booking.calculated_total_amount - booking.paid_amount,
+        'total_amount': float(total_amount),
+        'paid_amount': float(net_paid_amount),
+        'remaining_amount': float(remaining_amount),
+        'calculated_total': float(total_amount),
+        'half_amount': float(total_amount / 2) if total_amount > 0 else 0,
+        'overpayment': overpayment,
         'daily_rate': booking.daily_rate,
         'duration_days': booking.duration_days,
         'days_remaining': booking.days_remaining,
@@ -4891,7 +5828,7 @@ def create_payment(request, booking_id):
 @login_required
 def booking_detail(request, pk):
     """View booking details and payment history"""
-    booking = get_object_or_404(Booking, pk=pk)
+    booking = get_object_or_404(Booking.objects.select_related('customer', 'property_obj', 'property_obj__property_type'), pk=pk)
     
     # Get payment history for this booking
     payments = Payment.objects.filter(booking=booking).order_by('-payment_date')
@@ -4912,48 +5849,58 @@ def api_payment_details(request, payment_id):
             'booking', 'booking__customer', 'booking__property_obj', 'booking__property_obj__property_type', 'recorded_by'
         ).get(id=payment_id)
         
-        data = {
-            'id': payment.id,
-            'amount': float(payment.amount),
-            'payment_method': payment.payment_method,
-            'payment_method_display': payment.get_payment_method_display(),
-            'payment_type': payment.payment_type,
-            'payment_type_display': payment.get_payment_type_display(),
-            'payment_date': payment.payment_date.strftime('%Y-%m-%d %H:%M'),
-            'transaction_reference': payment.transaction_reference,
-            'notes': payment.notes,
-            'created_at': payment.created_at.strftime('%Y-%m-%d %H:%M'),
-            'recorded_by': payment.recorded_by.get_full_name() or payment.recorded_by.username,
-            'booking': {
-                'id': payment.booking.id,
-                'booking_reference': payment.booking.booking_reference,
-                'room_number': payment.booking.room_number,
-                'check_in_date': payment.booking.check_in_date.strftime('%Y-%m-%d'),
-                'check_out_date': payment.booking.check_out_date.strftime('%Y-%m-%d'),
-                'total_amount': float(payment.booking.total_amount),
-                'paid_amount': float(payment.booking.paid_amount),
-                'customer': {
-                    'id': payment.booking.customer.id,
-                    'full_name': payment.booking.customer.full_name,
-                    'email': payment.booking.customer.email,
-                    'phone': payment.booking.customer.phone,
-                }
-            }
-        }
-        
         # Check if this should return HTML for modal or JSON
         # If it's a modal request (not explicitly asking for JSON), render template
         if request.META.get('HTTP_ACCEPT', '').find('json') == -1:
             context = {
                 'payment': payment,
+                'payment_type': 'booking',
             }
             return render(request, 'properties/modals/payment_view_details.html', context)
+        
+        # Return JSON data
+        data = {
+            'id': payment.id,
+            'amount': float(payment.amount) if payment.amount else 0,
+            'payment_method': payment.payment_method or '',
+            'payment_method_display': payment.get_payment_method_display() if payment.payment_method else '',
+            'payment_type': payment.payment_type or '',
+            'payment_type_display': payment.get_payment_type_display() if payment.payment_type else '',
+            'payment_date': payment.payment_date.strftime('%Y-%m-%d %H:%M') if payment.payment_date else '',
+            'transaction_reference': payment.transaction_reference or '',
+            'notes': payment.notes or '',
+            'created_at': payment.created_at.strftime('%Y-%m-%d %H:%M') if payment.created_at else '',
+            'recorded_by': payment.recorded_by.get_full_name() or payment.recorded_by.username if payment.recorded_by else 'N/A',
+        }
+        
+        # Add booking data if available
+        if payment.booking:
+            data['booking'] = {
+                'id': payment.booking.id,
+                'booking_reference': payment.booking.booking_reference or '',
+                'room_number': payment.booking.room_number or '',
+                'check_in_date': payment.booking.check_in_date.strftime('%Y-%m-%d') if payment.booking.check_in_date else '',
+                'check_out_date': payment.booking.check_out_date.strftime('%Y-%m-%d') if payment.booking.check_out_date else '',
+                'total_amount': float(payment.booking.total_amount) if payment.booking.total_amount else 0,
+                'paid_amount': float(payment.booking.paid_amount) if payment.booking.paid_amount else 0,
+                'customer': {
+                    'id': payment.booking.customer.id if payment.booking.customer else None,
+                    'full_name': payment.booking.customer.full_name if payment.booking.customer else 'N/A',
+                    'email': payment.booking.customer.email if payment.booking.customer else 'N/A',
+                    'phone': payment.booking.customer.phone if payment.booking.customer else 'N/A',
+                } if payment.booking.customer else {}
+            }
         
         return JsonResponse(data)
     except Payment.DoesNotExist:
         return JsonResponse({'error': 'Payment not found'}, status=404)
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error loading payment details for payment {payment_id}: {str(e)}")
+        logger.error(traceback.format_exc())
+        return JsonResponse({'error': f'Error loading payment details: {str(e)}'}, status=500)
 
 
 @login_required
@@ -5540,7 +6487,7 @@ def api_delete_room(request, room_id):
 def api_booking_details(request, booking_id):
     """Get booking details for modal display"""
     try:
-        booking = Booking.objects.select_related('customer', 'property_obj', 'created_by').get(id=booking_id)
+        booking = Booking.objects.select_related('customer', 'property_obj', 'property_obj__property_type', 'created_by').get(id=booking_id)
         
         # Check if user has permission to view this booking
         if not request.user.has_perm('properties.view_booking') and booking.created_by != request.user:
@@ -5548,11 +6495,25 @@ def api_booking_details(request, booking_id):
         
         # Auto-correct total amount if there is a mismatch with calculated amount
         try:
-            if booking.total_amount != booking.calculated_total_amount:
+            # Safely calculate calculated_total_amount
+            calculated_total = booking.calculated_total_amount
+            if booking.total_amount != calculated_total:
                 booking.calculate_and_update_total()
-        except Exception:
+        except Exception as calc_error:
             # Fail silently in details view; leave existing amount if calculation fails
-            pass
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Could not calculate total for booking {booking_id}: {str(calc_error)}")
+        
+        # Ensure property has required fields
+        if not booking.property_obj:
+            return JsonResponse({'error': 'Property not found for this booking'}, status=404)
+        
+        # Check if property has rent_amount and rent_period
+        if booking.property_obj.rent_amount is None:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Property {booking.property_obj.id} has no rent_amount set")
         
         context = {
             'booking': booking,
@@ -5562,6 +6523,11 @@ def api_booking_details(request, booking_id):
     except Booking.DoesNotExist:
         return JsonResponse({'error': 'Booking not found'}, status=404)
     except Exception as e:
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error loading booking details for booking {booking_id}: {str(e)}")
+        logger.error(traceback.format_exc())
         return JsonResponse({'error': f'Error loading booking details: {str(e)}'}, status=500)
 
 
@@ -5569,7 +6535,7 @@ def api_booking_details(request, booking_id):
 def api_booking_edit(request, booking_id):
     """Get booking edit form for modal display"""
     try:
-        booking = Booking.objects.select_related('customer', 'property_obj').get(id=booking_id)
+        booking = Booking.objects.select_related('customer', 'property_obj', 'property_obj__property_type', 'created_by').get(id=booking_id)
         
         # Check if user has permission to edit this booking
         if not request.user.has_perm('properties.change_booking') and booking.created_by != request.user:
@@ -5577,14 +6543,33 @@ def api_booking_edit(request, booking_id):
         
         if request.method == 'POST':
             # Handle form submission
-            booking.check_in_date = request.POST.get('check_in_date', booking.check_in_date)
-            booking.check_out_date = request.POST.get('check_out_date', booking.check_out_date)
-            booking.number_of_guests = int(request.POST.get('number_of_guests', booking.number_of_guests))
-            booking.total_amount = float(request.POST.get('total_amount', booking.total_amount))
-            booking.special_requests = request.POST.get('special_requests', booking.special_requests)
-            booking.save()
-            
-            return JsonResponse({'success': True, 'message': 'Booking updated successfully'})
+            try:
+                from datetime import datetime
+                check_in_str = request.POST.get('check_in_date')
+                check_out_str = request.POST.get('check_out_date')
+                
+                if check_in_str:
+                    booking.check_in_date = datetime.strptime(check_in_str, '%Y-%m-%d').date()
+                if check_out_str:
+                    booking.check_out_date = datetime.strptime(check_out_str, '%Y-%m-%d').date()
+                
+                number_of_guests = request.POST.get('number_of_guests')
+                if number_of_guests:
+                    booking.number_of_guests = int(number_of_guests)
+                
+                total_amount = request.POST.get('total_amount')
+                if total_amount:
+                    booking.total_amount = float(total_amount)
+                
+                booking.special_requests = request.POST.get('special_requests', booking.special_requests)
+                booking.save()
+                
+                return JsonResponse({'success': True, 'message': 'Booking updated successfully'})
+            except Exception as save_error:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Error saving booking {booking_id}: {str(save_error)}")
+                return JsonResponse({'error': f'Error updating booking: {str(save_error)}'}, status=500)
         
         context = {
             'booking': booking,
@@ -5594,6 +6579,11 @@ def api_booking_edit(request, booking_id):
     except Booking.DoesNotExist:
         return JsonResponse({'error': 'Booking not found'}, status=404)
     except Exception as e:
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error loading booking edit form for booking {booking_id}: {str(e)}")
+        logger.error(traceback.format_exc())
         return JsonResponse({'error': f'Error loading booking edit form: {str(e)}'}, status=500)
 
 
@@ -5601,19 +6591,25 @@ def api_booking_edit(request, booking_id):
 def api_booking_confirm(request, booking_id):
     """Confirm booking modal"""
     try:
-        booking = Booking.objects.select_related('customer', 'property_obj').get(id=booking_id)
+        booking = Booking.objects.select_related('customer', 'property_obj', 'property_obj__property_type', 'created_by').get(id=booking_id)
         
         # Check if user has permission to confirm this booking
         if not request.user.has_perm('properties.change_booking') and booking.created_by != request.user:
             return JsonResponse({'error': 'Permission denied'}, status=403)
         
         if request.method == 'POST':
-            # Confirm the booking
-            booking.booking_status = 'confirmed'
-            booking.confirmed_at = timezone.now()
-            booking.save()
-            
-            return JsonResponse({'success': True, 'message': 'Booking confirmed successfully'})
+            try:
+                # Confirm the booking
+                booking.booking_status = 'confirmed'
+                booking.confirmed_at = timezone.now()
+                booking.save()
+                
+                return JsonResponse({'success': True, 'message': 'Booking confirmed successfully'})
+            except Exception as save_error:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Error confirming booking {booking_id}: {str(save_error)}")
+                return JsonResponse({'error': f'Error confirming booking: {str(save_error)}'}, status=500)
         
         context = {
             'booking': booking,
@@ -5623,6 +6619,11 @@ def api_booking_confirm(request, booking_id):
     except Booking.DoesNotExist:
         return JsonResponse({'error': 'Booking not found'}, status=404)
     except Exception as e:
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error loading booking confirm for booking {booking_id}: {str(e)}")
+        logger.error(traceback.format_exc())
         return JsonResponse({'error': f'Error confirming booking: {str(e)}'}, status=500)
 
 
@@ -5630,19 +6631,25 @@ def api_booking_confirm(request, booking_id):
 def api_booking_checkin(request, booking_id):
     """Check-in booking modal"""
     try:
-        booking = Booking.objects.select_related('customer', 'property_obj').get(id=booking_id)
+        booking = Booking.objects.select_related('customer', 'property_obj', 'property_obj__property_type', 'created_by').get(id=booking_id)
         
         # Check if user has permission to check-in this booking
         if not request.user.has_perm('properties.change_booking') and booking.created_by != request.user:
             return JsonResponse({'error': 'Permission denied'}, status=403)
         
         if request.method == 'POST':
-            # Process check-in
-            booking.booking_status = 'checked_in'
-            booking.checked_in_at = timezone.now()
-            booking.save()
-            
-            return JsonResponse({'success': True, 'message': 'Guest checked in successfully'})
+            try:
+                # Process check-in
+                booking.booking_status = 'checked_in'
+                booking.checked_in_at = timezone.now()
+                booking.save()
+                
+                return JsonResponse({'success': True, 'message': 'Guest checked in successfully'})
+            except Exception as save_error:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Error checking in booking {booking_id}: {str(save_error)}")
+                return JsonResponse({'error': f'Error processing check-in: {str(save_error)}'}, status=500)
         
         context = {
             'booking': booking,
@@ -5652,6 +6659,11 @@ def api_booking_checkin(request, booking_id):
     except Booking.DoesNotExist:
         return JsonResponse({'error': 'Booking not found'}, status=404)
     except Exception as e:
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error loading booking checkin for booking {booking_id}: {str(e)}")
+        logger.error(traceback.format_exc())
         return JsonResponse({'error': f'Error processing check-in: {str(e)}'}, status=500)
 
 
@@ -5659,19 +6671,25 @@ def api_booking_checkin(request, booking_id):
 def api_booking_checkout(request, booking_id):
     """Check-out booking modal"""
     try:
-        booking = Booking.objects.select_related('customer', 'property_obj').get(id=booking_id)
+        booking = Booking.objects.select_related('customer', 'property_obj', 'property_obj__property_type', 'created_by').get(id=booking_id)
         
         # Check if user has permission to check-out this booking
         if not request.user.has_perm('properties.change_booking') and booking.created_by != request.user:
             return JsonResponse({'error': 'Permission denied'}, status=403)
         
         if request.method == 'POST':
-            # Process check-out
-            booking.booking_status = 'checked_out'
-            booking.checked_out_at = timezone.now()
-            booking.save()
-            
-            return JsonResponse({'success': True, 'message': 'Guest checked out successfully'})
+            try:
+                # Process check-out
+                booking.booking_status = 'checked_out'
+                booking.checked_out_at = timezone.now()
+                booking.save()
+                
+                return JsonResponse({'success': True, 'message': 'Guest checked out successfully'})
+            except Exception as save_error:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Error checking out booking {booking_id}: {str(save_error)}")
+                return JsonResponse({'error': f'Error processing check-out: {str(save_error)}'}, status=500)
         
         context = {
             'booking': booking,
@@ -5681,6 +6699,11 @@ def api_booking_checkout(request, booking_id):
     except Booking.DoesNotExist:
         return JsonResponse({'error': 'Booking not found'}, status=404)
     except Exception as e:
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error loading booking checkout for booking {booking_id}: {str(e)}")
+        logger.error(traceback.format_exc())
         return JsonResponse({'error': f'Error processing check-out: {str(e)}'}, status=500)
 
 
@@ -5688,13 +6711,19 @@ def api_booking_checkout(request, booking_id):
 def api_booking_payments(request, booking_id):
     """Get booking payment history for modal display"""
     try:
-        booking = Booking.objects.select_related('customer', 'property_obj').get(id=booking_id)
+        booking = Booking.objects.select_related('customer', 'property_obj', 'property_obj__property_type', 'created_by').get(id=booking_id)
         
         # Check if user has permission to view payments
         if not request.user.has_perm('properties.view_payment') and booking.created_by != request.user:
             return JsonResponse({'error': 'Permission denied'}, status=403)
         
-        payments = Payment.objects.filter(booking=booking).order_by('-payment_date')
+        payments = []
+        try:
+            payments = Payment.objects.filter(booking=booking).select_related('recorded_by').order_by('-payment_date')
+        except Exception as payment_error:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Could not load payments for booking {booking_id}: {str(payment_error)}")
         
         context = {
             'booking': booking,
@@ -5705,6 +6734,11 @@ def api_booking_payments(request, booking_id):
     except Booking.DoesNotExist:
         return JsonResponse({'error': 'Booking not found'}, status=404)
     except Exception as e:
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error loading payment history for booking {booking_id}: {str(e)}")
+        logger.error(traceback.format_exc())
         return JsonResponse({'error': f'Error loading payment history: {str(e)}'}, status=500)
 
 
@@ -5712,7 +6746,7 @@ def api_booking_payments(request, booking_id):
 def api_booking_invoice(request, booking_id):
     """Generate booking invoice for modal display"""
     try:
-        booking = Booking.objects.select_related('customer', 'property_obj').get(id=booking_id)
+        booking = Booking.objects.select_related('customer', 'property_obj', 'property_obj__property_type', 'created_by').get(id=booking_id)
         
         # Check if user has permission to view invoices
         if not request.user.has_perm('properties.view_booking') and booking.created_by != request.user:
@@ -5726,6 +6760,11 @@ def api_booking_invoice(request, booking_id):
     except Booking.DoesNotExist:
         return JsonResponse({'error': 'Booking not found'}, status=404)
     except Exception as e:
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error generating invoice for booking {booking_id}: {str(e)}")
+        logger.error(traceback.format_exc())
         return JsonResponse({'error': f'Error generating invoice: {str(e)}'}, status=500)
 
 
@@ -5733,7 +6772,7 @@ def api_booking_invoice(request, booking_id):
 def api_booking_invoice_download(request, booking_id):
     """Download booking invoice as PDF"""
     try:
-        booking = Booking.objects.select_related('customer', 'property_obj').get(id=booking_id)
+        booking = Booking.objects.select_related('customer', 'property_obj', 'property_obj__property_type', 'created_by').get(id=booking_id)
         
         # Check if user has permission to download invoices
         if not request.user.has_perm('properties.view_booking') and booking.created_by != request.user:
@@ -5917,6 +6956,11 @@ def api_booking_invoice_download(request, booking_id):
     except ImportError:
         return JsonResponse({'error': 'PDF generation library not installed. Please install reportlab.'}, status=500)
     except Exception as e:
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error generating PDF invoice for booking {booking_id}: {str(e)}")
+        logger.error(traceback.format_exc())
         return JsonResponse({'error': f'Error generating PDF invoice: {str(e)}'}, status=500)
 
 
@@ -5924,7 +6968,7 @@ def api_booking_invoice_download(request, booking_id):
 def api_booking_invoice_email(request, booking_id):
     """Email booking invoice"""
     try:
-        booking = Booking.objects.select_related('customer', 'property_obj').get(id=booking_id)
+        booking = Booking.objects.select_related('customer', 'property_obj', 'property_obj__property_type', 'created_by').get(id=booking_id)
         
         # Check if user has permission to email invoices
         if not request.user.has_perm('properties.view_booking') and booking.created_by != request.user:
@@ -5932,11 +6976,17 @@ def api_booking_invoice_email(request, booking_id):
         
         # For now, return success message
         # In a real implementation, you would send an email here
-        return JsonResponse({'success': True, 'message': f'Invoice sent to {booking.customer.email}'})
+        customer_email = booking.customer.email if booking.customer and booking.customer.email else 'N/A'
+        return JsonResponse({'success': True, 'message': f'Invoice sent to {customer_email}'})
         
     except Booking.DoesNotExist:
         return JsonResponse({'error': 'Booking not found'}, status=404)
     except Exception as e:
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error emailing invoice for booking {booking_id}: {str(e)}")
+        logger.error(traceback.format_exc())
         return JsonResponse({'error': f'Error emailing invoice: {str(e)}'}, status=500)
 
 
@@ -5944,20 +6994,26 @@ def api_booking_invoice_email(request, booking_id):
 def api_booking_cancel(request, booking_id):
     """Cancel booking modal"""
     try:
-        booking = Booking.objects.select_related('customer', 'property_obj').get(id=booking_id)
+        booking = Booking.objects.select_related('customer', 'property_obj', 'property_obj__property_type', 'created_by').get(id=booking_id)
         
         # Check if user has permission to cancel this booking
         if not request.user.has_perm('properties.change_booking') and booking.created_by != request.user:
             return JsonResponse({'error': 'Permission denied'}, status=403)
         
         if request.method == 'POST':
-            # Cancel the booking
-            cancellation_reason = request.POST.get('cancellation_reason', 'No reason provided')
-            booking.booking_status = 'cancelled'
-            booking.special_requests = f"{booking.special_requests or ''}\n\nCancellation Reason: {cancellation_reason}"
-            booking.save()
-            
-            return JsonResponse({'success': True, 'message': 'Booking cancelled successfully'})
+            try:
+                # Cancel the booking
+                cancellation_reason = request.POST.get('cancellation_reason', 'No reason provided')
+                booking.booking_status = 'cancelled'
+                booking.special_requests = f"{booking.special_requests or ''}\n\nCancellation Reason: {cancellation_reason}"
+                booking.save()
+                
+                return JsonResponse({'success': True, 'message': 'Booking cancelled successfully'})
+            except Exception as save_error:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Error cancelling booking {booking_id}: {str(save_error)}")
+                return JsonResponse({'error': f'Error cancelling booking: {str(save_error)}'}, status=500)
         
         context = {
             'booking': booking,
@@ -5967,6 +7023,11 @@ def api_booking_cancel(request, booking_id):
     except Booking.DoesNotExist:
         return JsonResponse({'error': 'Booking not found'}, status=404)
     except Exception as e:
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error loading booking cancel for booking {booking_id}: {str(e)}")
+        logger.error(traceback.format_exc())
         return JsonResponse({'error': f'Error cancelling booking: {str(e)}'}, status=500)
 
 
@@ -5974,29 +7035,40 @@ def api_booking_cancel(request, booking_id):
 def api_booking_update_total(request, booking_id):
     """Update booking total amount based on calculated amount"""
     try:
-        booking = Booking.objects.select_related('customer', 'property_obj').get(id=booking_id)
+        booking = Booking.objects.select_related('customer', 'property_obj', 'property_obj__property_type', 'created_by').get(id=booking_id)
         
         # Check if user has permission to update this booking
         if not request.user.has_perm('properties.change_booking') and booking.created_by != request.user:
             return JsonResponse({'error': 'Permission denied'}, status=403)
         
         if request.method == 'POST':
-            # Calculate and update the total amount
-            old_total = booking.total_amount
-            new_total = booking.calculate_and_update_total()
-            
-            return JsonResponse({
-                'success': True, 
-                'message': f'Booking total updated from Tsh {old_total:,.0f} to Tsh {new_total:,.0f}',
-                'old_total': float(old_total),
-                'new_total': float(new_total)
-            })
+            try:
+                # Calculate and update the total amount
+                old_total = booking.total_amount
+                new_total = booking.calculate_and_update_total()
+                
+                return JsonResponse({
+                    'success': True, 
+                    'message': f'Booking total updated from Tsh {old_total:,.0f} to Tsh {new_total:,.0f}',
+                    'old_total': float(old_total),
+                    'new_total': float(new_total)
+                })
+            except Exception as calc_error:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Error calculating/updating total for booking {booking_id}: {str(calc_error)}")
+                return JsonResponse({'error': f'Error updating booking total: {str(calc_error)}'}, status=500)
         
         return JsonResponse({'error': 'Method not allowed'}, status=405)
         
     except Booking.DoesNotExist:
         return JsonResponse({'error': 'Booking not found'}, status=404)
     except Exception as e:
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error updating booking total for booking {booking_id}: {str(e)}")
+        logger.error(traceback.format_exc())
         return JsonResponse({'error': f'Error updating booking total: {str(e)}'}, status=500)
 
 
@@ -6009,9 +7081,15 @@ def api_tenant_profile(request, tenant_id):
         tenant = Customer.objects.select_related().prefetch_related('customer_bookings__property_obj').get(id=tenant_id)
         
         # Get latest booking for this tenant
-        latest_booking = tenant.customer_bookings.filter(
-            property_obj__property_type__name__iexact='house'
-        ).order_by('-created_at').first()
+        latest_booking = None
+        try:
+            latest_booking = tenant.customer_bookings.filter(
+                property_obj__property_type__name__iexact='house'
+            ).select_related('property_obj', 'property_obj__property_type').order_by('-created_at').first()
+        except Exception as booking_error:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Could not load latest booking for tenant {tenant_id}: {str(booking_error)}")
         
         context = {
             'tenant': tenant,
@@ -6022,6 +7100,11 @@ def api_tenant_profile(request, tenant_id):
     except Customer.DoesNotExist:
         return JsonResponse({'error': 'Tenant not found'}, status=404)
     except Exception as e:
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error loading tenant profile for tenant {tenant_id}: {str(e)}")
+        logger.error(traceback.format_exc())
         return JsonResponse({'error': f'Error loading tenant profile: {str(e)}'}, status=500)
 
 
@@ -6033,13 +7116,19 @@ def api_tenant_edit(request, tenant_id):
         
         if request.method == 'POST':
             # Handle form submission
-            tenant.first_name = request.POST.get('first_name', tenant.first_name)
-            tenant.last_name = request.POST.get('last_name', tenant.last_name)
-            tenant.email = request.POST.get('email', tenant.email)
-            tenant.phone = request.POST.get('phone', tenant.phone)
-            tenant.save()
-            
-            return JsonResponse({'success': True, 'message': 'Tenant updated successfully'})
+            try:
+                tenant.first_name = request.POST.get('first_name', tenant.first_name)
+                tenant.last_name = request.POST.get('last_name', tenant.last_name)
+                tenant.email = request.POST.get('email', tenant.email)
+                tenant.phone = request.POST.get('phone', tenant.phone)
+                tenant.save()
+                
+                return JsonResponse({'success': True, 'message': 'Tenant updated successfully'})
+            except Exception as save_error:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Error saving tenant {tenant_id}: {str(save_error)}")
+                return JsonResponse({'error': f'Error updating tenant: {str(save_error)}'}, status=500)
         
         context = {
             'tenant': tenant,
@@ -6049,6 +7138,11 @@ def api_tenant_edit(request, tenant_id):
     except Customer.DoesNotExist:
         return JsonResponse({'error': 'Tenant not found'}, status=404)
     except Exception as e:
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error loading tenant edit form for tenant {tenant_id}: {str(e)}")
+        logger.error(traceback.format_exc())
         return JsonResponse({'error': f'Error loading tenant edit form: {str(e)}'}, status=500)
 
 
@@ -6059,10 +7153,16 @@ def api_property_details(request, property_id):
         property_obj = Property.objects.select_related('property_type', 'owner').get(id=property_id)
         
         # Get current tenant for this property
-        current_booking = Booking.objects.filter(
-            property_obj=property_obj,
-            booking_status__in=['confirmed', 'checked_in']
-        ).select_related('customer').first()
+        current_booking = None
+        try:
+            current_booking = Booking.objects.filter(
+                property_obj=property_obj,
+                booking_status__in=['confirmed', 'checked_in']
+            ).select_related('customer').first()
+        except Exception as booking_error:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Could not load current booking for property {property_id}: {str(booking_error)}")
         
         context = {
             'property': property_obj,
@@ -6073,6 +7173,11 @@ def api_property_details(request, property_id):
     except Property.DoesNotExist:
         return JsonResponse({'error': 'Property not found'}, status=404)
     except Exception as e:
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error loading property details for property {property_id}: {str(e)}")
+        logger.error(traceback.format_exc())
         return JsonResponse({'error': f'Error loading property details: {str(e)}'}, status=500)
 
 
@@ -6083,10 +7188,16 @@ def api_tenant_lease_history(request, tenant_id):
         tenant = Customer.objects.get(id=tenant_id)
         
         # Get all house bookings for this tenant
-        lease_history = Booking.objects.filter(
-            customer=tenant,
-            property_obj__property_type__name__iexact='house'
-        ).select_related('property_obj').order_by('-created_at')
+        lease_history = []
+        try:
+            lease_history = Booking.objects.filter(
+                customer=tenant,
+                property_obj__property_type__name__iexact='house'
+            ).select_related('property_obj', 'property_obj__property_type').order_by('-created_at')
+        except Exception as history_error:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Could not load lease history for tenant {tenant_id}: {str(history_error)}")
         
         context = {
             'tenant': tenant,
@@ -6097,6 +7208,11 @@ def api_tenant_lease_history(request, tenant_id):
     except Customer.DoesNotExist:
         return JsonResponse({'error': 'Tenant not found'}, status=404)
     except Exception as e:
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error loading lease history for tenant {tenant_id}: {str(e)}")
+        logger.error(traceback.format_exc())
         return JsonResponse({'error': f'Error loading lease history: {str(e)}'}, status=500)
 
 
@@ -6107,10 +7223,16 @@ def api_tenant_payment_history(request, tenant_id):
         tenant = Customer.objects.get(id=tenant_id)
         
         # Get all payments for this tenant's house bookings
-        payments = Payment.objects.filter(
-            booking__customer=tenant,
-            booking__property_obj__property_type__name__iexact='house'
-        ).select_related('booking', 'booking__property_obj').order_by('-payment_date')
+        payments = []
+        try:
+            payments = Payment.objects.filter(
+                booking__customer=tenant,
+                booking__property_obj__property_type__name__iexact='house'
+            ).select_related('booking', 'booking__property_obj', 'booking__property_obj__property_type').order_by('-payment_date')
+        except Exception as payment_error:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Could not load payment history for tenant {tenant_id}: {str(payment_error)}")
         
         context = {
             'tenant': tenant,
@@ -6121,6 +7243,11 @@ def api_tenant_payment_history(request, tenant_id):
     except Customer.DoesNotExist:
         return JsonResponse({'error': 'Tenant not found'}, status=404)
     except Exception as e:
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error loading payment history for tenant {tenant_id}: {str(e)}")
+        logger.error(traceback.format_exc())
         return JsonResponse({'error': f'Error loading payment history: {str(e)}'}, status=500)
 
 
@@ -6297,6 +7424,107 @@ def api_record_payment(request):
 
 
 # Venue Management API Endpoints
+@login_required
+def api_property_availability(request, property_id):
+    """
+    AJAX endpoint to get property availability information
+    Returns booked dates and next available date for a property
+    """
+    try:
+        from datetime import datetime, timedelta
+        from django.utils import timezone
+        
+        property_obj = get_object_or_404(Property, pk=property_id)
+        
+        # Get all active bookings (confirmed, checked_in, pending)
+        active_bookings = property_obj.property_bookings.filter(
+            booking_status__in=['confirmed', 'checked_in', 'pending']
+        ).order_by('check_in_date')
+        
+        # Get active leases
+        from documents.models import Lease
+        active_leases = Lease.objects.filter(
+            property_ref=property_obj,
+            status='active'
+        ).order_by('start_date')
+        
+        # Prepare booked dates from bookings
+        booked_dates = []
+        current_bookings = []
+        
+        for booking in active_bookings:
+            booked_dates.append({
+                'check_in': booking.check_in_date.strftime('%Y-%m-%d'),
+                'check_out': booking.check_out_date.strftime('%Y-%m-%d'),
+                'status': booking.booking_status,
+                'booking_reference': booking.booking_reference
+            })
+            current_bookings.append({
+                'id': booking.id,
+                'check_in': booking.check_in_date.strftime('%Y-%m-%d'),
+                'check_out': booking.check_out_date.strftime('%Y-%m-%d'),
+                'status': booking.booking_status,
+                'booking_reference': booking.booking_reference,
+                'customer': booking.customer.full_name if booking.customer else 'N/A'
+            })
+        
+        # Add lease dates
+        for lease in active_leases:
+            booked_dates.append({
+                'check_in': lease.start_date.strftime('%Y-%m-%d'),
+                'check_out': lease.end_date.strftime('%Y-%m-%d'),
+                'status': 'lease',
+                'booking_reference': f"Lease-{lease.id}"
+            })
+        
+        # Calculate next available date
+        today = timezone.now().date()
+        next_available_date = None
+        
+        # Sort booked dates by check_in
+        sorted_bookings = sorted(booked_dates, key=lambda x: x['check_in'])
+        
+        # Find first gap or date after last booking
+        if sorted_bookings:
+            last_checkout = max(
+                datetime.strptime(b['check_out'], '%Y-%m-%d').date() 
+                for b in sorted_bookings
+            )
+            # Next available is day after last checkout
+            if last_checkout >= today:
+                next_available_date = (last_checkout + timedelta(days=1)).strftime('%Y-%m-%d')
+            else:
+                next_available_date = today.strftime('%Y-%m-%d')
+        else:
+            # No bookings, available from today
+            next_available_date = today.strftime('%Y-%m-%d')
+        
+        # Check if property is currently available
+        is_available = property_obj.is_available_for_booking()
+        
+        return JsonResponse({
+            'success': True,
+            'property_id': property_obj.id,
+            'property_title': property_obj.title,
+            'is_available': is_available,
+            'property_status': property_obj.status,
+            'booked_dates': booked_dates,
+            'current_bookings': current_bookings,
+            'next_available_date': next_available_date,
+            'has_active_bookings': len(current_bookings) > 0,
+            'has_active_leases': len(active_leases) > 0
+        })
+        
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error fetching property availability: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': f'Failed to fetch availability: {str(e)}'
+        }, status=500)
+
+
 @login_required
 def api_venue_availability(request):
     """API endpoint to get venue availability"""
@@ -6483,7 +7711,7 @@ def api_venue_booking_status(request, booking_id):
                 return JsonResponse({'success': True, 'message': 'Event started successfully'})
             
             elif action == 'end':
-                booking.booking_status = 'completed'
+                booking.booking_status = 'checked_out'
                 booking.save()
                 return JsonResponse({'success': True, 'message': 'Event ended successfully'})
             
@@ -6614,7 +7842,7 @@ def api_venue_analytics(request):
             # Calculate metrics
             total_bookings = bookings.count()
             confirmed_bookings = bookings.filter(booking_status='confirmed').count()
-            completed_bookings = bookings.filter(booking_status='completed').count()
+            completed_bookings = bookings.filter(booking_status='checked_out').count()
             cancelled_bookings = bookings.filter(booking_status='cancelled').count()
             
             total_revenue = bookings.filter(payment_status='paid').aggregate(
@@ -6627,7 +7855,7 @@ def api_venue_analytics(request):
             
             occupancy_rate = 0
             if venue.capacity and total_bookings > 0:
-                total_guests = sum(booking.number_of_guests or 0 for booking in bookings.filter(booking_status__in=['confirmed', 'completed']))
+                total_guests = sum(booking.number_of_guests or 0 for booking in bookings.filter(booking_status__in=['confirmed', 'checked_in', 'checked_out']))
                 occupancy_rate = min(100, (total_guests / (venue.capacity * total_bookings)) * 100)
             
             venue_analytics = {
@@ -6664,28 +7892,48 @@ def api_venue_analytics(request):
 def api_payment_view_details(request, payment_id):
     """API endpoint to view payment details - handles both booking payments and visit payments"""
     try:
+        payment = None
+        payment_type = None
+        
         # Try booking payment first (properties.models.Payment)
         try:
-            payment = Payment.objects.select_related('booking', 'booking__customer', 'booking__property_obj').get(id=payment_id)
+            payment = Payment.objects.select_related(
+                'booking', 
+                'booking__customer', 
+                'booking__property_obj',
+                'booking__property_obj__property_type',
+                'recorded_by'
+            ).get(id=payment_id)
             payment_type = 'booking'
         except Payment.DoesNotExist:
             # Try unified payment (payments.models.Payment) - could be visit payment
             from payments.models import Payment as UnifiedPayment
             from .models import PropertyVisitPayment
-            payment = UnifiedPayment.objects.select_related('tenant', 'recorded_by').get(id=payment_id)
-            # Check if it's a visit payment
-            visit_payment = PropertyVisitPayment.objects.filter(payment=payment).first()
-            if visit_payment:
-                payment_type = 'visit'
-                payment.visit_payment = visit_payment
-                payment.property = visit_payment.property
-            else:
-                payment_type = 'unified'
+            try:
+                payment = UnifiedPayment.objects.select_related('tenant', 'recorded_by', 'provider').get(id=payment_id)
+                # Check if it's a visit payment
+                visit_payment = PropertyVisitPayment.objects.filter(payment=payment).select_related('property', 'property__property_type').first()
+                if visit_payment:
+                    payment_type = 'visit'
+                    payment.visit_payment = visit_payment
+                    payment.property = visit_payment.property
+                else:
+                    payment_type = 'unified'
+            except UnifiedPayment.DoesNotExist:
+                pass
+        
+        if not payment:
+            return JsonResponse({'success': False, 'message': 'Payment not found'}, status=404)
         
         context = {'payment': payment, 'payment_type': payment_type}
         return render(request, 'properties/modals/payment_view_details.html', context)
     except Exception as e:
-        return JsonResponse({'success': False, 'message': f'Payment not found: {str(e)}'})
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error loading payment details for payment {payment_id}: {str(e)}")
+        logger.error(traceback.format_exc())
+        return JsonResponse({'success': False, 'message': f'Error loading payment details: {str(e)}'}, status=500)
 
 
 @login_required
@@ -6713,7 +7961,12 @@ def api_payment_generate_receipt(request, payment_id):
         context = {'payment': payment, 'payment_type': payment_type}
         return render(request, 'properties/modals/payment_generate_receipt.html', context)
     except Exception as e:
-        return JsonResponse({'success': False, 'message': f'Payment not found: {str(e)}'})
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error generating receipt for payment {payment_id}: {str(e)}")
+        logger.error(traceback.format_exc())
+        return JsonResponse({'success': False, 'message': f'Error generating receipt: {str(e)}'}, status=500)
 
 
 @login_required
@@ -6912,7 +8165,12 @@ def api_payment_edit(request, payment_id):
         
         return render(request, 'properties/modals/payment_edit.html', context)
     except Exception as e:
-        return JsonResponse({'success': False, 'message': f'Payment not found: {str(e)}'})
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error loading payment edit for payment {payment_id}: {str(e)}")
+        logger.error(traceback.format_exc())
+        return JsonResponse({'success': False, 'message': f'Error loading payment: {str(e)}'}, status=500)
 
 
 @login_required
@@ -6963,14 +8221,29 @@ def api_payment_mark_paid(request, payment_id):
         context = {'payment': payment, 'payment_type': payment_type}
         return render(request, 'properties/modals/payment_mark_paid.html', context)
     except Exception as e:
-        return JsonResponse({'success': False, 'message': f'Payment not found: {str(e)}'})
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error loading payment mark paid for payment {payment_id}: {str(e)}")
+        logger.error(traceback.format_exc())
+        return JsonResponse({'success': False, 'message': f'Error loading payment: {str(e)}'}, status=500)
 
 
 @login_required
 def api_payment_booking_details(request, payment_id):
     """API endpoint to view booking details for a payment - only works for booking payments"""
     try:
-        payment = Payment.objects.select_related('booking', 'booking__customer', 'booking__property_obj').get(id=payment_id)
+        payment = Payment.objects.select_related(
+            'booking', 
+            'booking__customer', 
+            'booking__property_obj',
+            'booking__property_obj__property_type',
+            'booking__created_by'
+        ).get(id=payment_id)
+        
+        if not payment.booking:
+            return JsonResponse({'success': False, 'message': 'Payment is not linked to a booking'}, status=404)
+        
         context = {'booking': payment.booking}
         return render(request, 'properties/modals/booking_details.html', context)
     except Payment.DoesNotExist:
@@ -6981,36 +8254,75 @@ def api_payment_booking_details(request, payment_id):
             unified_payment = UnifiedPayment.objects.get(id=payment_id)
             visit_payment = PropertyVisitPayment.objects.filter(payment=unified_payment).first()
             if visit_payment:
-                return JsonResponse({'success': False, 'message': 'Visit payments do not have booking details'})
-        except:
+                return JsonResponse({'success': False, 'message': 'Visit payments do not have booking details'}, status=400)
+        except UnifiedPayment.DoesNotExist:
             pass
-        return JsonResponse({'success': False, 'message': 'Payment not found'})
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Error checking visit payment for payment {payment_id}: {str(e)}")
+        return JsonResponse({'success': False, 'message': 'Payment not found'}, status=404)
+    except Exception as e:
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error loading booking details for payment {payment_id}: {str(e)}")
+        logger.error(traceback.format_exc())
+        return JsonResponse({'success': False, 'message': f'Error loading booking details: {str(e)}'}, status=500)
 
 
 @login_required
 def api_payment_property_details(request, payment_id):
     """API endpoint to view property details for a payment - handles both booking and visit payments"""
     try:
+        property_obj = None
+        
         # Try booking payment first (properties.models.Payment)
         try:
-            payment = Payment.objects.select_related('booking', 'booking__property_obj').get(id=payment_id)
-            property_obj = payment.booking.property_obj
+            payment = Payment.objects.select_related('booking', 'booking__property_obj', 'booking__property_obj__property_type', 'booking__property_obj__owner').get(id=payment_id)
+            if payment.booking and payment.booking.property_obj:
+                property_obj = payment.booking.property_obj
         except Payment.DoesNotExist:
             # Try unified payment (payments.models.Payment) - could be visit payment
             from payments.models import Payment as UnifiedPayment
             from .models import PropertyVisitPayment
-            payment = UnifiedPayment.objects.get(id=payment_id)
-            # Check if it's a visit payment
-            visit_payment = PropertyVisitPayment.objects.filter(payment=payment).select_related('property').first()
-            if visit_payment:
-                property_obj = visit_payment.property
-            else:
-                return JsonResponse({'success': False, 'message': 'Payment not linked to a property'})
+            try:
+                payment = UnifiedPayment.objects.select_related('tenant', 'recorded_by').get(id=payment_id)
+                # Check if it's a visit payment
+                visit_payment = PropertyVisitPayment.objects.filter(payment=payment).select_related('property', 'property__property_type', 'property__owner').first()
+                if visit_payment and visit_payment.property:
+                    property_obj = visit_payment.property
+                elif hasattr(payment, 'booking') and payment.booking:
+                    # Check if unified payment has a booking
+                    property_obj = payment.booking.property_obj if payment.booking.property_obj else None
+            except UnifiedPayment.DoesNotExist:
+                pass
         
-        context = {'property': property_obj}
+        if not property_obj:
+            return JsonResponse({'success': False, 'message': 'Payment not linked to a property'}, status=404)
+        
+        # Get current booking for the property
+        current_booking = None
+        try:
+            current_booking = Booking.objects.filter(
+                property_obj=property_obj,
+                booking_status__in=['confirmed', 'checked_in']
+            ).select_related('customer').first()
+        except Exception:
+            pass
+        
+        context = {
+            'property': property_obj,
+            'current_booking': current_booking,
+        }
         return render(request, 'properties/modals/property_details.html', context)
     except Exception as e:
-        return JsonResponse({'success': False, 'message': f'Payment not found: {str(e)}'})
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error loading property details for payment {payment_id}: {str(e)}")
+        logger.error(traceback.format_exc())
+        return JsonResponse({'success': False, 'message': f'Error loading property details: {str(e)}'}, status=500)
 
 
 @login_required
@@ -7030,7 +8342,14 @@ def api_payment_send_reminder(request, payment_id):
         context = {'payment': payment}
         return render(request, 'properties/modals/payment_send_reminder.html', context)
     except Payment.DoesNotExist:
-        return JsonResponse({'success': False, 'message': 'Payment not found'})
+        return JsonResponse({'success': False, 'message': 'Payment not found'}, status=404)
+    except Exception as e:
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error loading payment reminder for payment {payment_id}: {str(e)}")
+        logger.error(traceback.format_exc())
+        return JsonResponse({'success': False, 'message': f'Error loading payment reminder: {str(e)}'}, status=500)
 
 
 @login_required
@@ -7051,7 +8370,7 @@ def api_visit_payment_status(request, property_id):
         visit_payment = PropertyVisitPayment.objects.filter(
             property=property_obj,
             user=request.user,
-            status='successful'
+            status='completed'
         ).first()
         
         has_paid = visit_payment is not None
@@ -7120,7 +8439,7 @@ def api_visit_payment_initiate(request, property_id):
         existing_payment = PropertyVisitPayment.objects.filter(
             property=property_obj,
             user=request.user,
-            status='successful'
+            status='completed'
         ).first()
         
         if existing_payment:
@@ -7164,7 +8483,13 @@ def api_visit_payment_initiate(request, property_id):
         # Initiate gateway payment
         from payments.gateway_service import AZAMPayGateway
         
-        callback_url = f"{request.build_absolute_uri('/')}api/v1/payments/webhook/azam-pay/"
+        # Use configured webhook URL (production) instead of localhost
+        from django.conf import settings
+        callback_url = getattr(settings, 'AZAM_PAY_WEBHOOK_URL', None)
+        if not callback_url:
+            # Fallback to BASE_URL if webhook URL not configured
+            base_domain = getattr(settings, 'BASE_URL', 'https://portal.maishaapp.co.tz')
+            callback_url = f"{base_domain}/api/v1/payments/webhook/azam-pay/"
         gateway_response = AZAMPayGateway.initiate_payment(payment, callback_url=callback_url)
         
         if gateway_response.get('success'):
@@ -7237,7 +8562,7 @@ def api_visit_payment_verify(request, property_id):
             }, status=404)
         
         # If already successful, return contact info
-        if visit_payment.status == 'successful':
+        if visit_payment.status == 'completed':
             owner = property_obj.owner
             owner_profile = getattr(owner, 'profile', None)
             
@@ -7328,14 +8653,17 @@ def api_payment_delete(request, payment_id):
         from django.contrib.auth.models import User
         from django.db.models import Q
         
-        payment = Payment.objects.select_related('booking', 'booking__customer', 'booking__property_obj', 'recorded_by').get(id=payment_id)
+        payment = Payment.objects.select_related('booking', 'booking__customer', 'booking__property_obj', 'booking__property_obj__property_type', 'recorded_by').get(id=payment_id)
+        
+        if not payment.booking:
+            return JsonResponse({'success': False, 'message': 'Payment is not linked to a booking'}, status=404)
         
         if request.method == 'POST':
             # Store payment info for confirmation message
-            booking_ref = payment.booking.booking_reference
-            amount = payment.amount
-            customer_name = payment.booking.customer.full_name
-            property_title = payment.booking.property_obj.title
+            booking_ref = payment.booking.booking_reference if payment.booking else 'N/A'
+            amount = payment.amount or 0
+            customer_name = payment.booking.customer.full_name if payment.booking and payment.booking.customer else 'N/A'
+            property_title = payment.booking.property_obj.title if payment.booking and payment.booking.property_obj else 'N/A'
             
             # Store booking object before deleting
             booking_obj = payment.booking
@@ -7407,9 +8735,14 @@ def api_payment_delete(request, payment_id):
         context = {'payment': payment}
         return render(request, 'properties/modals/payment_delete_confirm.html', context)
     except Payment.DoesNotExist:
-        return JsonResponse({'success': False, 'message': 'Payment not found'})
+        return JsonResponse({'success': False, 'message': 'Payment not found'}, status=404)
     except Exception as e:
-        return JsonResponse({'success': False, 'message': f'Error: {str(e)}'})
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error deleting payment {payment_id}: {str(e)}")
+        logger.error(traceback.format_exc())
+        return JsonResponse({'success': False, 'message': f'Error deleting payment: {str(e)}'}, status=500)
 
 
 # ============================================================================
@@ -7758,6 +9091,67 @@ def property_image_delete(request, pk, image_id):
         return JsonResponse({'success': False, 'error': 'Image not found'}, status=404)
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def geocode_property_address(request):
+    """
+    AJAX endpoint to geocode an address and return coordinates
+    """
+    from django.http import JsonResponse
+    import json
+    
+    try:
+        data = json.loads(request.body)
+        address = data.get('address', '').strip()
+        region_id = data.get('region_id')
+        
+        if not address:
+            return JsonResponse({
+                'success': False,
+                'error': 'Address is required'
+            }, status=400)
+        
+        # Get region name if provided
+        region_name = None
+        if region_id:
+            try:
+                region = Region.objects.get(id=region_id)
+                region_name = region.name
+            except Region.DoesNotExist:
+                pass
+        
+        # Geocode the address
+        from .utils import geocode_address
+        result = geocode_address(address, region=region_name)
+        
+        if result:
+            latitude, longitude = result
+            return JsonResponse({
+                'success': True,
+                'latitude': float(latitude),
+                'longitude': float(longitude)
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': 'Could not find coordinates for this address. Please enter coordinates manually.'
+            }, status=404)
+            
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Invalid JSON data'
+        }, status=400)
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Geocoding error: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': f'An error occurred: {str(e)}'
+        }, status=500)
 
 
 @login_required

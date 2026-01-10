@@ -1,0 +1,90 @@
+<div class="payment-receipt">
+  <div class="text-center mb-4">
+    <h4 class="mb-2">Payment Receipt</h4>
+    <p class="text-muted">Payment #{{ payment.id }}</p>
+  </div>
+  
+  <div class="row mb-4">
+    <div class="col-md-6">
+      <h6 class="text-500 mb-3">Payment Details</h6>
+      <table class="table table-sm table-borderless">
+        <tr>
+          <td class="text-600">Receipt Number:</td>
+          <td><strong>#{{ payment.id }}</strong></td>
+        </tr>
+        <tr>
+          <td class="text-600">Date:</td>
+          <td>{{ payment.paid_date|date:"M d, Y"|default:payment.created_at|date:"M d, Y" }}</td>
+        </tr>
+        <tr>
+          <td class="text-600">Amount:</td>
+          <td><strong class="text-success">Tsh{{ payment.amount|floatformat:2 }}</strong></td>
+        </tr>
+        <tr>
+          <td class="text-600">Payment Method:</td>
+          <td>{{ payment.get_payment_method_display }}</td>
+        </tr>
+        {% if payment.provider %}
+        <tr>
+          <td class="text-600">Provider:</td>
+          <td>{{ payment.provider.name }}</td>
+        </tr>
+        {% endif %}
+        {% if payment.transaction_ref %}
+        <tr>
+          <td class="text-600">Transaction Ref:</td>
+          <td><code>{{ payment.transaction_ref }}</code></td>
+        </tr>
+        {% endif %}
+      </table>
+    </div>
+    <div class="col-md-6">
+      <h6 class="text-500 mb-3">Tenant Details</h6>
+      <table class="table table-sm table-borderless">
+        <tr>
+          <td class="text-600">Name:</td>
+          <td><strong>{{ payment.tenant.get_full_name|default:payment.tenant.username }}</strong></td>
+        </tr>
+        <tr>
+          <td class="text-600">Email:</td>
+          <td>{{ payment.tenant.email|default:"N/A" }}</td>
+        </tr>
+        <tr>
+          <td class="text-600">Phone:</td>
+          <td>{{ payment.tenant.profile.phone|default:"N/A" }}</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+  
+  {% if payment.invoice %}
+  <div class="row mb-4">
+    <div class="col-12">
+      <h6 class="text-500 mb-3">Invoice Information</h6>
+      <table class="table table-sm table-borderless">
+        <tr>
+          <td class="text-600">Invoice ID:</td>
+          <td><strong>#{{ payment.invoice.id }}</strong></td>
+        </tr>
+        <tr>
+          <td class="text-600">Invoice Amount:</td>
+          <td><strong>Tsh{{ payment.invoice.amount|floatformat:2 }}</strong></td>
+        </tr>
+        <tr>
+          <td class="text-600">Due Date:</td>
+          <td>{{ payment.invoice.due_date|date:"M d, Y" }}</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+  
+  <div class="text-center mt-4 pt-4 border-top">
+    <p class="text-muted small mb-0">
+      This is a computer-generated receipt. No signature required.
+    </p>
+    <p class="text-muted small mb-0">
+      Generated on {{ payment.created_at|date:"M d, Y H:i" }}
+    </p>
+  </div>
+</div>

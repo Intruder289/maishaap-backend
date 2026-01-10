@@ -131,6 +131,12 @@ def complaint_list(request):
             'user': request.user,
         })
     
+    # Calculate statistics based on user role
+    if request.user.is_staff:
+        stats_complaints = Complaint.objects.all()
+    else:
+        stats_complaints = Complaint.objects.filter(user=request.user)
+    
     context = {
         'complaints': page_obj,
         'is_staff_view': is_staff_view,
@@ -140,9 +146,9 @@ def complaint_list(request):
         'current_priority': priority_filter,
         'search_query': search_query,
         'properties': Property.objects.all(),
-        'pending_count': Complaint.objects.filter(status='pending').count(),
-        'in_progress_count': Complaint.objects.filter(status='in_progress').count(),
-        'resolved_count': Complaint.objects.filter(status='resolved').count(),
+        'pending_count': stats_complaints.filter(status='pending').count(),
+        'in_progress_count': stats_complaints.filter(status='in_progress').count(),
+        'resolved_count': stats_complaints.filter(status='resolved').count(),
     }
     return render(request, 'complaints/complaint_list.html', context)
 

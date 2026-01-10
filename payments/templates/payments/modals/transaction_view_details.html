@@ -1,0 +1,204 @@
+<div class="transaction-details">
+  <div class="row mb-3">
+    <div class="col-md-6">
+      <h6 class="text-500 mb-2">Transaction Information</h6>
+      <table class="table table-sm table-borderless">
+        <tr>
+          <td class="text-600" style="width: 40%;">Transaction ID:</td>
+          <td><strong>#{{ transaction.id }}</strong></td>
+        </tr>
+        <tr>
+          <td class="text-600">Status:</td>
+          <td>
+            {% if transaction.status == 'successful' %}
+            <span class="badge bg-success">Successful</span>
+            {% elif transaction.status == 'pending' %}
+            <span class="badge bg-warning">Pending</span>
+            {% elif transaction.status == 'initiated' %}
+            <span class="badge bg-info">Initiated</span>
+            {% elif transaction.status == 'processing' %}
+            <span class="badge bg-primary">Processing</span>
+            {% elif transaction.status == 'failed' %}
+            <span class="badge bg-danger">Failed</span>
+            {% else %}
+            <span class="badge bg-secondary">{{ transaction.status|title }}</span>
+            {% endif %}
+          </td>
+        </tr>
+        <tr>
+          <td class="text-600">Provider:</td>
+          <td>
+            {% if transaction.provider %}
+            <span class="badge bg-info-subtle text-info">{{ transaction.provider.name }}</span>
+            {% else %}
+            <span class="text-muted">N/A</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% if transaction.gateway_transaction_id %}
+        <tr>
+          <td class="text-600">Gateway Transaction ID:</td>
+          <td><code class="text-primary">{{ transaction.gateway_transaction_id }}</code></td>
+        </tr>
+        {% endif %}
+        {% if transaction.azam_reference %}
+        <tr>
+          <td class="text-600">AZAM Reference:</td>
+          <td><code class="text-info">{{ transaction.azam_reference }}</code></td>
+        </tr>
+        {% endif %}
+        {% if transaction.selcom_reference %}
+        <tr>
+          <td class="text-600">SELCOM Reference:</td>
+          <td><code class="text-secondary">{{ transaction.selcom_reference }}</code></td>
+        </tr>
+        {% endif %}
+        <tr>
+          <td class="text-600">Created:</td>
+          <td>{{ transaction.created_at|date:"M d, Y H:i:s" }}</td>
+        </tr>
+        <tr>
+          <td class="text-600">Last Updated:</td>
+          <td>{{ transaction.updated_at|date:"M d, Y H:i:s" }}</td>
+        </tr>
+      </table>
+    </div>
+    <div class="col-md-6">
+      <h6 class="text-500 mb-2">Payment Information</h6>
+      <table class="table table-sm table-borderless">
+        <tr>
+          <td class="text-600" style="width: 40%;">Payment ID:</td>
+          <td>
+            <a href="#" class="text-decoration-none" onclick="viewPayment({{ transaction.payment.id }}); return false;">
+              <strong>#{{ transaction.payment.id }}</strong>
+            </a>
+          </td>
+        </tr>
+        <tr>
+          <td class="text-600">Amount:</td>
+          <td><strong class="text-success">Tsh{{ transaction.payment.amount|floatformat:2 }}</strong></td>
+        </tr>
+        <tr>
+          <td class="text-600">Payment Status:</td>
+          <td>
+            {% if transaction.payment.status == 'completed' %}
+            <span class="badge bg-success">{{ transaction.payment.get_status_display }}</span>
+            {% elif transaction.payment.status == 'pending' %}
+            <span class="badge bg-warning">{{ transaction.payment.get_status_display }}</span>
+            {% elif transaction.payment.status == 'failed' %}
+            <span class="badge bg-danger">{{ transaction.payment.get_status_display }}</span>
+            {% else %}
+            <span class="badge bg-secondary">{{ transaction.payment.get_status_display }}</span>
+            {% endif %}
+          </td>
+        </tr>
+        <tr>
+          <td class="text-600">Payment Method:</td>
+          <td>{{ transaction.payment.get_payment_method_display }}</td>
+        </tr>
+        {% if transaction.payment.transaction_ref %}
+        <tr>
+          <td class="text-600">Payment Ref:</td>
+          <td><code>{{ transaction.payment.transaction_ref }}</code></td>
+        </tr>
+        {% endif %}
+      </table>
+    </div>
+  </div>
+  
+  <div class="row mb-3">
+    <div class="col-12">
+      <h6 class="text-500 mb-2">Tenant Information</h6>
+      <table class="table table-sm table-borderless">
+        <tr>
+          <td class="text-600" style="width: 20%;">Name:</td>
+          <td><strong>{{ transaction.payment.tenant.get_full_name|default:transaction.payment.tenant.username }}</strong></td>
+        </tr>
+        <tr>
+          <td class="text-600">Email:</td>
+          <td>{{ transaction.payment.tenant.email|default:"N/A" }}</td>
+        </tr>
+        <tr>
+          <td class="text-600">Username:</td>
+          <td>{{ transaction.payment.tenant.username }}</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+  
+  {% if request_payload_formatted or response_payload_formatted %}
+  <div class="row">
+    <div class="col-12">
+      <h6 class="text-500 mb-2">API Payloads</h6>
+      
+      {% if request_payload_formatted %}
+      <div class="mb-3">
+        <label class="form-label fw-bold">Request Payload:</label>
+        <pre class="bg-light p-3 rounded" style="max-height: 200px; overflow-y: auto; font-size: 0.85rem;"><code>{{ request_payload_formatted }}</code></pre>
+      </div>
+      {% endif %}
+      
+      {% if response_payload_formatted %}
+      <div class="mb-3">
+        <label class="form-label fw-bold">Response Payload:</label>
+        <pre class="bg-light p-3 rounded" style="max-height: 200px; overflow-y: auto; font-size: 0.85rem;"><code>{{ response_payload_formatted }}</code></pre>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+  
+  {% if transaction.payment.invoice %}
+  <div class="row mt-3">
+    <div class="col-12">
+      <h6 class="text-500 mb-2">Invoice Information</h6>
+      <table class="table table-sm table-borderless">
+        <tr>
+          <td class="text-600" style="width: 20%;">Invoice ID:</td>
+          <td><strong>#{{ transaction.payment.invoice.id }}</strong></td>
+        </tr>
+        <tr>
+          <td class="text-600">Invoice Amount:</td>
+          <td><strong>Tsh{{ transaction.payment.invoice.amount|floatformat:2 }}</strong></td>
+        </tr>
+        <tr>
+          <td class="text-600">Due Date:</td>
+          <td>{{ transaction.payment.invoice.due_date|date:"M d, Y" }}</td>
+        </tr>
+        <tr>
+          <td class="text-600">Invoice Status:</td>
+          <td>
+            {% if transaction.payment.invoice.status == 'paid' %}
+            <span class="badge bg-success">Paid</span>
+            {% else %}
+            <span class="badge bg-warning">Unpaid</span>
+            {% endif %}
+          </td>
+        </tr>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+  
+  <div class="row mt-3">
+    <div class="col-12">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <small class="text-muted">Transaction created: {{ transaction.created_at|date:"M d, Y H:i:s" }}</small>
+        </div>
+        {% if transaction.updated_at != transaction.created_at %}
+        <div>
+          <small class="text-muted">Last updated: {{ transaction.updated_at|date:"M d, Y H:i:s" }}</small>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.transaction-details pre code {
+  color: #333;
+  background: transparent;
+}
+</style>

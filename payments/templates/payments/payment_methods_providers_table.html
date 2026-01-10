@@ -1,0 +1,137 @@
+<!-- AJAX Payment Providers Table Content -->
+<div class="table-responsive">
+  <table class="table table-sm table-hover mb-0">
+    <thead class="bg-200">
+      <tr>
+        <th class="border-0">Provider</th>
+        <th class="border-0">Type</th>
+        <th class="border-0">Status</th>
+        <th class="border-0">Transaction Fee</th>
+        <th class="border-0">Last Used</th>
+        <th class="border-0">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for provider in provider_page_obj %}
+      <tr>
+        <td>
+          <div class="d-flex align-items-center">
+            <div class="bg-200 rounded me-3 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+              <span class="fas fa-credit-card text-600"></span>
+            </div>
+            <div>
+              <h6 class="mb-0">{{ provider.name }}</h6>
+              <small class="text-600">{{ provider.description|default:"Payment provider"|truncatechars:50 }}</small>
+            </div>
+          </div>
+        </td>
+        <td>
+          <span class="badge bg-info-subtle text-info">{{ provider.get_provider_type_display }}</span>
+        </td>
+        <td>
+          {% if provider.is_active %}
+          <span class="badge bg-success-subtle text-success">
+            <span class="fas fa-check-circle me-1"></span>
+            Active
+          </span>
+          {% else %}
+          <span class="badge bg-danger-subtle text-danger">
+            <span class="fas fa-times-circle me-1"></span>
+            Inactive
+          </span>
+          {% endif %}
+        </td>
+        <td>
+          <span class="fw-bold">{{ provider.transaction_fee }}%</span>
+        </td>
+        <td>
+          <span class="text-600">{{ provider.updated_at|date:"M j, Y" }}</span>
+        </td>
+        <td>
+          <div class="dropdown">
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="fas fa-ellipsis-v"></i>
+            </button>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="#" onclick="viewProvider({{ provider.id }}); return false;">
+                <i class="fas fa-eye me-2"></i>View Details
+              </a></li>
+              <li><a class="dropdown-item" href="#" onclick="editProvider({{ provider.id }}); return false;">
+                <i class="fas fa-edit me-2"></i>Edit Settings
+              </a></li>
+              <li><hr class="dropdown-divider"></li>
+              {% if provider.is_active %}
+              <li><a class="dropdown-item text-warning" href="#" onclick="toggleProviderStatus({{ provider.id }}); return false;">
+                <i class="fas fa-pause me-2"></i>Disable
+              </a></li>
+              {% else %}
+              <li><a class="dropdown-item text-success" href="#" onclick="toggleProviderStatus({{ provider.id }}); return false;">
+                <i class="fas fa-play me-2"></i>Enable
+              </a></li>
+              {% endif %}
+            </ul>
+          </div>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="6" class="text-center py-4">
+          <div class="text-600">
+            <span class="fas fa-credit-card fs-3 mb-3 d-block"></span>
+            <p class="mb-0">No payment providers found</p>
+            <small>Add your first payment provider to get started</small>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Pagination -->
+{% if provider_page_obj.has_other_pages %}
+<div class="card-footer bg-white border-0 py-3">
+  <div class="row align-items-center">
+    <div class="col-md-6">
+      <div class="text-muted">
+        Showing {{ provider_page_obj.start_index }} to {{ provider_page_obj.end_index }} of {{ provider_page_obj.paginator.count }} entries
+      </div>
+    </div>
+    <div class="col-md-6">
+      <nav aria-label="Page navigation" class="d-flex justify-content-end">
+        <ul class="pagination pagination-sm mb-0">
+          {% if provider_page_obj.has_previous %}
+          <li class="page-item">
+            <a class="page-link" href="#" onclick="loadProvidersPage(1); return false;" title="First Page">
+              <i class="fas fa-angle-double-left"></i>
+            </a>
+          </li>
+          <li class="page-item">
+            <a class="page-link" href="#" onclick="loadProvidersPage({{ provider_page_obj.previous_page_number }}); return false;" title="Previous Page">
+              <i class="fas fa-angle-left"></i>
+            </a>
+          </li>
+          {% endif %}
+          
+          <li class="page-item active">
+            <span class="page-link">Page {{ provider_page_obj.number }} of {{ provider_page_obj.paginator.num_pages }}</span>
+          </li>
+          
+          {% if provider_page_obj.has_next %}
+          <li class="page-item">
+            <a class="page-link" href="#" onclick="loadProvidersPage({{ provider_page_obj.next_page_number }}); return false;" title="Next Page">
+              <i class="fas fa-angle-right"></i>
+            </a>
+          </li>
+          <li class="page-item">
+            <a class="page-link" href="#" onclick="loadProvidersPage({{ provider_page_obj.paginator.num_pages }}); return false;" title="Last Page">
+              <i class="fas fa-angle-double-right"></i>
+            </a>
+          </li>
+          {% endif %}
+        </ul>
+      </nav>
+    </div>
+  </div>
+</div>
+{% endif %}

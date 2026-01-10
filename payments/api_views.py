@@ -8,16 +8,34 @@ from django.utils import timezone
 from . import models, serializers
 from .gateway_service import PaymentGatewayService
 from django.shortcuts import get_object_or_404
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 import json
 
 
 class PaymentProviderViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    API ViewSet for Payment Providers (Read-only)
+    
+    list: Get all payment providers
+    retrieve: Get a specific payment provider
+    """
     queryset = models.PaymentProvider.objects.all()
     serializer_class = serializers.PaymentProviderSerializer
     permission_classes = [permissions.IsAuthenticated]
 
 
 class InvoiceViewSet(viewsets.ModelViewSet):
+    """
+    API ViewSet for Invoice management
+    
+    list: Get all invoices (filtered by user role)
+    retrieve: Get a specific invoice
+    create: Create a new invoice
+    update: Update an invoice
+    partial_update: Partially update an invoice
+    destroy: Delete an invoice
+    """
     queryset = models.Invoice.objects.all()
     serializer_class = serializers.InvoiceSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -35,6 +53,16 @@ class InvoiceViewSet(viewsets.ModelViewSet):
 
 
 class PaymentViewSet(viewsets.ModelViewSet):
+    """
+    API ViewSet for Payment management
+    
+    list: Get all payments (filtered by user role)
+    retrieve: Get a specific payment
+    create: Create a new payment
+    update: Update a payment
+    partial_update: Partially update a payment
+    destroy: Delete a payment
+    """
     queryset = models.Payment.objects.all()
     serializer_class = serializers.PaymentSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -49,6 +77,24 @@ class PaymentViewSet(viewsets.ModelViewSet):
             return super().get_queryset()
         return self.queryset.filter(tenant=user)
 
+    @swagger_auto_schema(
+        method='post',
+        operation_description="Initiate a payment transaction for a payment record. Creates a PaymentTransaction and returns transaction details.",
+        operation_summary="Initiate Payment Transaction",
+        tags=['Payments'],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'request_payload': openapi.Schema(type=openapi.TYPE_OBJECT, description='Additional request payload')
+            }
+        ),
+        responses={
+            201: serializers.PaymentTransactionSerializer,
+            404: "Payment not found",
+            401: "Authentication required"
+        },
+        security=[{'Bearer': []}]
+    )
     @action(detail=True, methods=['post'])
     def initiate(self, request, pk=None):
         """Initiate a payment transaction for a payment record."""
@@ -65,6 +111,16 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
 
 class PaymentTransactionViewSet(viewsets.ModelViewSet):
+    """
+    API ViewSet for Payment Transaction management
+    
+    list: Get all payment transactions (filtered by user role)
+    retrieve: Get a specific payment transaction
+    create: Create a new payment transaction
+    update: Update a payment transaction
+    partial_update: Partially update a payment transaction
+    destroy: Delete a payment transaction
+    """
     queryset = models.PaymentTransaction.objects.all()
     serializer_class = serializers.PaymentTransactionSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -82,6 +138,12 @@ class PaymentTransactionViewSet(viewsets.ModelViewSet):
 
 
 class PaymentAuditViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    API ViewSet for Payment Audit logs (Read-only)
+    
+    list: Get all payment audit logs (filtered by user role)
+    retrieve: Get a specific payment audit log
+    """
     queryset = models.PaymentAudit.objects.all()
     serializer_class = serializers.PaymentAuditSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -98,6 +160,16 @@ class PaymentAuditViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class ExpenseViewSet(viewsets.ModelViewSet):
+    """
+    API ViewSet for Expense management
+    
+    list: Get all expenses (filtered by user role - owners see their properties' expenses)
+    retrieve: Get a specific expense
+    create: Create a new expense
+    update: Update an expense
+    partial_update: Partially update an expense
+    destroy: Delete an expense
+    """
     queryset = models.Expense.objects.all()
     serializer_class = serializers.ExpenseSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -120,47 +192,41 @@ class ExpenseViewSet(viewsets.ModelViewSet):
 @csrf_exempt
 def azam_pay_webhook(request):
     """
-    Webhook endpoint for AZAM Pay payment notifications
+    Webhook/Callback endpoint for AZAM Pay payment notifications
     
-    This endpoint receives payment status updates from AZAM Pay.
-    It verifies the webhook signature and updates payment records.
+    This endpoint receives payment status updates from AZAM Pay via callback URL.
+    According to AzamPay technical support, signature validation is not applicable in this flow.
     
     Flow:
-    1. AZAM Pay sends webhook after payment completion
-    2. Verify webhook signature
-    3. Parse webhook payload
-    4. Update PaymentTransaction status
-    5. Update Payment status
-    6. Update RentInvoice if applicable
+    1. AZAM Pay sends callback after payment completion
+    2. Parse callback payload
+    3. Update PaymentTransaction status
+    4. Update Payment status
+    5. Update RentInvoice/Booking if applicable
+    
+    Note: Signature validation has been removed per AzamPay technical support instructions.
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
-        # Get raw body for signature verification
-        raw_body = request.body
-        
-        # Get signature from headers
-        # AZAM Pay typically sends signature in X-Signature or X-Azam-Pay-Signature header
-        signature = (
-            request.headers.get('X-Signature') or
-            request.headers.get('X-Azam-Pay-Signature') or
-            request.headers.get('X-Webhook-Signature') or
-            request.headers.get('Authorization')
-        )
-        
-        # Verify webhook signature
-        if not PaymentGatewayService.verify_webhook_signature(
-            payload=raw_body,
-            signature=signature,
-            provider_name='azam pay'
-        ):
-            return JsonResponse({
-                'error': 'Invalid webhook signature'
-            }, status=400)
+        # Log incoming webhook for debugging
+        logger.info("AzamPay webhook received")
+        logger.info(f"Headers: {dict(request.headers)}")
         
         # Parse webhook payload
         try:
-            payload = json.loads(raw_body.decode('utf-8'))
-        except:
+            raw_body = request.body
+            if raw_body:
+                payload = json.loads(raw_body.decode('utf-8'))
+            else:
+                payload = request.data
+            logger.info(f"Webhook payload: {payload}")
+        except Exception as e:
+            logger.warning(f"Failed to parse JSON body, trying request.data: {str(e)}")
             payload = request.data
+            if not payload:
+                payload = {}
         
         # Parse webhook data
         webhook_data = PaymentGatewayService.parse_webhook_payload(
@@ -168,65 +234,230 @@ def azam_pay_webhook(request):
             provider_name='azam pay'
         )
         
+        logger.info(f"Parsed webhook data: {webhook_data}")
+        
+        # Always try direct extraction from payload as fallback/override
+        # AzamPay sends: transid, transactionstatus, utilityref, etc.
+        if isinstance(payload, dict):
+            # Override with direct extraction (more reliable for AzamPay format)
+            direct_data = {
+                'transaction_id': (
+                    payload.get('transid') or  # AzamPay actual field name (PRIORITY)
+                    payload.get('transactionId') or
+                    payload.get('transaction_id') or
+                    payload.get('id') or
+                    payload.get('referenceId') or
+                    payload.get('reference_id') or
+                    payload.get('transId') or
+                    webhook_data.get('transaction_id') if webhook_data else None  # Fallback to parsed
+                ),
+                'reference': (
+                    payload.get('reference') or
+                    payload.get('externalreference') or  # AzamPay field
+                    payload.get('referenceId') or
+                    payload.get('ref') or
+                    payload.get('reference_id') or
+                    webhook_data.get('reference') if webhook_data else None
+                ),
+                'status': (
+                    payload.get('transactionstatus') or  # AzamPay actual field name (PRIORITY)
+                    payload.get('status') or
+                    payload.get('transaction_status') or
+                    webhook_data.get('status') if webhook_data else ''
+                ),
+                'amount': payload.get('amount') or (webhook_data.get('amount') if webhook_data else None),
+                'payment_id': payload.get('payment_id') or payload.get('paymentId') or (webhook_data.get('payment_id') if webhook_data else None),
+                'utilityref': payload.get('utilityref'),  # Store for payment lookup
+            }
+            
+            # Merge with parsed data (direct extraction takes priority)
+            if webhook_data:
+                webhook_data.update(direct_data)
+            else:
+                webhook_data = direct_data
+            
+            logger.info(f"After direct extraction: {webhook_data}")
+        
         if not webhook_data:
+            logger.error(f"Failed to parse webhook payload: {payload}")
             return JsonResponse({
-                'error': 'Failed to parse webhook payload'
+                'error': 'Failed to parse webhook payload',
+                'received_payload': payload
             }, status=400)
         
         # Get payment from metadata or transaction_id
         payment_id = webhook_data.get('payment_id')
         transaction_id = webhook_data.get('transaction_id')
+        utilityref = webhook_data.get('utilityref')  # AzamPay external reference
+        
+        logger.info(f"Looking for payment - payment_id: {payment_id}, transaction_id: {transaction_id}, utilityref: {utilityref}")
+        
+        payment = None
         
         if payment_id:
-            payment = get_object_or_404(models.Payment, id=payment_id)
-        elif transaction_id:
-            # Find payment by transaction ID
+            try:
+                payment = models.Payment.objects.get(id=payment_id)
+                logger.info(f"Found payment by ID: {payment.id}")
+            except models.Payment.DoesNotExist:
+                logger.warning(f"Payment with ID {payment_id} not found")
+        
+        if not payment and transaction_id:
+            # Find payment by transaction ID (gateway_transaction_id)
             transaction = models.PaymentTransaction.objects.filter(
                 gateway_transaction_id=transaction_id
             ).first()
-            if not transaction:
-                return JsonResponse({
-                    'error': 'Transaction not found'
-                }, status=404)
-            payment = transaction.payment
-        else:
+            if transaction:
+                payment = transaction.payment
+                logger.info(f"Found payment by transaction ID: {payment.id}")
+            else:
+                logger.warning(f"Transaction with ID {transaction_id} not found")
+        
+        # Try to find payment by external reference (utilityref)
+        # This matches the externalId used when creating the payment
+        # Format: BOOKING-{booking_reference}-{timestamp} or RENT-{payment_id}-{timestamp}
+        if not payment and utilityref:
+            logger.info(f"Trying to find payment by utilityref: {utilityref}")
+            
+            if utilityref.startswith('BOOKING-'):
+                # Format: BOOKING-HSE-000009-1767956005
+                # Extract booking reference (everything after BOOKING- and before last timestamp)
+                parts = utilityref.split('-')
+                if len(parts) >= 3:
+                    # Try different combinations of booking reference
+                    # Booking reference could be: HSE-000009 or just the number part
+                    booking_ref_variations = [
+                        '-'.join(parts[1:-1]),  # HSE-000009 (all middle parts)
+                        parts[1] + '-' + parts[2] if len(parts) > 2 else parts[1],  # HSE-000009
+                        parts[1],  # Just HSE
+                    ]
+                    
+                    logger.info(f"Trying booking reference variations: {booking_ref_variations}")
+                    
+                    from properties.models import Booking
+                    booking = None
+                    for ref_variant in booking_ref_variations:
+                        booking = Booking.objects.filter(booking_reference__icontains=ref_variant).first()
+                        if booking:
+                            logger.info(f"Found booking with reference containing: {ref_variant}")
+                            break
+                    
+                    # Also try exact match with full reference without timestamp
+                    if not booking and len(parts) >= 3:
+                        booking_ref_full = '-'.join(parts[1:-1])  # Remove BOOKING- prefix and timestamp
+                        booking = Booking.objects.filter(booking_reference=booking_ref_full).first()
+                        if booking:
+                            logger.info(f"Found booking with exact reference: {booking_ref_full}")
+                    
+                    if booking:
+                        # Find the most recent payment linked to this booking
+                        payment = models.Payment.objects.filter(booking=booking).order_by('-created_at').first()
+                        if payment:
+                            logger.info(f"Found payment {payment.id} by booking reference")
+                        else:
+                            logger.warning(f"Booking found but no payment linked to booking {booking.id}")
+            
+            elif utilityref.startswith('RENT-'):
+                # Format: RENT-{payment_id}-{timestamp}
+                # Extract payment ID
+                parts = utilityref.split('-')
+                if len(parts) >= 2:
+                    try:
+                        payment_id_from_ref = int(parts[1])
+                        payment = models.Payment.objects.filter(id=payment_id_from_ref).first()
+                        if payment:
+                            logger.info(f"Found payment {payment.id} from RENT utilityref")
+                    except (ValueError, IndexError):
+                        logger.warning(f"Could not extract payment ID from RENT utilityref: {utilityref}")
+            
+            # Also try to find by azam_reference if it matches
+            if not payment:
+                transaction = models.PaymentTransaction.objects.filter(
+                    azam_reference=utilityref
+                ).first()
+                if transaction:
+                    payment = transaction.payment
+                    logger.info(f"Found payment by azam_reference: {payment.id}")
+            
+            # Also try finding by reference field in transaction
+            if not payment and transaction_id:
+                transaction = models.PaymentTransaction.objects.filter(
+                    azam_reference=transaction_id
+                ).first()
+                if transaction:
+                    payment = transaction.payment
+                    logger.info(f"Found payment by transaction azam_reference: {payment.id}")
+        
+        if not payment:
+            logger.error(f"Could not find payment - payment_id: {payment_id}, transaction_id: {transaction_id}, utilityref: {utilityref}")
+            # Return 200 to prevent webhook retries, but log the error
             return JsonResponse({
-                'error': 'Payment ID or transaction ID required'
-            }, status=400)
+                'error': 'Payment or transaction not found',
+                'payment_id': payment_id,
+                'transaction_id': transaction_id,
+                'utilityref': utilityref,
+                'payload_keys': list(payload.keys()) if isinstance(payload, dict) else []
+            }, status=200)  # Return 200 to prevent retries
         
         # Get or create transaction record
-        transaction = payment.transactions.filter(
-            gateway_transaction_id=transaction_id
-        ).first()
+        # Use transaction_id if available, otherwise use reference
+        lookup_transaction_id = transaction_id or webhook_data.get('reference')
+        
+        transaction = None
+        if lookup_transaction_id:
+            transaction = payment.transactions.filter(
+                gateway_transaction_id=lookup_transaction_id
+            ).first()
         
         if not transaction:
             # Create new transaction if not found
             provider = models.PaymentProvider.objects.filter(name='AZAM Pay').first()
+            if not provider:
+                # Create provider if it doesn't exist
+                provider = models.PaymentProvider.objects.create(
+                    name='AZAM Pay',
+                    provider_type='online',
+                    is_active=True
+                )
+            
             transaction = models.PaymentTransaction.objects.create(
                 payment=payment,
                 provider=provider,
-                gateway_transaction_id=transaction_id,
-                azam_reference=webhook_data.get('reference'),
+                gateway_transaction_id=lookup_transaction_id or webhook_data.get('reference'),
+                azam_reference=webhook_data.get('reference') or lookup_transaction_id,
                 request_payload={},
                 response_payload=payload,
                 status='processing'
             )
+            logger.info(f"Created new transaction record: {transaction.id}")
         
         # Update transaction status
+        # AzamPay uses 'transactionstatus' field with values like 'success'
         webhook_status = webhook_data.get('status', '').lower()
-        if webhook_status in ['successful', 'success', 'completed']:
+        if not webhook_status:
+            # Try to get from payload directly
+            if isinstance(payload, dict):
+                webhook_status = payload.get('transactionstatus', '').lower()
+        
+        logger.info(f"Webhook status: {webhook_status}")
+        
+        if webhook_status in ['successful', 'success', 'completed', 'success']:
             transaction.status = 'successful'
             payment.status = 'completed'
             payment.paid_date = timezone.now().date()
-        elif webhook_status in ['failed', 'failure', 'error']:
+            logger.info(f"Payment {payment.id} marked as completed")
+        elif webhook_status in ['failed', 'failure', 'error', 'fail']:
             transaction.status = 'failed'
             payment.status = 'failed'
+            logger.info(f"Payment {payment.id} marked as failed")
         else:
             transaction.status = 'processing'
+            logger.info(f"Payment {payment.id} status: processing")
         
         transaction.response_payload = payload
+        transaction.gateway_transaction_id = transaction_id or transaction.gateway_transaction_id or webhook_data.get('reference')
         transaction.save()
         payment.save()
+        logger.info(f"Transaction {transaction.id} and Payment {payment.id} updated successfully")
         
         # Update rent invoice if this is a rent payment
         if payment.rent_invoice and payment.status == 'completed':
@@ -239,6 +470,28 @@ def azam_pay_webhook(request):
             if payment.rent_invoice.amount_paid >= payment.rent_invoice.total_amount:
                 payment.rent_invoice.status = 'paid'
             payment.rent_invoice.save()
+        
+        # Update booking if this is a booking payment
+        if payment.booking and payment.status == 'completed':
+            from django.db.models import Sum
+            # Calculate total paid from unified payments
+            total_paid = models.Payment.objects.filter(
+                booking=payment.booking,
+                status__in=['completed', 'successful']
+            ).aggregate(total=Sum('amount'))['total'] or 0
+            
+            # Also include old property payments if they exist
+            from properties.models import Payment as PropertyPayment
+            old_payments_total = PropertyPayment.objects.filter(
+                booking=payment.booking,
+                status='active'
+            ).aggregate(total=Sum('amount'))['total'] or 0
+            
+            total_paid = total_paid + old_payments_total
+            
+            payment.booking.paid_amount = total_paid
+            payment.booking.update_payment_status()
+            payment.booking.save()
         
         return JsonResponse({
             'success': True,

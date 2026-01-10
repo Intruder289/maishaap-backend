@@ -18,9 +18,9 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
                     <h2 class="mb-1">
-                        <i class="fas fa-calendar-check text-primary me-2"></i>Booking Details
+                        <i class="fas fa-calendar-check me-2"></i>Booking Details
                     </h2>
-                    <h4 class="text-primary mb-0">Booking #{{ booking.id }}</h4>
+                    <h4 class="mb-0">Booking #{{ booking.id }}</h4>
                 </div>
                 <div>
                     <a href="{% url 'properties:hotel_bookings' %}" class="btn btn-secondary">
@@ -32,34 +32,34 @@
             <!-- Stay Duration and Payment Calculation -->
             <div class="row mb-4">
                 <div class="col-md-3">
-                    <div class="card bg-primary text-white">
+                    <div class="card">
                         <div class="card-body text-center">
                             <h3 class="mb-0">{{ booking.duration_days }}</h3>
-                            <p class="mb-0">Total Days</p>
+                            <p class="mb-0 text-muted">Total Days</p>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="card bg-info text-white">
+                    <div class="card">
                         <div class="card-body text-center">
                             <h3 class="mb-0">Tsh {{ booking.daily_rate|floatformat:0 }}</h3>
-                            <p class="mb-0">Daily Rate</p>
+                            <p class="mb-0 text-muted">Daily Rate</p>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="card bg-success text-white">
+                    <div class="card">
                         <div class="card-body text-center">
                             <h3 class="mb-0">Tsh {{ booking.calculated_total_amount|floatformat:0 }}</h3>
-                            <p class="mb-0">Calculated Total</p>
+                            <p class="mb-0 text-muted">Calculated Total</p>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="card {% if booking.is_stay_over %}bg-danger{% elif booking.days_remaining <= 1 %}bg-warning{% else %}bg-secondary{% endif %} text-white">
+                    <div class="card">
                         <div class="card-body text-center">
                             <h3 class="mb-0">{{ booking.days_remaining }}</h3>
-                            <p class="mb-0">Days Remaining</p>
+                            <p class="mb-0 text-muted">Days Remaining</p>
                         </div>
                     </div>
                 </div>
@@ -87,7 +87,7 @@
                 <!-- Booking Information -->
                 <div class="col-md-8">
                     <div class="card mb-4">
-                        <div class="card-header bg-primary text-white">
+                        <div class="card-header">
                             <h5 class="mb-0">
                                 <i class="fas fa-info-circle me-2"></i>Booking Information
                             </h5>
@@ -95,7 +95,7 @@
                         <div class="card-body">
                             <div class="row">
                                 <div class="col-md-6">
-                                    <h6 class="text-primary mb-3">Property Details</h6>
+                                    <h6 class="mb-3">Property Details</h6>
                                     <p><strong>Property:</strong> {{ booking.property_obj.title }}</p>
                                     <p><strong>Address:</strong> {{ booking.property_obj.address }}</p>
                                     <p><strong>Property Type:</strong> {{ booking.property_obj.property_type.name }}</p>
@@ -105,7 +105,7 @@
                                     {% endif %}
                                 </div>
                                 <div class="col-md-6">
-                                    <h6 class="text-primary mb-3">Booking Dates</h6>
+                                    <h6 class="mb-3">Booking Dates</h6>
                                     <p><strong>Check-in:</strong> {{ booking.check_in_date|date:"F d, Y" }}</p>
                                     <p><strong>Check-out:</strong> {{ booking.check_out_date|date:"F d, Y" }}</p>
                                     <p><strong>Duration:</strong> Check-in to Check-out</p>
@@ -117,7 +117,7 @@
 
                     <!-- Customer Information -->
                     <div class="card mb-4">
-                        <div class="card-header bg-info text-white">
+                        <div class="card-header">
                             <h5 class="mb-0">
                                 <i class="fas fa-user me-2"></i>Customer Information
                             </h5>
@@ -127,7 +127,7 @@
                                 <div class="col-md-6">
                                     <p><strong>Name:</strong> {{ booking.customer.full_name }}</p>
                                     <p><strong>Email:</strong> {{ booking.customer.email }}</p>
-                                    <p><strong>Phone:</strong> {{ booking.customer.phone_number }}</p>
+                                    <p><strong>Phone:</strong> {{ booking.customer.phone|default:"N/A" }}</p>
                                 </div>
                                 <div class="col-md-6">
                                     <p><strong>Guests:</strong> {{ booking.number_of_guests }} guest{{ booking.number_of_guests|pluralize }}</p>
@@ -146,7 +146,7 @@
                 <!-- Payment Information -->
                 <div class="col-md-4">
                     <div class="card mb-4">
-                        <div class="card-header bg-success text-white">
+                        <div class="card-header">
                             <h5 class="mb-0">
                                 <i class="fas fa-dollar-sign me-2"></i>Payment Summary
                             </h5>
@@ -178,7 +178,7 @@
 
                     <!-- Quick Actions -->
                     <div class="card">
-                        <div class="card-header bg-secondary text-white">
+                        <div class="card-header">
                             <h5 class="mb-0">
                                 <i class="fas fa-cogs me-2"></i>Quick Actions
                             </h5>
@@ -217,7 +217,7 @@
             <div class="row">
                 <div class="col-12">
                     <div class="card">
-                        <div class="card-header bg-warning text-dark">
+                        <div class="card-header">
                             <h5 class="mb-0">
                                 <i class="fas fa-history me-2"></i>Payment History
                             </h5>

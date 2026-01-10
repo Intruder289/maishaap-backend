@@ -1,0 +1,127 @@
+{% load humanize %}
+<!-- AJAX Recent Payments Table Content -->
+<div class="table-responsive">
+  <table class="table table-sm table-striped table-hover mb-0">
+    <thead class="bg-200">
+      <tr>
+        <th class="border-0">Payment</th>
+        <th class="border-0">Amount</th>
+        <th class="border-0">Status</th>
+        <th class="border-0">Date</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for payment in recent_payments.object_list %}
+      <tr>
+        <td>
+          <div class="d-flex align-items-center">
+            <div class="avatar avatar-sm me-3">
+              <div class="avatar-name rounded-circle bg-primary-subtle text-primary">
+                <span class="fw-bold">#{{ payment.id }}</span>
+              </div>
+            </div>
+            <div>
+              <h6 class="mb-0">{{ payment.tenant.get_full_name|default:payment.tenant.username }}</h6>
+              {% if payment.transaction_ref %}
+              <small class="text-600">Ref: {{ payment.transaction_ref }}</small>
+              {% endif %}
+            </div>
+          </div>
+        </td>
+        <td>
+          <span class="fw-bold text-success">Tsh{{ payment.amount|floatformat:2 }}</span>
+        </td>
+        <td>
+          {% if payment.status == 'completed' %}
+          <span class="badge bg-success-subtle text-success">
+            <span class="fas fa-check me-1"></span>
+            Completed
+          </span>
+          {% elif payment.status == 'pending' %}
+          <span class="badge bg-warning-subtle text-warning">
+            <span class="fas fa-clock me-1"></span>
+            Pending
+          </span>
+          {% else %}
+          <span class="badge bg-secondary-subtle text-secondary">
+            {{ payment.get_status_display }}
+          </span>
+          {% endif %}
+        </td>
+        <td>
+          <div class="d-flex flex-column">
+            <span class="fw-bold">{{ payment.created_at|naturalday }}</span>
+            <small class="text-600">{{ payment.created_at|time:"H:i" }}</small>
+          </div>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="4" class="text-center py-4">
+          <div class="text-muted">
+            <i class="fas fa-credit-card fa-2x mb-3"></i>
+            <p>No recent payments found.</p>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Pagination -->
+{% if recent_payments.has_other_pages %}
+<div class="card-footer bg-white border-0 py-2">
+  <div class="row align-items-center">
+    <div class="col-md-6">
+      <div class="text-muted small">
+        Showing {{ recent_payments.start_index }} to {{ recent_payments.end_index }} of {{ recent_payments.paginator.count }} entries
+      </div>
+    </div>
+    <div class="col-md-6">
+      <nav aria-label="Page navigation" class="d-flex justify-content-end">
+        <ul class="pagination pagination-sm mb-0">
+          {% if recent_payments.has_previous %}
+          <li class="page-item">
+            <a class="page-link" href="#" onclick="loadRecentPaymentsPage(1); return false;" title="First Page">
+              <i class="fas fa-angle-double-left"></i>
+            </a>
+          </li>
+          <li class="page-item">
+            <a class="page-link" href="#" onclick="loadRecentPaymentsPage({{ recent_payments.previous_page_number }}); return false;" title="Previous Page">
+              <i class="fas fa-angle-left"></i>
+            </a>
+          </li>
+          {% endif %}
+
+          <!-- Page numbers -->
+          {% for num in recent_payments.paginator.page_range %}
+            {% if recent_payments.number == num %}
+            <li class="page-item active">
+              <span class="page-link">{{ num }}</span>
+            </li>
+            {% elif num > recent_payments.number|add:'-2' and num < recent_payments.number|add:'2' %}
+            <li class="page-item">
+              <a class="page-link" href="#" onclick="loadRecentPaymentsPage({{ num }}); return false;">{{ num }}</a>
+            </li>
+            {% endif %}
+          {% endfor %}
+
+          {% if recent_payments.has_next %}
+          <li class="page-item">
+            <a class="page-link" href="#" onclick="loadRecentPaymentsPage({{ recent_payments.next_page_number }}); return false;" title="Next Page">
+              <i class="fas fa-angle-right"></i>
+            </a>
+          </li>
+          <li class="page-item">
+            <a class="page-link" href="#" onclick="loadRecentPaymentsPage({{ recent_payments.paginator.num_pages }}); return false;" title="Last Page">
+              <i class="fas fa-angle-double-right"></i>
+            </a>
+          </li>
+          {% endif %}
+        </ul>
+      </nav>
+    </div>
+  </div>
+</div>
+{% endif %}

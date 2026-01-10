@@ -26,6 +26,7 @@ urlpatterns = [
     
     # AJAX endpoints
     path('toggle-favorite/<int:pk>/', views.toggle_favorite, name='toggle_favorite'),
+    path('geocode-address/', views.geocode_property_address, name='geocode_address'),
     
     # Management views
     path('manage/regions/', views.manage_regions, name='manage_regions'),
@@ -71,6 +72,7 @@ urlpatterns = [
     
     # Payment Management
     path('bookings/<int:booking_id>/payment/', views.create_payment, name='create_payment'),
+    path('payments/<int:payment_id>/record/', views.create_payment, {'booking_id': None}, name='create_visit_payment'),
     path('bookings/<int:pk>/', views.booking_detail, name='booking_detail'),
     
     # Payment API endpoints
@@ -127,6 +129,9 @@ urlpatterns = [
     path('house/rent-reminders/analytics/', views.house_rent_reminder_analytics, name='house_rent_reminder_analytics'),
     path('house/rent-reminders/send-manual/', views.send_manual_reminder, name='send_manual_reminder'),
     path('house/rent-reminders/cancel/', views.cancel_reminder, name='cancel_reminder'),
+    
+    # Property availability API endpoint
+    path('api/property/<int:property_id>/availability/', views.api_property_availability, name='api_property_availability'),
     
     # Booking API endpoints for modals
     path('api/booking/<int:booking_id>/details/', views.api_booking_details, name='api_booking_details'),

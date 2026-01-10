@@ -4,11 +4,25 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from .models import MaintenanceRequest
 from .serializers import MaintenanceRequestSerializer
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 
 
 class MaintenanceRequestViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for maintenance requests
+    API ViewSet for Maintenance Request management
+    
+    list: Get all maintenance requests (filtered by user role)
+    retrieve: Get a specific maintenance request
+    create: Create a new maintenance request
+    update: Update a maintenance request
+    partial_update: Partially update a maintenance request
+    destroy: Delete a maintenance request
+    
+    MULTI-TENANCY: Data isolation based on user role
+    - Property owners see maintenance requests for their properties
+    - Tenants see only their own maintenance requests
+    - Admins/staff see all maintenance requests
     """
     queryset = MaintenanceRequest.objects.all()
     serializer_class = MaintenanceRequestSerializer

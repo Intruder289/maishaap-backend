@@ -1,0 +1,278 @@
+{% extends 'accounts/base.html' %}
+{% load static %}
+
+{% block title %}Payment Transactions{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-12">
+      <div class="card mb-3">
+        <div class="card-header bg-light">
+          <div class="row flex-between-center">
+            <div class="col-auto">
+              <h5 class="mb-0">Payment Transactions</h5>
+              <p class="text-600 mb-0">View all payment gateway transactions</p>
+            </div>
+            <div class="col-auto">
+              <div class="d-flex gap-2">
+                <span class="badge bg-primary">{{ total_transactions }} Total</span>
+                <span class="badge bg-success">{{ successful_transactions }} Successful</span>
+                <span class="badge bg-warning">{{ pending_transactions }} Pending</span>
+                <span class="badge bg-danger">{{ failed_transactions }} Failed</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card-body">
+          <!-- Filters -->
+          <div class="mb-3">
+            <div class="row g-2">
+              <div class="col-md-3">
+                <input type="text" id="transactions-search-input" class="form-control" placeholder="Search..." value="{{ search_query|default:'' }}">
+              </div>
+              <div class="col-md-2">
+                <select id="transactions-status-filter" class="form-select">
+                  <option value="">All Status</option>
+                  {% for value, label in status_choices %}
+                  <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-2">
+                <select id="transactions-provider-filter" class="form-select">
+                  <option value="">All Providers</option>
+                  {% for provider in providers %}
+                  <option value="{{ provider.id }}" {% if provider_filter == provider.id|stringformat:"s" %}selected{% endif %}>{{ provider.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-2">
+                <button type="button" class="btn btn-primary w-100" onclick="loadTransactionsTable(1)">Filter</button>
+              </div>
+              <div class="col-md-2">
+                <button type="button" class="btn btn-outline-secondary w-100" onclick="clearTransactionsFilters()">Clear</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Transactions Table -->
+          <div id="transactions-table-container">
+            {% include 'payments/payment_transactions_table.html' %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Wait for jQuery
+function waitForJQuery() {
+    if (typeof $ !== 'undefined') {
+        initializeTransactions();
+    } else {
+        setTimeout(waitForJQuery, 100);
+    }
+}
+
+function initializeTransactions() {
+    // AJAX function to load transactions table
+    function loadTransactionsTable(page = 1) {
+        var search = $('#transactions-search-input').val() || '';
+        var status = $('#transactions-status-filter').val() || '';
+        var provider = $('#transactions-provider-filter').val() || '';
+        
+        $('#transactions-table-container').html('<div class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">Loading...</p></div>');
+        
+        $.ajax({
+            url: '{% url "payments:payment_transactions" %}',
+            type: 'GET',
+            data: {
+                'search': search,
+                'status': status,
+                'provider': provider,
+                'page': page
+            },
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(data) {
+                $('#transactions-table-container').html(data);
+            },
+            error: function(xhr, status, error) {
+                $('#transactions-table-container').html('<div class="text-center py-5"><p class="text-danger">Error loading data: ' + error + '</p></div>');
+            }
+        });
+    }
+    
+    // Search input handler
+    var searchTimeout;
+    $('#transactions-search-input').on('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(function() {
+            loadTransactionsTable(1);
+        }, 500);
+    });
+    
+    // Filter change handlers
+    $('#transactions-status-filter').on('change', function() {
+        loadTransactionsTable(1);
+    });
+    
+    $('#transactions-provider-filter').on('change', function() {
+        loadTransactionsTable(1);
+    });
+    
+    // Global pagination function
+    window.loadTransactionsPage = function(page) {
+        loadTransactionsTable(page);
+    };
+    
+    // Clear filters function
+    window.clearTransactionsFilters = function() {
+        $('#transactions-search-input').val('');
+        $('#transactions-status-filter').val('');
+        $('#transactions-provider-filter').val('');
+        loadTransactionsTable(1);
+    };
+}
+
+// Transaction Action Functions
+function viewTransaction(transactionId) {
+    $.get('/payments/api/transaction/' + transactionId + '/view-details/', function(data) {
+        if ($('#transactionViewModal').length === 0) {
+            $('body').append('<div class="modal fade" id="transactionViewModal" tabindex="-1"><div class="modal-dialog modal-xl"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Transaction Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="transactionViewContent"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>');
+        }
+        $('#transactionViewContent').html(data);
+        $('#transactionViewModal').modal('show');
+    }).fail(function() {
+        alert('Failed to load transaction details.');
+    });
+}
+
+function verifyTransaction(transactionId) {
+    if (!confirm('Verify transaction status with payment gateway?')) return;
+    
+    // Find the button that was clicked
+    var btn = null;
+    var originalText = '';
+    
+    // Try to find the button from the event or by searching
+    if (typeof event !== 'undefined' && event.target) {
+        btn = $(event.target).closest('.dropdown-item')[0];
+    }
+    
+    if (btn) {
+        originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Verifying...';
+        btn.style.pointerEvents = 'none';
+    }
+    
+    // Show loading indicator
+    var loadingMsg = $('<div class="alert alert-info"><i class="fas fa-spinner fa-spin me-2"></i>Verifying transaction with payment gateway...</div>');
+    if ($('#transactions-table-container').length) {
+        $('#transactions-table-container').prepend(loadingMsg);
+    }
+    
+    $.ajax({
+        url: '/payments/api/transaction/' + transactionId + '/verify/',
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val() || $('meta[name=csrf-token]').attr('content') || getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        success: function(response) {
+            loadingMsg.remove();
+            if (response.success) {
+                // Show success message with more details
+                var message = 'Transaction verified successfully!\n\n';
+                message += 'Transaction Status: ' + response.status + '\n';
+                message += 'Payment Status: ' + response.payment_status + '\n';
+                if (response.verification_result && response.verification_result.reference) {
+                    message += 'Reference: ' + response.verification_result.reference;
+                }
+                
+                // Use a better notification method if available
+                if (typeof toastr !== 'undefined') {
+                    toastr.success(message.replace(/\n/g, '<br>'));
+                } else {
+                    alert(message);
+                }
+                
+                // Reload the table to show updated status
+                if (typeof loadTransactionsTable === 'function') {
+                    loadTransactionsTable(1);
+                } else {
+                    location.reload();
+                }
+            } else {
+                var errorMsg = 'Verification failed: ' + (response.message || 'Unknown error');
+                if (typeof toastr !== 'undefined') {
+                    toastr.error(errorMsg);
+                } else {
+                    alert(errorMsg);
+                }
+            }
+        },
+        error: function(xhr) {
+            loadingMsg.remove();
+            var errorMsg = 'Failed to verify transaction';
+            if (xhr.responseJSON && xhr.responseJSON.message) {
+                errorMsg = xhr.responseJSON.message;
+            } else if (xhr.status === 403) {
+                errorMsg = 'Permission denied. Please ensure you have the correct permissions.';
+            } else if (xhr.status === 404) {
+                errorMsg = 'Transaction not found.';
+            } else if (xhr.status === 500) {
+                errorMsg = 'Server error. Please try again later.';
+            }
+            
+            if (typeof toastr !== 'undefined') {
+                toastr.error(errorMsg);
+            } else {
+                alert(errorMsg);
+            }
+        },
+        complete: function() {
+            if (btn) {
+                btn.innerHTML = originalText;
+                btn.style.pointerEvents = '';
+            }
+        }
+    });
+}
+
+// Helper function to get CSRF token from cookies
+function getCookie(name) {
+    var cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        var cookies = document.cookie.split(';');
+        for (var i = 0; i < cookies.length; i++) {
+            var cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Payment Action Functions (reuse from dashboard)
+function viewPayment(paymentId) {
+    $.get('/payments/api/payment/' + paymentId + '/view-details/', function(data) {
+        if ($('#paymentViewModal').length === 0) {
+            $('body').append('<div class="modal fade" id="paymentViewModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Payment Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="paymentViewContent"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>');
+        }
+        $('#paymentViewContent').html(data);
+        $('#paymentViewModal').modal('show');
+    }).fail(function() {
+        alert('Failed to load payment details.');
+    });
+}
+
+// Start initialization
+waitForJQuery();
+</script>
+{% endblock %}

@@ -93,7 +93,10 @@ def get_dashboard_stats(user):
     month_ago = now - timedelta(days=30)
     
     # Check if user has permission to view properties
+    # For admin/staff users, always show stats regardless of navigation permissions
+    # This ensures superusers and staff can always see dashboard stats
     has_property_permission = (user.is_superuser or 
+                              user.is_staff or
                               user_has_navigation_permission(user, 'property_list') or
                               user_has_navigation_permission(user, 'properties') or
                               user_has_navigation_permission(user, 'manage_properties'))
@@ -103,14 +106,33 @@ def get_dashboard_stats(user):
         from properties.models import Property
         if has_property_permission:
             if user.is_staff or user.is_superuser:
-                stats['total_properties'] = Property.objects.exclude(status='unavailable').count()
+                # Admin/staff: count all properties (excluding unavailable)
+                # Use distinct() to avoid any duplicate counting issues
+                all_properties = Property.objects.exclude(status='unavailable')
+                stats['total_properties'] = all_properties.count()
                 stats['available_properties'] = Property.objects.filter(status='available').count()
                 stats['rented_properties'] = Property.objects.filter(status='rented').count()
             else:
-                stats['total_properties'] = Property.objects.filter(owner=user).exclude(status='unavailable').count()
+                # Property owner: only count their own properties
+                owner_properties = Property.objects.filter(owner=user).exclude(status='unavailable')
+                stats['total_properties'] = owner_properties.count()
                 stats['available_properties'] = Property.objects.filter(owner=user, status='available').count()
                 stats['rented_properties'] = Property.objects.filter(owner=user, status='rented').count()
+        else:
+            # Even without explicit permission, if user is staff/superuser, show stats
+            # This is a fallback to ensure admins always see stats
+            if user.is_staff or user.is_superuser:
+                all_properties = Property.objects.exclude(status='unavailable')
+                stats['total_properties'] = all_properties.count()
+                stats['available_properties'] = Property.objects.filter(status='available').count()
+                stats['rented_properties'] = Property.objects.filter(status='rented').count()
     except ImportError:
+        pass
+    except Exception as e:
+        # Log error but don't break dashboard
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error calculating property stats: {str(e)}")
         pass
     
     # Check permissions for different sections
@@ -154,15 +176,19 @@ def get_dashboard_stats(user):
         pass
     
     try:
-        # Monthly revenue from successful payments
+        # Monthly revenue from completed payments
         if has_payment_permission:
             from payments.models import Payment
             payments_query = Payment.objects.filter(
                 created_at__gte=month_start,
-                status='successful'
+                status='completed'  # Payment model uses 'completed' not 'successful'
             )
             if not (user.is_staff or user.is_superuser):
-                payments_query = payments_query.filter(tenant=user)
+                # For property owners, filter by their properties
+                payments_query = payments_query.filter(
+                    Q(booking__property_obj__owner=user) | 
+                    Q(rent_invoice__lease__property_ref__owner=user)
+                )
             
             revenue = payments_query.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
             stats['monthly_revenue'] = revenue
@@ -196,14 +222,32 @@ def get_dashboard_stats(user):
         pass
     
     try:
-        # Pending bookings
+        # Pending bookings - check both Booking models
         if has_booking_permission:
-            from documents.models import Booking
-            bookings_query = Booking.objects.filter(status='pending')
-            if not (user.is_staff or user.is_superuser):
-                bookings_query = bookings_query.filter(property_ref__owner=user)
-            stats['pending_bookings'] = bookings_query.count()
-    except ImportError:
+            pending_count = 0
+            
+            # Check documents.Booking model
+            try:
+                from documents.models import Booking as DocumentBooking
+                doc_bookings_query = DocumentBooking.objects.filter(status='pending')
+                if not (user.is_staff or user.is_superuser):
+                    doc_bookings_query = doc_bookings_query.filter(property_ref__owner=user)
+                pending_count += doc_bookings_query.count()
+            except ImportError:
+                pass
+            
+            # Check properties.Booking model
+            try:
+                from properties.models import Booking as PropertyBooking
+                prop_bookings_query = PropertyBooking.objects.filter(booking_status='pending')
+                if not (user.is_staff or user.is_superuser):
+                    prop_bookings_query = prop_bookings_query.filter(property_obj__owner=user)
+                pending_count += prop_bookings_query.count()
+            except ImportError:
+                pass
+            
+            stats['pending_bookings'] = pending_count
+    except Exception:
         pass
     
     try:

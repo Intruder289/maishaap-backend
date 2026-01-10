@@ -128,8 +128,13 @@
                             <div class="row flex-between-center">
                                 <div class="col">
                                     <h6 class="mb-2">Properties Overview</h6>
-                                    <h5 class="mb-0">Manage and monitor all house properties</h5>
+                                    {% if selected_property %}
+                                        <h5 class="mb-0">Property Details</h5>
+                                    {% else %}
+                                        <h5 class="mb-0">Manage and monitor all house properties</h5>
+                                    {% endif %}
                                 </div>
+                                {% if not selected_property %}
                                 <div class="col-auto">
                                     <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newPropertyModal">
                                         <span class="fas fa-plus me-2"></span>New Property
@@ -138,10 +143,12 @@
                                         <span class="fas fa-times me-2"></span>Clear All
                                     </button>
                                 </div>
+                                {% endif %}
                             </div>
                         </div>
                         
-                        <!-- Search and Filters -->
+                        <!-- Search and Filters (only show when no specific property is selected) -->
+                        {% if not selected_property %}
                         <div class="card-body">
                             <div class="row g-3">
                                 <div class="col-md-4">
@@ -167,6 +174,7 @@
                                 </div>
                             </div>
                         </div>
+                        {% endif %}
                         
                         <div class="card-body p-0">
                             <div class="table-responsive">

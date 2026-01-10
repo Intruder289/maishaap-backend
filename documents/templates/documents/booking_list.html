@@ -1,4 +1,4 @@
-﻿{% extends "accounts/base.html" %}
+{% extends "accounts/base.html" %}
 {% load static %}
 {% load humanize %}
 {% load humanize %}
@@ -65,7 +65,7 @@
                         <td>{{ booking.check_out_date|date:"M d, Y"|default:"N/A" }}</td>
                         <td>
                             <strong>
-                                TZS {{ booking.total_amount|floatformat:0|intcomma|default:"0" }}
+                                Tsh{{ booking.total_amount|floatformat:0|intcomma|default:"0" }}
                             </strong>
                         </td>
                         <td>

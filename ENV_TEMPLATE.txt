@@ -1,0 +1,23 @@
+# AZAM Pay Credentials Template
+# Copy this file to .env in the project root and fill in your actual credentials
+# Get these from: https://sandbox.azampay.co.tz/ (after registering your app)
+# 
+# For Sandbox Mode: You only need CLIENT_ID and CLIENT_SECRET!
+# The code automatically uses Client ID as API Key and Client Secret as Webhook Secret in sandbox.
+
+AZAM_PAY_CLIENT_ID=your_client_id_here
+AZAM_PAY_CLIENT_SECRET=your_client_secret_here
+# Optional in sandbox - code will auto-use Client ID/Secret if not provided
+# AZAM_PAY_API_KEY=your_api_key_here
+# AZAM_PAY_WEBHOOK_SECRET=your_webhook_secret_here
+
+# Optional AZAM Pay Settings
+AZAM_PAY_APP_NAME=Maisha Property Management
+AZAM_PAY_SANDBOX=True
+AZAM_PAY_BASE_URL=https://sandbox.azampay.co.tz
+AZAM_PAY_PRODUCTION_URL=https://api.azampay.co.tz
+AZAM_PAY_VENDOR_ID=your_vendor_id
+AZAM_PAY_MERCHANT_ACCOUNT=your_merchant_account
+
+# Base URL for webhook callbacks (update with your domain)
+BASE_URL=https://yourdomain.com

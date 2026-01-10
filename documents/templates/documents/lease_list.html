@@ -46,7 +46,9 @@
             <div class="stat-info">
                 <h3>{{ lease_list|length|default:0 }}</h3>
                 <p>Total Leases</p>
-                <span class="stat-change positive">+12% this month</span>
+                <span class="stat-change {% if total_leases_change >= 0 %}positive{% else %}negative{% endif %}">
+                    {% if total_leases_change >= 0 %}+{% endif %}{{ total_leases_change }}% this month
+                </span>
             </div>
         </div>
 
@@ -64,7 +66,9 @@
             <div class="stat-info">
                 <h3>{{ active_leases_count|default:0 }}</h3>
                 <p>Active Leases</p>
-                <span class="stat-change positive">+8% this month</span>
+                <span class="stat-change {% if active_leases_change >= 0 %}positive{% else %}negative{% endif %}">
+                    {% if active_leases_change >= 0 %}+{% endif %}{{ active_leases_change }}% this month
+                </span>
             </div>
         </div>
 
@@ -80,9 +84,11 @@
                 </svg>
             </div>
             <div class="stat-info">
-                <h3>3</h3>
+                <h3>{{ expiring_leases_count|default:0 }}</h3>
                 <p>Expiring Soon</p>
-                <span class="stat-change negative">Requires attention</span>
+                <span class="stat-change {% if expiring_leases_count > 0 %}negative{% else %}positive{% endif %}">
+                    {% if expiring_leases_count > 0 %}{{ expiring_leases_count }} lease{{ expiring_leases_count|pluralize }} expiring soon{% else %}No expiring leases{% endif %}
+                </span>
             </div>
         </div>
 
@@ -98,9 +104,11 @@
                 </svg>
             </div>
             <div class="stat-info">
-                <h3>TZS 24.8K</h3>
+                <h3>{{ monthly_revenue_display }}</h3>
                 <p>Monthly Revenue</p>
-                <span class="stat-change positive">+15% this month</span>
+                <span class="stat-change {% if revenue_change >= 0 %}positive{% else %}negative{% endif %}">
+                    {% if revenue_change >= 0 %}+{% endif %}{{ revenue_change }}% this month
+                </span>
             </div>
         </div>
     </div>
@@ -154,7 +162,7 @@
                         <td>{{ lease.end_date|date:"M d, Y"|default:"N/A" }}</td>
                         <td>
                             <strong>
-                                TZS {{ lease.rent_amount|floatformat:0|intcomma|default:"0" }}
+                                Tsh{{ lease.rent_amount|floatformat:0|intcomma|default:"0" }}
                             </strong>
                         </td>
                         <td>
