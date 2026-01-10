@@ -12,21 +12,36 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import os
+from decouple import Csv, RepositoryEnv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Explicitly set .env file location to ensure it's found regardless of working directory
+# This fixes the issue where python-decouple can't find .env when web server runs from different directory
+ENV_FILE = BASE_DIR / '.env'
+
+# Create a config function that explicitly uses the .env file from project root
+if ENV_FILE.exists():
+    _env_repo = RepositoryEnv(str(ENV_FILE))
+    def config(key, default=None, cast=None):
+        """Load config from .env file in project root, regardless of working directory"""
+        return _env_repo(key, default=default, cast=cast)
+else:
+    # Fallback to default behavior if .env doesn't exist
+    from decouple import config
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure--lcr^7cu6oeuae)6&4(*s8h_4e@2aph+104tmjtm%2nt0n0*m6'
+SECRET_KEY = config('SECRET_KEY', default='django-insecure--lcr^7cu6oeuae)6&4(*s8h_4e@2aph+104tmjtm%2nt0n0*m6')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = config('DEBUG', default='True', cast=bool)
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='*', cast=Csv())
 
 # Increase field limit for forms with many fields (e.g., property formsets)
 # Default is 1000, increased significantly for property forms with images and amenities
@@ -101,18 +116,23 @@ WSGI_APPLICATION = 'Maisha_backend.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-    'default':{
+    'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'maishaportal_db',
-        'USER': 'admin',
-        'PASSWORD': 'admin@123',
-        'HOST': 'localhost',
-        'PORT': '5432',
+        'NAME': config('DATABASE_NAME'),
+        'USER': config('DATABASE_USER'),
+        'PASSWORD': config('DATABASE_PASSWORD'),
+        'HOST': config('DATABASE_HOST'),
+        'PORT': config('DATABASE_PORT'),
+        'OPTIONS': {
+            'connect_timeout': 10,
+        },
     }
-
 }
 
-# Database configuration: prefer PostgreSQL via environment variables, fall back to SQLite
+# Database configuration: PostgreSQL "maisha" database only
+# NO SQLite fallback - must use PostgreSQL
+# Database credentials can be set via environment variables:
+# DATABASE_NAME, DATABASE_USER, DATABASE_PASSWORD, DATABASE_HOST, DATABASE_PORT
 
 
 
@@ -426,16 +446,47 @@ LOGGING = {
 # 3. Register your application to get Client ID, Client Secret, and API Key
 # 4. Configure webhook URL in AZAM Pay dashboard
 
-AZAM_PAY_CLIENT_ID = os.environ.get('AZAM_PAY_CLIENT_ID', '')
-AZAM_PAY_CLIENT_SECRET = os.environ.get('AZAM_PAY_CLIENT_SECRET', '')
-AZAM_PAY_API_KEY = os.environ.get('AZAM_PAY_API_KEY', '')
-AZAM_PAY_APP_NAME = os.environ.get('AZAM_PAY_APP_NAME', 'Maisha Property Management')
-AZAM_PAY_SANDBOX = os.environ.get('AZAM_PAY_SANDBOX', 'True').lower() == 'true'
-AZAM_PAY_BASE_URL = os.environ.get('AZAM_PAY_BASE_URL', 'https://sandbox.azampay.co.tz')
-AZAM_PAY_PRODUCTION_URL = os.environ.get('AZAM_PAY_PRODUCTION_URL', 'https://api.azampay.co.tz')
-AZAM_PAY_WEBHOOK_SECRET = os.environ.get('AZAM_PAY_WEBHOOK_SECRET', '')
-AZAM_PAY_VENDOR_ID = os.environ.get('AZAM_PAY_VENDOR_ID', '')
-AZAM_PAY_MERCHANT_ACCOUNT = os.environ.get('AZAM_PAY_MERCHANT_ACCOUNT', '')
+AZAM_PAY_CLIENT_ID = config('AZAM_PAY_CLIENT_ID', default='')
+AZAM_PAY_CLIENT_SECRET = config('AZAM_PAY_CLIENT_SECRET', default='')
+AZAM_PAY_API_KEY = config('AZAM_PAY_API_KEY', default='')
+AZAM_PAY_APP_NAME = config('AZAM_PAY_APP_NAME', default='Maisha Property Management')
+AZAM_PAY_SANDBOX = config('AZAM_PAY_SANDBOX', default='True', cast=bool)
+AZAM_PAY_BASE_URL = config('AZAM_PAY_BASE_URL', default='https://sandbox.azampay.co.tz')
+AZAM_PAY_PRODUCTION_URL = config('AZAM_PAY_PRODUCTION_URL', default='https://api.azampay.co.tz')
+AZAM_PAY_WEBHOOK_SECRET = config('AZAM_PAY_WEBHOOK_SECRET', default='')
+AZAM_PAY_VENDOR_ID = config('AZAM_PAY_VENDOR_ID', default='')
+AZAM_PAY_MERCHANT_ACCOUNT = config('AZAM_PAY_MERCHANT_ACCOUNT', default='')
+# Pre-generated token from AZAMpay dashboard (for sandbox testing)
+# Get this from: Dashboard → Register App → Token field
+AZAM_PAY_TOKEN = config('AZAM_PAY_TOKEN', default='')
+
+# Test phone number for sandbox testing (optional)
+# Use this if customer doesn't have a phone number or for testing
+AZAM_PAY_TEST_PHONE = config('AZAM_PAY_TEST_PHONE', default='255758285812')
 
 # Base URL for webhook callbacks
-BASE_URL = os.environ.get('BASE_URL', 'http://localhost:8000')
+BASE_URL = config('BASE_URL', default='http://localhost:8000')
+
+# AZAMpay Webhook URL (optional - overrides BASE_URL for webhooks)
+# For local testing with ngrok: https://abc123.ngrok.io/api/v1/payments/webhook/azam-pay/
+# For production: https://portal.maishaapp.co.tz/api/v1/payments/webhook/azam-pay/
+AZAM_PAY_WEBHOOK_URL = config('AZAM_PAY_WEBHOOK_URL', default='https://portal.maishaapp.co.tz/api/v1/payments/webhook/azam-pay/')
+
+# =============================================================================
+# SERPAPI CONFIGURATION
+# =============================================================================
+# SerpApi for Google Maps geocoding and search
+# Documentation: https://serpapi.com/
+# 
+# To get API key:
+# 1. Sign up at https://serpapi.com/
+# 2. Get your API key from dashboard
+# 3. Add to .env file: SERPAPI_KEY=your_api_key_here
+# 
+# Plans:
+# - Free: 250 searches/month
+# - Starter: $25/month - 1,000 searches
+# - Developer: $75/month - 5,000 searches
+# - Production: $150/month - 15,000 searches
+
+SERPAPI_KEY = config('SERPAPI_KEY', default='')
