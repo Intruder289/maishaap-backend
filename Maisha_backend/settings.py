@@ -12,7 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import os
-from decouple import Csv, RepositoryEnv
+from decouple import Csv, Config, RepositoryEnv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -23,10 +23,11 @@ ENV_FILE = BASE_DIR / '.env'
 
 # Create a config function that explicitly uses the .env file from project root
 if ENV_FILE.exists():
+    # Use Config with RepositoryEnv to explicitly load from project root
+    # This ensures .env is found even if web server runs from different directory
     _env_repo = RepositoryEnv(str(ENV_FILE))
-    def config(key, default=None, cast=None):
-        """Load config from .env file in project root, regardless of working directory"""
-        return _env_repo(key, default=default, cast=cast)
+    _config_obj = Config(_env_repo)
+    config = _config_obj
 else:
     # Fallback to default behavior if .env doesn't exist
     from decouple import config
@@ -118,11 +119,11 @@ WSGI_APPLICATION = 'Maisha_backend.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('DATABASE_NAME'),
-        'USER': config('DATABASE_USER'),
-        'PASSWORD': config('DATABASE_PASSWORD'),
-        'HOST': config('DATABASE_HOST'),
-        'PORT': config('DATABASE_PORT'),
+        'NAME': config('DATABASE_NAME', default='maisha'),
+        'USER': config('DATABASE_USER', default='postgres'),
+        'PASSWORD': config('DATABASE_PASSWORD', default='alfred'),
+        'HOST': config('DATABASE_HOST', default='localhost'),
+        'PORT': config('DATABASE_PORT', default='5432'),
         'OPTIONS': {
             'connect_timeout': 10,
         },
