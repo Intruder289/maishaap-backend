@@ -50,6 +50,8 @@ class AZAMPayGateway:
         'app_name': getattr(settings, 'AZAM_PAY_APP_NAME', 'Maisha Property Management'),
         'base_url': getattr(settings, 'AZAM_PAY_BASE_URL', 'https://sandbox.azampay.co.tz'),
         'production_url': getattr(settings, 'AZAM_PAY_PRODUCTION_URL', 'https://api.azampay.co.tz'),
+        'checkout_base_url': getattr(settings, 'AZAM_PAY_CHECKOUT_BASE_URL', 'https://checkout.azampay.co.tz'),
+        'authenticator_base_url': getattr(settings, 'AZAM_PAY_AUTHENTICATOR_BASE_URL', 'https://authenticator.azampay.co.tz'),
         'sandbox': _sandbox,
         # In sandbox mode, fallback to Client Secret if Webhook Secret not provided
         'webhook_secret': _webhook_secret or (_client_secret if _sandbox else ''),
@@ -119,7 +121,11 @@ class AZAMPayGateway:
         # According to AZAMpay API spec: https://developerdocs.azampay.co.tz/redoc
         # Endpoint: POST /AppRegistration/GenerateToken
         # Base URL: https://authenticator-sandbox.azampay.co.tz (sandbox) or https://authenticator.azampay.co.tz (production)
-        authenticator_base = "https://authenticator-sandbox.azampay.co.tz" if cls.AZAM_PAY_CONFIG['sandbox'] else "https://authenticator.azampay.co.tz"
+        if cls.AZAM_PAY_CONFIG['sandbox']:
+            authenticator_base = "https://authenticator-sandbox.azampay.co.tz"
+        else:
+            # Use configured authenticator base URL for production
+            authenticator_base = cls.AZAM_PAY_CONFIG.get('authenticator_base_url', 'https://authenticator.azampay.co.tz')
         authenticator_endpoints = [
             "/AppRegistration/GenerateToken",  # ✅ CORRECT - Official token endpoint
         ]
@@ -464,11 +470,17 @@ class AZAMPayGateway:
             else:
                 reference = f"PAY-{payment.id}-{int(timezone.now().timestamp())}"
             
-            # ✅ CORRECT ENDPOINT: Mobile Money Checkout (Sandbox)
+            # ✅ CORRECT ENDPOINT: Mobile Money Checkout
             # Official AZAMpay API endpoint for Mobile Money Operator checkout
             # Documentation: https://developerdocs.azampay.co.tz/redoc
-            # Endpoint: POST /azampay/mno/checkout (NOT /api/v1/azampay/mno/checkout)
-            checkout_url_endpoint = f"{base_url}/azampay/mno/checkout"
+            # Endpoint: POST /azampay/mno/checkout
+            # In production, checkout uses a separate base URL: https://checkout.azampay.co.tz
+            if cls.AZAM_PAY_CONFIG['sandbox']:
+                checkout_base = base_url
+            else:
+                # Production uses separate checkout base URL
+                checkout_base = cls.AZAM_PAY_CONFIG.get('checkout_base_url', 'https://checkout.azampay.co.tz')
+            checkout_url_endpoint = f"{checkout_base}/azampay/mno/checkout"
             
             # Format phone number: Must be exactly 12 digits starting with "2557" (E.164 format for Tanzania)
             # AZAMpay requires: 2557XXXXXXXX (exactly 12 digits, starting with 2557)

@@ -55,7 +55,21 @@
                                 <option value="ballroom">Grand Ballroom</option>
                             </select>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
+                            <label class="form-label">&nbsp;</label>
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" id="showDeletedFilter" {% if show_deleted %}checked{% endif %}>
+                                <label class="form-check-label" for="showDeletedFilter" title="Check this to view soft-deleted bookings">
+                                    Show Deleted Bookings
+                                </label>
+                            </div>
+                            {% if show_deleted %}
+                            <small class="text-muted d-block mt-1">
+                                <i class="fas fa-info-circle"></i> Showing deleted bookings
+                            </small>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-2">
                             <label class="form-label">&nbsp;</label>
                             <div class="d-flex gap-2">
                                 <button class="btn btn-outline-secondary" onclick="clearFilters()">
@@ -95,8 +109,15 @@
                             <tbody>
                                 {% if bookings %}
                                     {% for booking in bookings %}
-                                <tr>
-                                        <td><span class="badge bg-primary">VB{{ booking.id|stringformat:"03d" }}</span></td>
+                                <tr {% if booking.is_deleted %}class="table-secondary opacity-75"{% endif %}>
+                                        <td>
+                                            <span class="badge bg-primary">VB{{ booking.id|stringformat:"03d" }}</span>
+                                            {% if booking.is_deleted %}
+                                            <span class="badge bg-danger ms-1" title="This booking has been soft deleted">
+                                                <i class="fas fa-trash"></i> Deleted
+                                            </span>
+                                            {% endif %}
+                                        </td>
                                     <td>
                                         <div>
                                                 <strong>{{ booking.booking_reference }}</strong><br>
@@ -133,7 +154,13 @@
                                                 <span class="badge bg-secondary">General</span>
                                             {% endif %}
                                         </td>
-                                        <td>Tsh{{ booking.total_amount|floatformat:2 }}</td>
+                                        <td>
+                                            {% if booking.calculated_total_amount and booking.calculated_total_amount > 0 %}
+                                                Tsh {{ booking.calculated_total_amount|floatformat:2 }}
+                                            {% else %}
+                                                Tsh {{ booking.total_amount|floatformat:2 }}
+                                            {% endif %}
+                                        </td>
                                         <td>
                                             {% if booking.booking_status == 'confirmed' %}
                                                 <span class="badge bg-success">Confirmed</span>
@@ -173,6 +200,16 @@
                                                     {% if booking.booking_status not in 'completed,cancelled' %}
                                                         <li><a class="dropdown-item text-danger" href="#" onclick="cancelBooking({{ booking.id }})"><i class="fas fa-times me-2"></i>Cancel</a></li>
                                                     {% endif %}
+                                                    {% if booking.booking_status == 'cancelled' or booking.booking_status == 'checked_out' %}
+                                                        {% if not booking.is_deleted %}
+                                                        <li><hr class="dropdown-divider"></li>
+                                                        <li><a class="dropdown-item text-danger soft-delete-booking-btn" href="javascript:void(0);" data-booking-id="{{ booking.pk }}"><i class="fas fa-trash me-2"></i>Delete</a></li>
+                                                        {% endif %}
+                                                    {% endif %}
+                                                    {% if booking.is_deleted %}
+                                                    <li><hr class="dropdown-divider"></li>
+                                                    <li><a class="dropdown-item text-success restore-booking-btn" href="javascript:void(0);" data-booking-id="{{ booking.pk }}"><i class="fas fa-undo me-2"></i>Restore</a></li>
+                                                    {% endif %}
                                             </ul>
                                         </div>
                                     </td>
@@ -206,35 +243,40 @@
             </div>
             <div class="modal-body">
                 <form id="newBookingForm">
+                    {% csrf_token %}
+                    <div id="venueBookingError" class="alert alert-danger" style="display: none;"></div>
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label">Event Name *</label>
-                            <input type="text" class="form-control" required>
+                            <input type="text" class="form-control" name="event_name" id="eventName" required>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Customer Name *</label>
-                            <input type="text" class="form-control" required>
+                            <input type="text" class="form-control" name="customer_name" id="customerName" required>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Email *</label>
-                            <input type="email" class="form-control" required>
+                            <input type="email" class="form-control" name="email" id="customerEmail" required>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Phone Number *</label>
-                            <input type="tel" class="form-control" required>
+                            <input type="tel" class="form-control" name="phone" id="customerPhone" required>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Venue *</label>
-                            <select class="form-control" required>
+                            <select class="form-control" name="venue" id="venueSelect" required>
                                 <option value="">Select Venue</option>
-                                <option value="conference_a">Conference Hall A (50 capacity)</option>
-                                <option value="conference_b">Conference Hall B (75 capacity)</option>
-                                <option value="ballroom">Grand Ballroom (150 capacity)</option>
+                                {% for venue in venue_properties %}
+                                <option value="{{ venue.id }}" data-capacity="{{ venue.capacity|default:0 }}" data-price="{{ venue.rent_amount|default:0 }}">
+                                    {{ venue.title }} ({{ venue.capacity|default:"N/A" }} capacity) - Tsh{{ venue.rent_amount|floatformat:0 }}/day
+                                </option>
+                                {% endfor %}
                             </select>
+                            <small class="form-text text-muted" id="venueInfo"></small>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Event Type *</label>
-                            <select class="form-control" required>
+                            <select class="form-control" name="event_type" id="eventType" required>
                                 <option value="">Select Type</option>
                                 <option value="conference">Conference</option>
                                 <option value="wedding">Wedding</option>
@@ -246,27 +288,29 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Event Date *</label>
-                            <input type="date" class="form-control" required>
+                            <input type="date" class="form-control" name="event_date" id="eventDate" required>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Start Time *</label>
-                            <input type="time" class="form-control" required>
+                            <input type="time" class="form-control" name="start_time" id="startTime" required>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">End Time *</label>
-                            <input type="time" class="form-control" required>
+                            <input type="time" class="form-control" name="end_time" id="endTime" required>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Expected Guests *</label>
-                            <input type="number" class="form-control" min="1" required>
+                            <input type="number" class="form-control" name="expected_guests" id="expectedGuests" min="1" required>
+                            <small class="form-text text-danger" id="capacityError" style="display: none;"></small>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Total Amount *</label>
-                            <input type="number" class="form-control" step="0.01" required>
+                            <input type="number" class="form-control" name="total_amount" id="totalAmount" step="0.01" readonly required>
+                            <small class="form-text text-muted" id="amountInfo">Amount will be calculated automatically</small>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Setup Required</label>
-                            <select class="form-control">
+                            <select class="form-control" name="setup_required" id="setupRequired">
                                 <option value="basic">Basic Setup</option>
                                 <option value="full">Full Setup</option>
                                 <option value="custom">Custom Setup</option>
@@ -274,14 +318,14 @@
                         </div>
                         <div class="col-12">
                             <label class="form-label">Special Requirements</label>
-                            <textarea class="form-control" rows="3" placeholder="Audio/visual equipment, catering, decorations, etc."></textarea>
+                            <textarea class="form-control" name="special_requirements" id="specialRequirements" rows="3" placeholder="Audio/visual equipment, catering, decorations, etc."></textarea>
                         </div>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary">Create Booking</button>
+                <button type="button" class="btn btn-primary" id="createVenueBookingBtn">Create Booking</button>
             </div>
         </div>
     </div>
@@ -367,12 +411,33 @@
 
 {% block extra_js %}
 <script>
+// Venue booking form variables
+let selectedVenue = null;
+let venuePricePerDay = 0;
+let venueCapacity = 0;
+
 $(document).ready(function() {
     console.log('Venue Bookings page initialized');
+    
+    // Initialize venue booking form handlers
+    initializeVenueBookingForm();
     
     // Filter functionality
     $('#bookingSearch, #statusFilter, #eventDateFilter, #venueFilter').on('change keyup', function() {
         filterBookings();
+    });
+    
+    // Handle show deleted filter checkbox
+    $('#showDeletedFilter').on('change', function() {
+        const url = new URL(window.location.href);
+        // Remove hash if present
+        url.hash = '';
+        if ($(this).is(':checked')) {
+            url.searchParams.set('show_deleted', 'true');
+        } else {
+            url.searchParams.delete('show_deleted');
+        }
+        window.location.href = url.toString();
     });
     
     function filterBookings() {
@@ -524,6 +589,90 @@ function showNotification(message, type = 'info') {
     }, 5000);
 }
 
+// Helper function to get CSRF token
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Soft delete booking
+$(document).on('click', '.soft-delete-booking-btn', function(e) {
+    e.preventDefault();
+    const bookingId = $(this).data('booking-id');
+    
+    if (!confirm('Are you sure you want to delete this booking? It will be hidden from the main list but can be restored later.')) {
+        return;
+    }
+    
+    $.ajax({
+        url: `/properties/api/booking/${bookingId}/soft-delete/`,
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        success: function(response) {
+            if (response.success) {
+                showNotification(response.message || 'Booking deleted successfully. It will be hidden from the list. Check "Show Deleted" to view it.', 'success');
+                setTimeout(function() {
+                    window.location.reload();
+                }, 1500);
+            } else {
+                showNotification(response.error || 'Failed to delete booking', 'error');
+            }
+        },
+        error: function(xhr) {
+            console.error('Error soft deleting booking:', xhr);
+            let errorMsg = 'Failed to delete booking';
+            if (xhr.responseJSON && xhr.responseJSON.error) {
+                errorMsg = xhr.responseJSON.error;
+            } else if (xhr.status === 403) {
+                errorMsg = 'Permission denied. Only admins can delete bookings.';
+            } else if (xhr.status === 400) {
+                errorMsg = xhr.responseJSON?.error || 'Invalid request. Booking may not be eligible for deletion.';
+            }
+            showNotification(errorMsg, 'error');
+        }
+    });
+});
+
+// Restore booking
+$(document).on('click', '.restore-booking-btn', function(e) {
+    e.preventDefault();
+    const bookingId = $(this).data('booking-id');
+    
+    $.ajax({
+        url: `/properties/api/booking/${bookingId}/restore/`,
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        success: function(response) {
+            if (response.success) {
+                showNotification(response.message || 'Booking restored successfully', 'success');
+                setTimeout(function() {
+                    window.location.reload();
+                }, 1500);
+            } else {
+                showNotification(response.error || 'Failed to restore booking', 'error');
+            }
+        },
+        error: function(xhr) {
+            const errorMsg = xhr.responseJSON?.error || 'Failed to restore booking';
+            showNotification(errorMsg, 'error');
+        }
+    });
+});
+
 // Update booking total from details modal
 function updateBookingTotal(bookingId) {
     $.ajax({
@@ -588,5 +737,283 @@ $(function() {
         });
     });
 });
+
+// Initialize venue booking form handlers
+function initializeVenueBookingForm() {
+    // Venue selection handler
+    $('#venueSelect').on('change', function() {
+        const venueId = $(this).val();
+        if (venueId) {
+            fetchVenueDetails(venueId);
+        } else {
+            selectedVenue = null;
+            venuePricePerDay = 0;
+            venueCapacity = 0;
+            $('#venueInfo').text('');
+            $('#totalAmount').val('');
+            $('#amountInfo').text('Amount will be calculated automatically');
+        }
+        calculateTotalAmount();
+    });
+    
+    // Date and time change handlers for calculating days
+    $('#eventDate, #startTime, #endTime').on('change', function() {
+        calculateTotalAmount();
+    });
+    
+    // Expected guests validation
+    $('#expectedGuests').on('input change', function() {
+        validateCapacity();
+        calculateTotalAmount();
+    });
+    
+    // Form submission handler
+    $('#createVenueBookingBtn').on('click', function(e) {
+        e.preventDefault();
+        createVenueBooking();
+    });
+}
+
+// Fetch venue details from API
+function fetchVenueDetails(venueId) {
+    $.ajax({
+        url: `/properties/api/venue/${venueId}/details/`,
+        method: 'GET',
+        success: function(response) {
+            if (response.success) {
+                selectedVenue = response.venue;
+                venuePricePerDay = parseFloat(response.venue.rent_amount) || 0;
+                venueCapacity = parseInt(response.venue.capacity) || 0;
+                
+                // Update venue info display
+                $('#venueInfo').html(`
+                    <i class="fas fa-info-circle"></i> 
+                    Price: Tsh${venuePricePerDay.toLocaleString()}/day | 
+                    Capacity: ${venueCapacity} guests
+                `);
+                
+                // Validate capacity if guests already entered
+                validateCapacity();
+                calculateTotalAmount();
+            } else {
+                showNotification('Error loading venue details: ' + response.message, 'error');
+            }
+        },
+        error: function(xhr) {
+            console.error('Error fetching venue details:', xhr);
+            showNotification('Error loading venue details', 'error');
+        }
+    });
+}
+
+// Calculate number of days from event date, start time, and end time
+function calculateNumberOfDays() {
+    const eventDate = $('#eventDate').val();
+    const startTime = $('#startTime').val();
+    const endTime = $('#endTime').val();
+    
+    if (!eventDate || !startTime || !endTime) {
+        return 0;
+    }
+    
+    // Parse date and times
+    const date = new Date(eventDate);
+    const [startHour, startMin] = startTime.split(':').map(Number);
+    const [endHour, endMin] = endTime.split(':').map(Number);
+    
+    const startDateTime = new Date(date);
+    startDateTime.setHours(startHour, startMin, 0, 0);
+    
+    const endDateTime = new Date(date);
+    endDateTime.setHours(endHour, endMin, 0, 0);
+    
+    // If end time is before start time, assume it's the next day
+    if (endDateTime <= startDateTime) {
+        endDateTime.setDate(endDateTime.getDate() + 1);
+    }
+    
+    // Calculate difference in milliseconds
+    const diffMs = endDateTime - startDateTime;
+    
+    // Convert to days (if more than 24 hours, count as multiple days)
+    const diffHours = diffMs / (1000 * 60 * 60);
+    const days = Math.ceil(diffHours / 24);
+    
+    return Math.max(1, days); // Minimum 1 day
+}
+
+// Calculate total amount based on venue price and number of days
+function calculateTotalAmount() {
+    if (!selectedVenue || venuePricePerDay === 0) {
+        $('#totalAmount').val('');
+        $('#amountInfo').text('Select a venue to calculate amount');
+        return;
+    }
+    
+    const numberOfDays = calculateNumberOfDays();
+    
+    if (numberOfDays === 0) {
+        $('#totalAmount').val('');
+        $('#amountInfo').text('Please fill in event date, start time, and end time');
+        return;
+    }
+    
+    const totalAmount = venuePricePerDay * numberOfDays;
+    $('#totalAmount').val(totalAmount.toFixed(2));
+    
+    if (numberOfDays === 1) {
+        $('#amountInfo').text(`Tsh${venuePricePerDay.toLocaleString()} × ${numberOfDays} day = Tsh${totalAmount.toLocaleString()}`);
+    } else {
+        $('#amountInfo').text(`Tsh${venuePricePerDay.toLocaleString()} × ${numberOfDays} days = Tsh${totalAmount.toLocaleString()}`);
+    }
+}
+
+// Validate expected guests against venue capacity
+function validateCapacity() {
+    const expectedGuests = parseInt($('#expectedGuests').val()) || 0;
+    const capacityError = $('#capacityError');
+    
+    if (!selectedVenue || venueCapacity === 0) {
+        capacityError.hide();
+        return true;
+    }
+    
+    if (expectedGuests > venueCapacity) {
+        capacityError.text(`Expected guests (${expectedGuests}) exceeds venue capacity (${venueCapacity})`);
+        capacityError.show();
+        $('#expectedGuests').addClass('is-invalid');
+        return false;
+    } else {
+        capacityError.hide();
+        $('#expectedGuests').removeClass('is-invalid');
+        return true;
+    }
+}
+
+// Create venue booking
+function createVenueBooking() {
+    // Validate form
+    if (!validateVenueBookingForm()) {
+        return;
+    }
+    
+    // Validate capacity
+    if (!validateCapacity()) {
+        showNotification('Please adjust the number of expected guests to match venue capacity', 'error');
+        return;
+    }
+    
+    // Collect form data
+    const formData = {
+        'csrfmiddlewaretoken': $('[name=csrfmiddlewaretoken]').val(),
+        'event_name': $('#eventName').val(),
+        'customer_name': $('#customerName').val(),
+        'email': $('#customerEmail').val(),
+        'phone': $('#customerPhone').val(),
+        'venue': $('#venueSelect').val(),
+        'event_type': $('#eventType').val(),
+        'event_date': $('#eventDate').val(),
+        'start_time': $('#startTime').val(),
+        'end_time': $('#endTime').val(),
+        'expected_guests': $('#expectedGuests').val(),
+        'number_of_guests': $('#expectedGuests').val(), // Also send as number_of_guests for backend
+        'total_amount': $('#totalAmount').val(),
+        'setup_required': $('#setupRequired').val(),
+        'special_requirements': $('#specialRequirements').val(),
+    };
+    
+    // Calculate check-in and check-out dates
+    // For venues, check-in is event date, check-out might be same day or next day depending on end time
+    const eventDate = $('#eventDate').val();
+    const startTime = $('#startTime').val();
+    const endTime = $('#endTime').val();
+    
+    // Parse to determine if event spans multiple days
+    const [startHour] = startTime.split(':').map(Number);
+    const [endHour] = endTime.split(':').map(Number);
+    
+    let checkOutDate = eventDate;
+    if (endHour < startHour || (endHour === startHour && endTime < startTime)) {
+        // Event spans to next day
+        const date = new Date(eventDate);
+        date.setDate(date.getDate() + 1);
+        checkOutDate = date.toISOString().split('T')[0];
+    }
+    
+    formData['check_in_date'] = eventDate;
+    formData['check_out_date'] = checkOutDate;
+    formData['number_of_guests'] = formData['expected_guests'];
+    
+    // Submit booking
+    $.ajax({
+        url: '/properties/api/create-booking/',
+        method: 'POST',
+        data: formData,
+        success: function(response) {
+            if (response.success) {
+                showNotification('Venue booking created successfully!', 'success');
+                $('#newBookingModal').modal('hide');
+                // Reset form
+                $('#newBookingForm')[0].reset();
+                selectedVenue = null;
+                venuePricePerDay = 0;
+                venueCapacity = 0;
+                $('#venueInfo').text('');
+                $('#totalAmount').val('');
+                $('#amountInfo').text('Amount will be calculated automatically');
+                // Reload page to show new booking
+                setTimeout(function() {
+                    window.location.reload();
+                }, 1500);
+            } else {
+                showNotification(response.error || 'Failed to create booking', 'error');
+            }
+        },
+        error: function(xhr) {
+            console.error('Error creating booking:', xhr);
+            let errorMsg = 'Failed to create booking';
+            if (xhr.responseJSON && xhr.responseJSON.error) {
+                errorMsg = xhr.responseJSON.error;
+            }
+            showNotification(errorMsg, 'error');
+        }
+    });
+}
+
+// Validate venue booking form
+function validateVenueBookingForm() {
+    const requiredFields = [
+        { id: '#eventName', name: 'Event Name' },
+        { id: '#customerName', name: 'Customer Name' },
+        { id: '#customerEmail', name: 'Email' },
+        { id: '#customerPhone', name: 'Phone Number' },
+        { id: '#venueSelect', name: 'Venue' },
+        { id: '#eventType', name: 'Event Type' },
+        { id: '#eventDate', name: 'Event Date' },
+        { id: '#startTime', name: 'Start Time' },
+        { id: '#endTime', name: 'End Time' },
+        { id: '#expectedGuests', name: 'Expected Guests' },
+    ];
+    
+    let isValid = true;
+    const missingFields = [];
+    
+    requiredFields.forEach(function(field) {
+        const value = $(field.id).val();
+        if (!value || value.trim() === '') {
+            isValid = false;
+            missingFields.push(field.name);
+            $(field.id).addClass('is-invalid');
+        } else {
+            $(field.id).removeClass('is-invalid');
+        }
+    });
+    
+    if (!isValid) {
+        showNotification('Please fill in all required fields: ' + missingFields.join(', '), 'error');
+    }
+    
+    return isValid;
+}
 </script>
 {% endblock %}

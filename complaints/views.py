@@ -80,13 +80,13 @@ def complaint_list(request):
                 # Security: Only staff or the user who created the complaint can delete
                 if not (request.user.is_staff or complaint.user == request.user):
                     return JsonResponse({'error': 'Permission denied'}, status=403)
-                if complaint.status == 'resolved':
-                    complaint.delete()
-                    return JsonResponse({'success': True})
-                else:
-                    return JsonResponse({'error': 'Only resolved complaints can be deleted'}, status=400)
+                # Allow deletion of any complaint (staff can delete any, users can delete their own)
+                complaint.delete()
+                return JsonResponse({'success': True, 'message': 'Complaint deleted successfully'})
             except Complaint.DoesNotExist:
                 return JsonResponse({'error': 'Complaint not found'}, status=404)
+            except Exception as e:
+                return JsonResponse({'error': f'Error deleting complaint: {str(e)}'}, status=500)
     
     if request.user.is_staff:
         complaints = Complaint.objects.select_related('user', 'property').all()

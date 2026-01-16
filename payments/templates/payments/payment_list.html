@@ -25,29 +25,38 @@
   </div>
   
   <!-- Search and Filters -->
-  <div class="card-body">
-    <div class="row g-3">
-      <div class="col-md-4">
-        <label for="search-input" class="form-label">Search</label>
-        <input type="text" class="form-control" id="search-input" placeholder="Search payments...">
+  <div class="card-header">
+    <div class="row flex-between-center">
+      <div class="col-auto">
+        <h5 class="mb-0">Payments</h5>
       </div>
-      <div class="col-md-4">
-        <label for="status-filter" class="form-label">Status</label>
-        <select class="form-select" id="status-filter">
-          <option value="">All Statuses</option>
-          {% for value, display in status_choices %}
-          <option value="{{ value }}">{{ display }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="col-md-4">
-        <label for="method-filter" class="form-label">Payment Method</label>
-        <select class="form-select" id="method-filter">
-          <option value="">All Methods</option>
-          {% for value, display in method_choices %}
-          <option value="{{ value }}">{{ display }}</option>
-          {% endfor %}
-        </select>
+      <div class="col-auto">
+        <div class="d-flex align-items-center gap-2">
+          <div class="input-group input-group-sm" style="width: 260px;">
+            <input type="search" class="form-control" id="search-input" placeholder="Search payments..." value="{{ search_query|default:'' }}">
+            <button class="btn btn-outline-secondary" id="search-clear">Clear</button>
+          </div>
+          <select class="form-select form-select-sm" id="status-filter" style="width: auto;">
+            <option value="">All Statuses</option>
+            {% for value, display in status_choices %}
+            <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ display }}</option>
+            {% endfor %}
+          </select>
+          <select class="form-select form-select-sm" id="method-filter" style="width: auto;">
+            <option value="">All Methods</option>
+            {% for value, display in method_choices %}
+            <option value="{{ value }}" {% if method_filter == value %}selected{% endif %}>{{ display }}</option>
+            {% endfor %}
+          </select>
+          <label class="form-label mb-0">Items per page:</label>
+          <select class="form-select form-select-sm" id="pageSizeSelect" style="width: auto;">
+            <option value="5" {% if current_page_size == 5 %}selected{% endif %}>5</option>
+            <option value="10" {% if current_page_size == 10 %}selected{% endif %}>10</option>
+            <option value="25" {% if current_page_size == 25 %}selected{% endif %}>25</option>
+            <option value="50" {% if current_page_size == 50 %}selected{% endif %}>50</option>
+            <option value="100" {% if current_page_size == 100 %}selected{% endif %}>100</option>
+          </select>
+        </div>
       </div>
     </div>
   </div>
@@ -363,12 +372,14 @@ function initializePaymentsPage() {
         var search = $('#search-input').val() || '';
         var status = $('#status-filter').val() || '';
         var method = $('#method-filter').val() || '';
+        var pageSize = $('#pageSizeSelect').val() || '5';
         
         console.log('=== LOADING PAYMENTS TABLE ===');
         console.log('Search:', search);
         console.log('Status:', status);
         console.log('Method:', method);
         console.log('Page:', page);
+        console.log('Page Size:', pageSize);
         
         // Show loading
         $('#table-container').html('<div class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">Loading...</p></div>');
@@ -380,7 +391,8 @@ function initializePaymentsPage() {
                 'search': search,
                 'status': status,
                 'method': method,
-                'page': page
+                'page': page,
+                'page_size': pageSize
             },
             headers: {
                 'X-Requested-With': 'XMLHttpRequest'
@@ -406,41 +418,32 @@ function initializePaymentsPage() {
         });
     }
     
-    // Search input handler
+    // Debounced search
     var searchTimeout;
     $('#search-input').on('input', function() {
-        var searchValue = $(this).val();
-        console.log('Search input changed:', searchValue);
-        
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(function() {
-            console.log('Search timeout triggered');
             loadTable(1);
-        }, 500);
+        }, 400);
+    });
+    
+    $('#search-clear').on('click', function() {
+        $('#search-input').val('');
+        loadTable(1);
     });
     
     // Filter change handlers
     $('#status-filter').on('change', function() {
-        var statusValue = $(this).val();
-        console.log('Status filter changed:', statusValue);
         loadTable(1);
     });
     
     $('#method-filter').on('change', function() {
-        var methodValue = $(this).val();
-        console.log('Method filter changed:', methodValue);
         loadTable(1);
     });
     
-    // Handle search clear
-    $('#search-input').on('keyup', function() {
-        var searchValue = $(this).val();
-        if (searchValue === '') {
-            console.log('Search cleared - resetting filters');
-            $('#status-filter').val('');
-            $('#method-filter').val('');
-            loadTable(1);
-        }
+    // Page size change handler
+    $('#pageSizeSelect').on('change', function() {
+        loadTable(1);
     });
     
     // Global functions for pagination
@@ -451,10 +454,10 @@ function initializePaymentsPage() {
     
     // Clear all filters function
     window.clearAllFilters = function() {
-        console.log('=== CLEARING ALL FILTERS ===');
         $('#search-input').val('');
         $('#status-filter').val('');
         $('#method-filter').val('');
+        $('#pageSizeSelect').val('5');
         loadTable(1);
     };
     

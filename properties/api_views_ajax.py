@@ -514,14 +514,28 @@ def assign_property_owner_api(request, property_id):
                 'message': 'Selected user is not a property owner'
             }, status=400)
         
-        # Assign the property to the owner
+        # Check if property already has this owner
+        if property_obj.owner and property_obj.owner.id == owner.id:
+            return JsonResponse({
+                'success': False,
+                'message': f'Property is already assigned to {owner.get_full_name() or owner.username}'
+            }, status=400)
+        
+        # Note: Property model has owner as ForeignKey, so one property can only have ONE owner
+        # This is enforced at the database level - assigning a new owner automatically replaces the old one
         old_owner = property_obj.owner
         property_obj.owner = owner
         property_obj.save()
         
+        # Build success message
+        if old_owner:
+            message = f'Property ownership transferred from {old_owner.get_full_name() or old_owner.username} to {owner.get_full_name() or owner.username} successfully'
+        else:
+            message = f'Property assigned to {owner.get_full_name() or owner.username} successfully'
+        
         return JsonResponse({
             'success': True,
-            'message': f'Property assigned to {owner.get_full_name() or owner.username} successfully',
+            'message': message,
             'owner': {
                 'id': owner.id,
                 'username': owner.username,

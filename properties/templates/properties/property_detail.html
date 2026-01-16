@@ -948,8 +948,14 @@ function checkVisitPaymentStatus() {
     .then(response => response.json())
     .then(data => {
         if (data.has_paid) {
-            // User has already paid, show contact info
+            // User has already paid and payment is active, show contact info
             showContactAndLocation(data);
+        } else if (data.is_expired) {
+            // Payment expired, show message to pay again
+            const statusDiv = document.getElementById('visitPaymentStatus');
+            statusDiv.innerHTML = '<div class="alert alert-warning"><i class="fas fa-exclamation-triangle me-2"></i>Your visit payment has expired. Please pay again to access property details.</div>';
+            document.getElementById('visitPaymentBtn').disabled = false;
+            document.getElementById('visitPaymentBtn').innerHTML = '<i class="fas fa-credit-card me-1"></i>Pay Again';
         }
     })
     .catch(error => {

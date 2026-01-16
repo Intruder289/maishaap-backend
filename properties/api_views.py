@@ -19,12 +19,205 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import parsers
-from drf_yasg.utils import swagger_auto_schema
-from drf_yasg import openapi
+# Swagger documentation - using drf-spectacular
+try:
+    from drf_yasg.utils import swagger_auto_schema
+    from drf_yasg import openapi
+except ImportError:
+    # drf-yasg not installed, use drf-spectacular instead
+    from drf_spectacular.utils import extend_schema, OpenApiParameter
+    from drf_spectacular.types import OpenApiTypes
+    
+    # Create a wrapper to convert swagger_auto_schema to extend_schema for drf-spectacular
+    def swagger_auto_schema(*args, **kwargs):
+        # Handle method parameter - drf-spectacular doesn't need it
+        # but we should still process the decorator
+        method = kwargs.pop('method', None)
+        
+        # Extract parameters from manual_parameters if present
+        manual_params = kwargs.get('manual_parameters', [])
+        spectacular_params = []
+        
+        if manual_params:
+            # Convert drf-yasg parameters to drf-spectacular parameters
+            for param in manual_params:
+                # Skip None values
+                if param is None:
+                    continue
+                
+                # Skip lambda functions (old fallback)
+                if callable(param) and not hasattr(param, 'name'):
+                    continue
+                
+                # Try to extract parameter info
+                param_name = None
+                param_type = OpenApiTypes.STR
+                param_location = OpenApiParameter.QUERY
+                param_description = ''
+                param_required = False
+                
+                # Check if it's a Parameter-like object (has 'name' attribute)
+                if hasattr(param, 'name') and param.name:
+                    param_name = param.name
+                    param_description = getattr(param, 'description', '') or ''
+                    param_required = getattr(param, 'required', False)
+                    
+                    # Determine type - check both string constants and actual values
+                    param_type_attr = getattr(param, 'type', None)
+                    type_str = str(param_type_attr).lower() if param_type_attr else ''
+                    
+                    if (param_type_attr == openapi.TYPE_INTEGER or 
+                        type_str == 'integer' or 
+                        'integer' in type_str):
+                        param_type = OpenApiTypes.INT
+                    elif (param_type_attr == openapi.TYPE_NUMBER or 
+                          type_str == 'number' or 
+                          'number' in type_str):
+                        param_type = OpenApiTypes.NUMBER
+                    elif (param_type_attr == openapi.TYPE_BOOLEAN or 
+                          type_str == 'boolean' or 
+                          'boolean' in type_str):
+                        param_type = OpenApiTypes.BOOL
+                    else:
+                        param_type = OpenApiTypes.STR
+                    
+                    # Determine location
+                    param_in = getattr(param, 'in_', None)
+                    in_str = str(param_in).lower() if param_in else ''
+                    
+                    if (param_in == openapi.IN_QUERY or 
+                        in_str == 'query' or 
+                        'query' in in_str):
+                        param_location = OpenApiParameter.QUERY
+                    elif (param_in == openapi.IN_PATH or 
+                          in_str == 'path' or 
+                          'path' in in_str):
+                        param_location = OpenApiParameter.PATH
+                    else:
+                        param_location = OpenApiParameter.QUERY
+                    
+                    # Create the parameter
+                    spectacular_params.append(
+                        OpenApiParameter(
+                            name=param_name,
+                            type=param_type,
+                            location=param_location,
+                            description=param_description,
+                            required=param_required
+                        )
+                    )
+                # Handle tuple/list format: (name, location, description, type, required)
+                elif isinstance(param, (tuple, list)) and len(param) >= 2:
+                    param_name = param[0]
+                    param_location_str = param[1] if len(param) > 1 else 'query'
+                    param_description = param[2] if len(param) > 2 else ''
+                    param_type_str = param[3] if len(param) > 3 else 'string'
+                    param_required = param[4] if len(param) > 4 else False
+                    
+                    # Convert location
+                    if param_location_str == 'query' or param_location_str == openapi.IN_QUERY:
+                        param_location = OpenApiParameter.QUERY
+                    elif param_location_str == 'path' or param_location_str == openapi.IN_PATH:
+                        param_location = OpenApiParameter.PATH
+                    else:
+                        param_location = OpenApiParameter.QUERY
+                    
+                    # Convert type
+                    if 'int' in str(param_type_str).lower():
+                        param_type = OpenApiTypes.INT
+                    elif 'number' in str(param_type_str).lower():
+                        param_type = OpenApiTypes.NUMBER
+                    else:
+                        param_type = OpenApiTypes.STR
+                    
+                    spectacular_params.append(
+                        OpenApiParameter(
+                            name=param_name,
+                            type=param_type,
+                            location=param_location,
+                            description=param_description,
+                            required=param_required
+                        )
+                    )
+        
+        # Use extend_schema with parameters
+        # extend_schema already returns a decorator, so we can return it directly
+        # Build extend_schema kwargs
+        schema_kwargs = {
+            'summary': kwargs.get('operation_summary', ''),
+            'description': kwargs.get('operation_description', ''),
+            'tags': kwargs.get('tags', []),
+        }
+        
+        # Only add parameters if we have any (don't pass empty list or None)
+        if spectacular_params:
+            schema_kwargs['parameters'] = spectacular_params
+        
+        # Add responses if provided
+        if kwargs.get('responses'):
+            schema_kwargs['responses'] = kwargs.get('responses')
+        
+        # Add request/request_body if provided (for POST/PUT/PATCH)
+        if kwargs.get('request_body'):
+            schema_kwargs['request'] = kwargs.get('request_body')
+        elif kwargs.get('request'):
+            schema_kwargs['request'] = kwargs.get('request')
+        
+        return extend_schema(**schema_kwargs)
+    
+    # Fallback openapi class for backward compatibility
+    class openapi:
+        class Response:
+            def __init__(self, *args, **kwargs):
+                pass
+        class Schema:
+            def __init__(self, *args, **kwargs):
+                pass
+        class Items:
+            def __init__(self, *args, **kwargs):
+                pass
+        class Contact:
+            def __init__(self, *args, **kwargs):
+                pass
+        class License:
+            def __init__(self, *args, **kwargs):
+                pass
+        class Info:
+            def __init__(self, *args, **kwargs):
+                pass
+        TYPE_OBJECT = 'object'
+        TYPE_STRING = 'string'
+        TYPE_INTEGER = 'integer'
+        TYPE_NUMBER = 'number'
+        TYPE_BOOLEAN = 'boolean'
+        TYPE_ARRAY = 'array'
+        FORMAT_EMAIL = 'email'
+        FORMAT_DATE = 'date'
+        FORMAT_DATETIME = 'date-time'
+        FORMAT_DECIMAL = 'decimal'
+        FORMAT_URI = 'uri'
+        FORMAT_UUID = 'uuid'
+        IN_QUERY = 'query'
+        IN_PATH = 'path'
+        IN_BODY = 'body'
+        IN_FORM = 'formData'
+        IN_HEADER = 'header'
+        
+        # Create a proper Parameter class that stores arguments
+        class Parameter:
+            def __init__(self, name, in_, description=None, type=None, required=False, **kwargs):
+                self.name = name
+                self.in_ = in_
+                self.description = description or ''
+                self.type = type or 'string'
+                self.required = required
+                # Store all kwargs for compatibility
+                for key, value in kwargs.items():
+                    setattr(self, key, value)
 
 from .models import (
     PropertyType, Region, PropertyFavorite, Property, PropertyImage,
-    District, Amenity
+    District, Amenity, Room, Booking
 )
 from .serializers import (
     PropertyTypeSerializer,
@@ -35,7 +228,8 @@ from .serializers import (
     PropertyDetailSerializer,
     PropertyImageUploadSerializer,
     DistrictSerializer,
-    AmenitySerializer
+    AmenitySerializer,
+    RoomSerializer
 )
 
 
@@ -66,24 +260,131 @@ class PropertyListCreateAPIView(APIView):
             return [IsAuthenticated()]
         return [AllowAny()]
 
+    # Use drf-spectacular directly to ensure parameters are properly documented
+    @extend_schema(
+        summary="List Properties",
+        description="Get a list of all properties. Public endpoint - no authentication required. Supports filtering and pagination.",
+        tags=['Properties'],
+        parameters=[
+            OpenApiParameter('property_type', OpenApiTypes.INT, OpenApiParameter.QUERY, description="Filter by property type ID", required=False),
+            OpenApiParameter('category', OpenApiTypes.STR, OpenApiParameter.QUERY, description="Filter by category name (e.g., 'house', 'hotel', 'lodge', 'venue')", required=False),
+            OpenApiParameter('region', OpenApiTypes.INT, OpenApiParameter.QUERY, description="Filter by region ID", required=False),
+            OpenApiParameter('district', OpenApiTypes.INT, OpenApiParameter.QUERY, description="Filter by district ID", required=False),
+            OpenApiParameter('status', OpenApiTypes.STR, OpenApiParameter.QUERY, description="Filter by status (available, rented, under_maintenance, unavailable)", required=False),
+            OpenApiParameter('page', OpenApiTypes.INT, OpenApiParameter.QUERY, description="Page number for pagination (default: 1)", required=False),
+            OpenApiParameter('page_size', OpenApiTypes.INT, OpenApiParameter.QUERY, description="Number of items per page (default: 20, max: 100)", required=False),
+        ],
+        responses={200: PropertyListSerializer(many=True)}
+    )
     @swagger_auto_schema(
-        operation_description="Get a list of all properties. Public endpoint - no authentication required.",
+        operation_description="Get a list of all properties. Public endpoint - no authentication required. Supports filtering and pagination.",
         operation_summary="List Properties",
         tags=['Properties'],
+        manual_parameters=[
+            openapi.Parameter('property_type', openapi.IN_QUERY, description="Filter by property type ID", type=openapi.TYPE_INTEGER, required=False),
+            openapi.Parameter('category', openapi.IN_QUERY, description="Filter by category name (e.g., 'house', 'hotel', 'lodge', 'venue')", type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('region', openapi.IN_QUERY, description="Filter by region ID", type=openapi.TYPE_INTEGER, required=False),
+            openapi.Parameter('district', openapi.IN_QUERY, description="Filter by district ID", type=openapi.TYPE_INTEGER, required=False),
+            openapi.Parameter('status', openapi.IN_QUERY, description="Filter by status (available, rented, under_maintenance, unavailable)", type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('page', openapi.IN_QUERY, description="Page number for pagination (default: 1)", type=openapi.TYPE_INTEGER, required=False),
+            openapi.Parameter('page_size', openapi.IN_QUERY, description="Number of items per page (default: 20, max: 100)", type=openapi.TYPE_INTEGER, required=False),
+        ],
         responses={
             200: PropertyListSerializer(many=True)
         }
     )
     def get(self, request, *args, **kwargs):
-        """Get all properties"""
+        """Get all properties with optional filtering"""
         properties = Property.objects.filter(
             is_active=True,
             is_approved=True
-        ).select_related('property_type', 'region', 'owner').prefetch_related('images', 'amenities').order_by('-created_at')
+        ).select_related('property_type', 'region', 'owner').prefetch_related('images', 'amenities')
         
-        serializer = PropertyListSerializer(properties, many=True, context={'request': request})
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        # Filter by property_type ID (if provided)
+        property_type_id = request.GET.get('property_type')
+        if property_type_id:
+            try:
+                properties = properties.filter(property_type_id=int(property_type_id))
+            except (ValueError, TypeError):
+                pass
+        
+        # Filter by category name (for mobile app compatibility)
+        # This allows filtering by category name like 'house', 'hotel', 'lodge', 'venue'
+        category_name = request.GET.get('category')
+        if category_name:
+            # Normalize category name to lowercase for matching
+            category_name = category_name.lower().strip()
+            properties = properties.filter(property_type__name__iexact=category_name)
+        
+        # Filter by region (if provided)
+        region_id = request.GET.get('region')
+        if region_id:
+            try:
+                properties = properties.filter(region_id=int(region_id))
+            except (ValueError, TypeError):
+                pass
+        
+        # Filter by district (if provided)
+        district_id = request.GET.get('district')
+        if district_id:
+            try:
+                properties = properties.filter(district_id=int(district_id))
+            except (ValueError, TypeError):
+                pass
+        
+        # Filter by status (if provided)
+        status_filter = request.GET.get('status')
+        if status_filter:
+            properties = properties.filter(status=status_filter)
+        
+        properties = properties.order_by('-created_at')
+        
+        # Pagination
+        page = request.GET.get('page', 1)
+        page_size = request.GET.get('page_size', 20)
+        
+        try:
+            page = int(page)
+            page_size = int(page_size)
+            if page_size > 100:
+                page_size = 100
+            if page_size < 1:
+                page_size = 20
+            if page < 1:
+                page = 1
+        except (ValueError, TypeError):
+            page = 1
+            page_size = 20
+        
+        # Calculate pagination
+        total = properties.count()
+        start = (page - 1) * page_size
+        end = start + page_size
+        properties_page = properties[start:end]
+        
+        serializer = PropertyListSerializer(properties_page, many=True, context={'request': request})
+        
+        # Return paginated response
+        return Response({
+            'count': total,
+            'page': page,
+            'page_size': page_size,
+            'total_pages': (total + page_size - 1) // page_size if total > 0 else 0,
+            'results': serializer.data
+        }, status=status.HTTP_200_OK)
 
+    # CRITICAL: @extend_schema must be BEFORE @swagger_auto_schema for drf-spectacular
+    @extend_schema(
+        summary="Create Property",
+        description="Create a new property. Requires authentication. Property will be pending approval unless user is admin/staff.",
+        tags=['Properties'],
+        request=PropertyCreateUpdateSerializer,
+        responses={
+            201: PropertyDetailSerializer,
+            400: {'description': 'Validation error'},
+            401: {'description': 'Authentication required'}
+        }
+    )
     @swagger_auto_schema(
         operation_description="Create a new property. Requires authentication. Property will be pending approval unless user is admin/staff.",
         operation_summary="Create Property",
@@ -122,6 +423,19 @@ class PropertyDetailAPIView(APIView):
             return [IsAuthenticated()]
         return [AllowAny()]
 
+    # CRITICAL: @extend_schema must be BEFORE @swagger_auto_schema for drf-spectacular
+    @extend_schema(
+        summary="Get Property Details",
+        description="Get detailed information about a specific property by ID",
+        tags=['Properties'],
+        parameters=[
+            OpenApiParameter('pk', OpenApiTypes.INT, OpenApiParameter.PATH, description="Property ID", required=True),
+        ],
+        responses={
+            200: PropertyDetailSerializer,
+            404: {'description': 'Property not found'}
+        }
+    )
     @swagger_auto_schema(
         operation_description="Get detailed information about a specific property by ID",
         operation_summary="Get Property Details",
@@ -146,6 +460,23 @@ class PropertyDetailAPIView(APIView):
         serializer = PropertyDetailSerializer(property_obj, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    # CRITICAL: @extend_schema must be BEFORE @swagger_auto_schema for drf-spectacular
+    @extend_schema(
+        summary="Update Property",
+        description="Update an entire property. User must own the property or be admin/staff.",
+        tags=['Properties'],
+        parameters=[
+            OpenApiParameter('pk', OpenApiTypes.INT, OpenApiParameter.PATH, description="Property ID", required=True),
+        ],
+        request=PropertyCreateUpdateSerializer,
+        responses={
+            200: PropertyDetailSerializer,
+            400: {'description': 'Validation error'},
+            401: {'description': 'Authentication required'},
+            403: {'description': 'Permission denied - you must own the property'},
+            404: {'description': 'Property not found'}
+        }
+    )
     @swagger_auto_schema(
         operation_description="Update an entire property. User must own the property or be admin/staff.",
         operation_summary="Update Property",
@@ -187,6 +518,23 @@ class PropertyDetailAPIView(APIView):
             return Response(response_serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    # CRITICAL: @extend_schema must be BEFORE @swagger_auto_schema for drf-spectacular
+    @extend_schema(
+        summary="Partially Update Property",
+        description="Partially update a property. User must own the property or be admin/staff.",
+        tags=['Properties'],
+        parameters=[
+            OpenApiParameter('pk', OpenApiTypes.INT, OpenApiParameter.PATH, description="Property ID", required=True),
+        ],
+        request=PropertyCreateUpdateSerializer,
+        responses={
+            200: PropertyDetailSerializer,
+            400: {'description': 'Validation error'},
+            401: {'description': 'Authentication required'},
+            403: {'description': 'Permission denied - you must own the property'},
+            404: {'description': 'Property not found'}
+        }
+    )
     @swagger_auto_schema(
         operation_description="Partially update a property. User must own the property or be admin/staff.",
         operation_summary="Partially Update Property",
@@ -271,6 +619,35 @@ class PropertyToggleStatusAPIView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
+    # CRITICAL: @extend_schema must be BEFORE @swagger_auto_schema for drf-spectacular
+    @extend_schema(
+        summary="Toggle Property Status",
+        description="Toggle property active status. User must own the property or be admin/staff.",
+        tags=['Properties'],
+        parameters=[
+            OpenApiParameter('pk', OpenApiTypes.INT, OpenApiParameter.PATH, description="Property ID", required=True),
+        ],
+        responses={
+            200: {
+                'description': 'Status toggled successfully',
+                'content': {
+                    'application/json': {
+                        'schema': {
+                            'type': 'object',
+                            'properties': {
+                                'id': {'type': 'integer'},
+                                'is_active': {'type': 'boolean'},
+                                'message': {'type': 'string'}
+                            }
+                        }
+                    }
+                }
+            },
+            401: {'description': 'Authentication required'},
+            403: {'description': 'Permission denied - you must own the property'},
+            404: {'description': 'Property not found'}
+        }
+    )
     @swagger_auto_schema(
         operation_description="Toggle property active status. User must own the property or be admin/staff.",
         operation_summary="Toggle Property Status",
@@ -330,6 +707,21 @@ class PropertyDeleteAPIView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
+    # CRITICAL: @extend_schema must be BEFORE @swagger_auto_schema for drf-spectacular
+    @extend_schema(
+        summary="Delete Property",
+        description="Delete a property. User must own the property or be admin/staff.",
+        tags=['Properties'],
+        parameters=[
+            OpenApiParameter('pk', OpenApiTypes.INT, OpenApiParameter.PATH, description="Property ID", required=True),
+        ],
+        responses={
+            204: {'description': 'Property deleted successfully'},
+            401: {'description': 'Authentication required'},
+            403: {'description': 'Permission denied - you must own the property'},
+            404: {'description': 'Property not found'}
+        }
+    )
     @swagger_auto_schema(
         operation_description="Delete a property. User must own the property or be admin/staff.",
         operation_summary="Delete Property",
@@ -373,10 +765,32 @@ class MyPropertiesAPIView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
+    # CRITICAL: @extend_schema must be BEFORE @swagger_auto_schema for drf-spectacular
+    @extend_schema(
+        summary="Get My Properties",
+        description="Get all properties owned by the current authenticated user. Supports pagination and optional filtering.",
+        tags=['Properties'],
+        parameters=[
+            OpenApiParameter('page', OpenApiTypes.INT, OpenApiParameter.QUERY, description="Page number for pagination (default: 1)", required=False),
+            OpenApiParameter('page_size', OpenApiTypes.INT, OpenApiParameter.QUERY, description="Number of items per page (default: 20, max: 100)", required=False),
+            OpenApiParameter('status', OpenApiTypes.STR, OpenApiParameter.QUERY, description="Filter by status (available, rented, under_maintenance, unavailable)", required=False),
+            OpenApiParameter('property_type', OpenApiTypes.INT, OpenApiParameter.QUERY, description="Filter by property type ID", required=False),
+        ],
+        responses={
+            200: PropertyListSerializer(many=True),
+            401: {'description': 'Authentication required'}
+        }
+    )
     @swagger_auto_schema(
-        operation_description="Get all properties owned by the current authenticated user",
+        operation_description="Get all properties owned by the current authenticated user. Supports pagination and optional filtering.",
         operation_summary="Get My Properties",
         tags=['Properties'],
+        manual_parameters=[
+            openapi.Parameter('page', openapi.IN_QUERY, description="Page number for pagination (default: 1)", type=openapi.TYPE_INTEGER, required=False),
+            openapi.Parameter('page_size', openapi.IN_QUERY, description="Number of items per page (default: 20, max: 100)", type=openapi.TYPE_INTEGER, required=False),
+            openapi.Parameter('status', openapi.IN_QUERY, description="Filter by status (available, rented, under_maintenance, unavailable)", type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('property_type', openapi.IN_QUERY, description="Filter by property type ID", type=openapi.TYPE_INTEGER, required=False),
+        ],
         responses={
             200: PropertyListSerializer(many=True),
             401: "Authentication required"
@@ -384,13 +798,59 @@ class MyPropertiesAPIView(APIView):
         security=[{'Bearer': []}]
     )
     def get(self, request, *args, **kwargs):
-        """Get current user's properties"""
+        """Get current user's properties with optional pagination and filtering"""
         properties = Property.objects.filter(owner=request.user).select_related(
             'property_type', 'region', 'owner'
-        ).prefetch_related('images', 'amenities').order_by('-created_at')
+        ).prefetch_related('images', 'amenities')
         
-        serializer = PropertyListSerializer(properties, many=True, context={'request': request})
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        # Filter by status (if provided)
+        status_filter = request.GET.get('status')
+        if status_filter:
+            properties = properties.filter(status=status_filter)
+        
+        # Filter by property_type ID (if provided)
+        property_type_id = request.GET.get('property_type')
+        if property_type_id:
+            try:
+                properties = properties.filter(property_type_id=int(property_type_id))
+            except (ValueError, TypeError):
+                pass
+        
+        properties = properties.order_by('-created_at')
+        
+        # Pagination
+        page = request.GET.get('page', 1)
+        page_size = request.GET.get('page_size', 20)
+        
+        try:
+            page = int(page)
+            page_size = int(page_size)
+            if page_size > 100:
+                page_size = 100
+            if page_size < 1:
+                page_size = 20
+            if page < 1:
+                page = 1
+        except (ValueError, TypeError):
+            page = 1
+            page_size = 20
+        
+        # Calculate pagination
+        total = properties.count()
+        start = (page - 1) * page_size
+        end = start + page_size
+        properties_page = properties[start:end]
+        
+        serializer = PropertyListSerializer(properties_page, many=True, context={'request': request})
+        
+        # Return paginated response
+        return Response({
+            'count': total,
+            'page': page,
+            'page_size': page_size,
+            'total_pages': (total + page_size - 1) // page_size if total > 0 else 0,
+            'results': serializer.data
+        }, status=status.HTTP_200_OK)
 
 
 # ---------------------------------------------------------------------------
@@ -404,17 +864,37 @@ class PropertyTypeListAPIView(APIView):
     """
     permission_classes = [AllowAny]
 
+    # CRITICAL: @extend_schema must be BEFORE @swagger_auto_schema for drf-spectacular
+    @extend_schema(
+        summary="List Property Types",
+        description="Get a list of all property types (apartment, house, studio, etc.). Supports optional search.",
+        tags=['Properties'],
+        parameters=[
+            OpenApiParameter('search', OpenApiTypes.STR, OpenApiParameter.QUERY, description="Search property types by name", required=False),
+        ],
+        responses={200: PropertyTypeSerializer(many=True)}
+    )
     @swagger_auto_schema(
-        operation_description="Get a list of all property types (apartment, house, studio, etc.)",
+        operation_description="Get a list of all property types (apartment, house, studio, etc.). Supports optional search.",
         operation_summary="List Property Types",
         tags=['Properties'],
+        manual_parameters=[
+            openapi.Parameter('search', openapi.IN_QUERY, description="Search property types by name", type=openapi.TYPE_STRING, required=False),
+        ],
         responses={
             200: PropertyTypeSerializer(many=True)
         }
     )
     def get(self, request, *args, **kwargs):
-        """Get all property types"""
-        property_types = PropertyType.objects.all().order_by('name')
+        """Get all property types with optional search"""
+        property_types = PropertyType.objects.all()
+        
+        # Optional search filter
+        search_query = request.GET.get('search', '').strip()
+        if search_query:
+            property_types = property_types.filter(name__icontains=search_query)
+        
+        property_types = property_types.order_by('name')
         serializer = PropertyTypeSerializer(property_types, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -426,6 +906,19 @@ class PropertyTypeDetailAPIView(APIView):
     """
     permission_classes = [AllowAny]
 
+    # CRITICAL: @extend_schema must be BEFORE @swagger_auto_schema for drf-spectacular
+    @extend_schema(
+        summary="Get Property Type Details",
+        description="Get detailed information about a specific property type by ID",
+        tags=['Properties'],
+        parameters=[
+            OpenApiParameter('pk', OpenApiTypes.INT, OpenApiParameter.PATH, description="Property Type ID", required=True),
+        ],
+        responses={
+            200: PropertyTypeSerializer,
+            404: {'description': 'Property type not found'}
+        }
+    )
     @swagger_auto_schema(
         operation_description="Get detailed information about a specific property type by ID",
         operation_summary="Get Property Type Details",
@@ -458,17 +951,37 @@ class RegionListAPIView(APIView):
     """
     permission_classes = [AllowAny]
 
+    # CRITICAL: @extend_schema must be BEFORE @swagger_auto_schema for drf-spectacular
+    @extend_schema(
+        summary="List Regions",
+        description="Get a list of all regions/locations where properties are available. Supports optional search.",
+        tags=['Properties'],
+        parameters=[
+            OpenApiParameter('search', OpenApiTypes.STR, OpenApiParameter.QUERY, description="Search regions by name", required=False),
+        ],
+        responses={200: RegionSerializer(many=True)}
+    )
     @swagger_auto_schema(
-        operation_description="Get a list of all regions/locations where properties are available",
+        operation_description="Get a list of all regions/locations where properties are available. Supports optional search.",
         operation_summary="List Regions",
         tags=['Properties'],
+        manual_parameters=[
+            openapi.Parameter('search', openapi.IN_QUERY, description="Search regions by name", type=openapi.TYPE_STRING, required=False),
+        ],
         responses={
             200: RegionSerializer(many=True)
         }
     )
     def get(self, request, *args, **kwargs):
-        """Get all regions"""
-        regions = Region.objects.all().order_by('name')
+        """Get all regions with optional search"""
+        regions = Region.objects.all()
+        
+        # Optional search filter
+        search_query = request.GET.get('search', '').strip()
+        if search_query:
+            regions = regions.filter(name__icontains=search_query)
+        
+        regions = regions.order_by('name')
         serializer = RegionSerializer(regions, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -480,6 +993,19 @@ class RegionDetailAPIView(APIView):
     """
     permission_classes = [AllowAny]
 
+    # CRITICAL: @extend_schema must be BEFORE @swagger_auto_schema for drf-spectacular
+    @extend_schema(
+        summary="Get Region Details",
+        description="Get detailed information about a specific region by ID",
+        tags=['Properties'],
+        parameters=[
+            OpenApiParameter('pk', OpenApiTypes.INT, OpenApiParameter.PATH, description="Region ID", required=True),
+        ],
+        responses={
+            200: RegionSerializer,
+            404: {'description': 'Region not found'}
+        }
+    )
     @swagger_auto_schema(
         operation_description="Get detailed information about a specific region by ID",
         operation_summary="Get Region Details",
@@ -512,17 +1038,47 @@ class DistrictListAPIView(APIView):
     """
     permission_classes = [AllowAny]
 
+    # CRITICAL: @extend_schema must be BEFORE @swagger_auto_schema for drf-spectacular
+    @extend_schema(
+        summary="List Districts",
+        description="Get a list of all districts within regions. Supports optional filtering.",
+        tags=['Properties'],
+        parameters=[
+            OpenApiParameter('search', OpenApiTypes.STR, OpenApiParameter.QUERY, description="Search districts by name", required=False),
+            OpenApiParameter('region', OpenApiTypes.INT, OpenApiParameter.QUERY, description="Filter districts by region ID", required=False),
+        ],
+        responses={200: DistrictSerializer(many=True)}
+    )
     @swagger_auto_schema(
-        operation_description="Get a list of all districts within regions",
+        operation_description="Get a list of all districts within regions. Supports optional filtering.",
         operation_summary="List Districts",
         tags=['Properties'],
+        manual_parameters=[
+            openapi.Parameter('search', openapi.IN_QUERY, description="Search districts by name", type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('region', openapi.IN_QUERY, description="Filter districts by region ID", type=openapi.TYPE_INTEGER, required=False),
+        ],
         responses={
             200: DistrictSerializer(many=True)
         }
     )
     def get(self, request, *args, **kwargs):
-        """Get all districts"""
-        districts = District.objects.all().select_related('region').order_by('name')
+        """Get all districts with optional filtering"""
+        districts = District.objects.all().select_related('region')
+        
+        # Optional search filter
+        search_query = request.GET.get('search', '').strip()
+        if search_query:
+            districts = districts.filter(name__icontains=search_query)
+        
+        # Optional region filter
+        region_id = request.GET.get('region')
+        if region_id:
+            try:
+                districts = districts.filter(region_id=int(region_id))
+            except (ValueError, TypeError):
+                pass
+        
+        districts = districts.order_by('name')
         serializer = DistrictSerializer(districts, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -534,6 +1090,19 @@ class DistrictDetailAPIView(APIView):
     """
     permission_classes = [AllowAny]
 
+    # CRITICAL: @extend_schema must be BEFORE @swagger_auto_schema for drf-spectacular
+    @extend_schema(
+        summary="Get District Details",
+        description="Get detailed information about a specific district by ID",
+        tags=['Properties'],
+        parameters=[
+            OpenApiParameter('pk', OpenApiTypes.INT, OpenApiParameter.PATH, description="District ID", required=True),
+        ],
+        responses={
+            200: DistrictSerializer,
+            404: {'description': 'District not found'}
+        }
+    )
     @swagger_auto_schema(
         operation_description="Get detailed information about a specific district by ID",
         operation_summary="Get District Details",
@@ -566,17 +1135,37 @@ class AmenityListAPIView(APIView):
     """
     permission_classes = [AllowAny]
 
+    # CRITICAL: @extend_schema must be BEFORE @swagger_auto_schema for drf-spectacular
+    @extend_schema(
+        summary="List Amenities",
+        description="Get a list of all available amenities (WiFi, Parking, Pool, etc.). Supports optional search.",
+        tags=['Properties'],
+        parameters=[
+            OpenApiParameter('search', OpenApiTypes.STR, OpenApiParameter.QUERY, description="Search amenities by name", required=False),
+        ],
+        responses={200: AmenitySerializer(many=True)}
+    )
     @swagger_auto_schema(
-        operation_description="Get a list of all property amenities (e.g., WiFi, Parking, Pool, etc.)",
+        operation_description="Get a list of all property amenities (e.g., WiFi, Parking, Pool, etc.). Supports optional search.",
         operation_summary="List Amenities",
         tags=['Properties'],
+        manual_parameters=[
+            openapi.Parameter('search', openapi.IN_QUERY, description="Search amenities by name", type=openapi.TYPE_STRING, required=False),
+        ],
         responses={
             200: AmenitySerializer(many=True)
         }
     )
     def get(self, request, *args, **kwargs):
-        """Get all amenities"""
-        amenities = Amenity.objects.all().order_by('name')
+        """Get all amenities with optional search"""
+        amenities = Amenity.objects.all()
+        
+        # Optional search filter
+        search_query = request.GET.get('search', '').strip()
+        if search_query:
+            amenities = amenities.filter(name__icontains=search_query)
+        
+        amenities = amenities.order_by('name')
         serializer = AmenitySerializer(amenities, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -588,6 +1177,19 @@ class AmenityDetailAPIView(APIView):
     """
     permission_classes = [AllowAny]
 
+    # CRITICAL: @extend_schema must be BEFORE @swagger_auto_schema for drf-spectacular
+    @extend_schema(
+        summary="Get Amenity Details",
+        description="Get detailed information about a specific amenity by ID",
+        tags=['Properties'],
+        parameters=[
+            OpenApiParameter('pk', OpenApiTypes.INT, OpenApiParameter.PATH, description="Amenity ID", required=True),
+        ],
+        responses={
+            200: AmenitySerializer,
+            404: {'description': 'Amenity not found'}
+        }
+    )
     @swagger_auto_schema(
         operation_description="Get detailed information about a specific amenity by ID",
         operation_summary="Get Amenity Details",
@@ -621,6 +1223,19 @@ class PropertyImageUploadAPIView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [parsers.MultiPartParser, parsers.FormParser]
 
+    # CRITICAL: @extend_schema must be BEFORE @swagger_auto_schema for drf-spectacular
+    @extend_schema(
+        summary="Upload Property Image",
+        description="Upload an image for a property. User must own the property.",
+        tags=['Properties'],
+        request=PropertyImageUploadSerializer,
+        responses={
+            201: PropertyImageUploadSerializer,
+            400: {'description': 'Validation error'},
+            401: {'description': 'Authentication required'},
+            403: {'description': 'Permission denied - you must own the property'}
+        }
+    )
     @swagger_auto_schema(
         operation_description="Upload an image for a property. User must own the property.",
         operation_summary="Upload Property Image",
@@ -670,10 +1285,32 @@ class FavoritePropertiesAPIView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
+    # CRITICAL: @extend_schema must be BEFORE @swagger_auto_schema for drf-spectacular
+    @extend_schema(
+        summary="Get Favorite Properties",
+        description="Get a list of properties favorited by the current authenticated user. Supports pagination and optional filtering.",
+        tags=['Properties'],
+        parameters=[
+            OpenApiParameter('page', OpenApiTypes.INT, OpenApiParameter.QUERY, description="Page number for pagination (default: 1)", required=False),
+            OpenApiParameter('page_size', OpenApiTypes.INT, OpenApiParameter.QUERY, description="Number of items per page (default: 20, max: 100)", required=False),
+            OpenApiParameter('property_type', OpenApiTypes.INT, OpenApiParameter.QUERY, description="Filter favorites by property type ID", required=False),
+            OpenApiParameter('category', OpenApiTypes.STR, OpenApiParameter.QUERY, description="Filter favorites by category name (e.g., 'house', 'hotel', 'lodge', 'venue')", required=False),
+        ],
+        responses={
+            200: PropertyFavoriteSerializer(many=True),
+            401: {'description': 'Authentication required'}
+        }
+    )
     @swagger_auto_schema(
-        operation_description="Get a list of properties favorited by the current authenticated user",
+        operation_description="Get a list of properties favorited by the current authenticated user. Supports pagination and optional filtering.",
         operation_summary="Get Favorite Properties",
         tags=['Properties'],
+        manual_parameters=[
+            openapi.Parameter('page', openapi.IN_QUERY, description="Page number for pagination (default: 1)", type=openapi.TYPE_INTEGER, required=False),
+            openapi.Parameter('page_size', openapi.IN_QUERY, description="Number of items per page (default: 20, max: 100)", type=openapi.TYPE_INTEGER, required=False),
+            openapi.Parameter('property_type', openapi.IN_QUERY, description="Filter favorites by property type ID", type=openapi.TYPE_INTEGER, required=False),
+            openapi.Parameter('category', openapi.IN_QUERY, description="Filter favorites by category name (e.g., 'house', 'hotel', 'lodge', 'venue')", type=openapi.TYPE_STRING, required=False),
+        ],
         responses={
             200: PropertyFavoriteSerializer(many=True),
             401: "Authentication required"
@@ -681,12 +1318,99 @@ class FavoritePropertiesAPIView(APIView):
         security=[{'Bearer': []}]
     )
     def get(self, request, *args, **kwargs):
-        """Get current user's favorite properties"""
-        favorites = PropertyFavorite.objects.filter(user=request.user).select_related('property').order_by('-created_at')
-        serializer = PropertyFavoriteSerializer(favorites, many=True, context={'request': request})
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        """Get current user's favorite properties with optional pagination and filtering"""
+        favorites = PropertyFavorite.objects.filter(user=request.user).select_related('property', 'property__property_type').order_by('-created_at')
+        
+        # Filter by property_type ID (if provided)
+        property_type_id = request.GET.get('property_type')
+        if property_type_id:
+            try:
+                favorites = favorites.filter(property__property_type_id=int(property_type_id))
+            except (ValueError, TypeError):
+                pass
+        
+        # Filter by category name (if provided)
+        category_name = request.GET.get('category')
+        if category_name:
+            category_name = category_name.lower().strip()
+            favorites = favorites.filter(property__property_type__name__iexact=category_name)
+        
+        # Pagination
+        page = request.GET.get('page', 1)
+        page_size = request.GET.get('page_size', 20)
+        
+        try:
+            page = int(page)
+            page_size = int(page_size)
+            # Limit max page size
+            if page_size > 100:
+                page_size = 100
+            if page_size < 1:
+                page_size = 20
+            if page < 1:
+                page = 1
+        except (ValueError, TypeError):
+            page = 1
+            page_size = 20
+        
+        # Calculate pagination
+        total = favorites.count()
+        start = (page - 1) * page_size
+        end = start + page_size
+        favorites_page = favorites[start:end]
+        
+        serializer = PropertyFavoriteSerializer(favorites_page, many=True, context={'request': request})
+        
+        # Return paginated response
+        return Response({
+            'count': total,
+            'page': page,
+            'page_size': page_size,
+            'total_pages': (total + page_size - 1) // page_size if total > 0 else 0,
+            'results': serializer.data
+        }, status=status.HTTP_200_OK)
 
 
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular
+@extend_schema(
+    summary="Toggle Property Favorite",
+    description="Add or remove a property from user's favorites. If property is already favorited, it will be removed. If not favorited, it will be added.",
+    tags=['Properties'],
+    request={
+        'application/json': {
+            'schema': {
+                'type': 'object',
+                'required': ['property_id'],
+                'properties': {
+                    'property_id': {
+                        'type': 'integer',
+                        'description': 'ID of the property to favorite/unfavorite'
+                    }
+                }
+            }
+        }
+    },
+    responses={
+        200: {
+            'description': 'Favorite status toggled successfully',
+            'content': {
+                'application/json': {
+                    'schema': {
+                        'type': 'object',
+                        'properties': {
+                            'is_favorited': {'type': 'boolean', 'description': 'Whether the property is now favorited'},
+                            'favorites_count': {'type': 'integer', 'description': 'Total number of users who favorited this property'},
+                            'message': {'type': 'string'}
+                        }
+                    }
+                }
+            }
+        },
+        400: {'description': 'Invalid property ID'},
+        401: {'description': 'Authentication required'},
+        404: {'description': 'Property not found'}
+    }
+)
 @swagger_auto_schema(
     operation_description="Add or remove a property from user's favorites. If property is already favorited, it will be removed. If not favorited, it will be added.",
     operation_summary="Toggle Property Favorite",
@@ -713,9 +1437,33 @@ class FavoritePropertiesAPIView(APIView):
                 }
             )
         ),
-        400: "Invalid property ID",
-        401: "Authentication required",
-        404: "Property not found"
+        400: openapi.Response(
+            description="Invalid property ID",
+            schema=openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'detail': openapi.Schema(type=openapi.TYPE_STRING, description='Error message')
+                }
+            )
+        ),
+        401: openapi.Response(
+            description="Authentication required",
+            schema=openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'detail': openapi.Schema(type=openapi.TYPE_STRING, description='Error message')
+                }
+            )
+        ),
+        404: openapi.Response(
+            description="Property not found",
+            schema=openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'detail': openapi.Schema(type=openapi.TYPE_STRING, description='Error message')
+                }
+            )
+        )
     },
     security=[{'Bearer': []}],
     methods=['post']
@@ -767,14 +1515,36 @@ def toggle_favorite(request):
 # Search and special endpoints
 # ---------------------------------------------------------------------------
 
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular to detect parameters
+@extend_schema(
+    summary="Search Properties",
+    description="Search properties with filters. Supports search by title, description, address, property type (ID) or category (name), region, bedrooms, rent range, etc. Supports pagination.",
+    tags=['Properties'],
+    parameters=[
+        OpenApiParameter('search', OpenApiTypes.STR, OpenApiParameter.QUERY, description="Search query (title, description, address)", required=False),
+        OpenApiParameter('property_type', OpenApiTypes.INT, OpenApiParameter.QUERY, description="Filter by property type ID", required=False),
+        OpenApiParameter('category', OpenApiTypes.STR, OpenApiParameter.QUERY, description="Filter by category name (e.g., 'house', 'hotel', 'lodge', 'venue')", required=False),
+        OpenApiParameter('region', OpenApiTypes.INT, OpenApiParameter.QUERY, description="Filter by region ID", required=False),
+        OpenApiParameter('district', OpenApiTypes.INT, OpenApiParameter.QUERY, description="Filter by district ID", required=False),
+        OpenApiParameter('min_bedrooms', OpenApiTypes.INT, OpenApiParameter.QUERY, description="Minimum bedrooms", required=False),
+        OpenApiParameter('max_bedrooms', OpenApiTypes.INT, OpenApiParameter.QUERY, description="Maximum bedrooms", required=False),
+        OpenApiParameter('min_rent', OpenApiTypes.NUMBER, OpenApiParameter.QUERY, description="Minimum rent amount", required=False),
+        OpenApiParameter('max_rent', OpenApiTypes.NUMBER, OpenApiParameter.QUERY, description="Maximum rent amount", required=False),
+        OpenApiParameter('status', OpenApiTypes.STR, OpenApiParameter.QUERY, description="Filter by status (available, rented, under_maintenance, unavailable)", required=False),
+        OpenApiParameter('page', OpenApiTypes.INT, OpenApiParameter.QUERY, description="Page number for pagination (default: 1)", required=False),
+        OpenApiParameter('page_size', OpenApiTypes.INT, OpenApiParameter.QUERY, description="Number of items per page (default: 20, max: 100)", required=False),
+    ],
+    responses={200: PropertyListSerializer(many=True)}
+)
 @swagger_auto_schema(
     method='get',
-    operation_description="Search properties with filters. Supports search by title, description, address, property type, region, bedrooms, rent range, etc.",
+    operation_description="Search properties with filters. Supports search by title, description, address, property type (ID) or category (name), region, bedrooms, rent range, etc. Supports pagination.",
     operation_summary="Search Properties",
     tags=['Properties'],
     manual_parameters=[
         openapi.Parameter('search', openapi.IN_QUERY, description="Search query (title, description, address)", type=openapi.TYPE_STRING, required=False),
         openapi.Parameter('property_type', openapi.IN_QUERY, description="Filter by property type ID", type=openapi.TYPE_INTEGER, required=False),
+        openapi.Parameter('category', openapi.IN_QUERY, description="Filter by category name (e.g., 'house', 'hotel', 'lodge', 'venue')", type=openapi.TYPE_STRING, required=False),
         openapi.Parameter('region', openapi.IN_QUERY, description="Filter by region ID", type=openapi.TYPE_INTEGER, required=False),
         openapi.Parameter('district', openapi.IN_QUERY, description="Filter by district ID", type=openapi.TYPE_INTEGER, required=False),
         openapi.Parameter('min_bedrooms', openapi.IN_QUERY, description="Minimum bedrooms", type=openapi.TYPE_INTEGER, required=False),
@@ -782,6 +1552,8 @@ def toggle_favorite(request):
         openapi.Parameter('min_rent', openapi.IN_QUERY, description="Minimum rent amount", type=openapi.TYPE_NUMBER, required=False),
         openapi.Parameter('max_rent', openapi.IN_QUERY, description="Maximum rent amount", type=openapi.TYPE_NUMBER, required=False),
         openapi.Parameter('status', openapi.IN_QUERY, description="Filter by status (available, rented, under_maintenance, unavailable)", type=openapi.TYPE_STRING, required=False),
+        openapi.Parameter('page', openapi.IN_QUERY, description="Page number for pagination (default: 1)", type=openapi.TYPE_INTEGER, required=False),
+        openapi.Parameter('page_size', openapi.IN_QUERY, description="Number of items per page (default: 20, max: 100)", type=openapi.TYPE_INTEGER, required=False),
     ],
     responses={
         200: PropertyListSerializer(many=True)
@@ -808,17 +1580,35 @@ def property_search(request):
         )
     
     # Filters
+    # Filter by property_type ID (if provided)
     property_type_id = request.GET.get('property_type')
     if property_type_id:
-        properties = properties.filter(property_type_id=property_type_id)
+        try:
+            properties = properties.filter(property_type_id=int(property_type_id))
+        except (ValueError, TypeError):
+            pass
+    
+    # Filter by category name (for mobile app compatibility)
+    # This allows filtering by category name like 'house', 'hotel', 'lodge', 'venue'
+    category_name = request.GET.get('category')
+    if category_name:
+        # Normalize category name to lowercase for matching
+        category_name = category_name.lower().strip()
+        properties = properties.filter(property_type__name__iexact=category_name)
     
     region_id = request.GET.get('region')
     if region_id:
-        properties = properties.filter(region_id=region_id)
+        try:
+            properties = properties.filter(region_id=int(region_id))
+        except (ValueError, TypeError):
+            pass
     
     district_id = request.GET.get('district')
     if district_id:
-        properties = properties.filter(district_id=district_id)
+        try:
+            properties = properties.filter(district_id=int(district_id))
+        except (ValueError, TypeError):
+            pass
     
     min_bedrooms = request.GET.get('min_bedrooms')
     if min_bedrooms:
@@ -853,15 +1643,90 @@ def property_search(request):
         properties = properties.filter(status=status_filter)
     
     properties = properties.order_by('-created_at')
-    serializer = PropertyListSerializer(properties, many=True, context={'request': request})
-    return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    # Pagination
+    page = request.GET.get('page', 1)
+    page_size = request.GET.get('page_size', 20)
+    
+    try:
+        page = int(page)
+        page_size = int(page_size)
+        if page_size > 100:
+            page_size = 100
+        if page_size < 1:
+            page_size = 20
+        if page < 1:
+            page = 1
+    except (ValueError, TypeError):
+        page = 1
+        page_size = 20
+    
+    # Calculate pagination
+    total = properties.count()
+    start = (page - 1) * page_size
+    end = start + page_size
+    properties_page = properties[start:end]
+    
+    serializer = PropertyListSerializer(properties_page, many=True, context={'request': request})
+    
+    # Return paginated response
+    return Response({
+        'count': total,
+        'page': page,
+        'page_size': page_size,
+        'total_pages': (total + page_size - 1) // page_size if total > 0 else 0,
+        'results': serializer.data
+    }, status=status.HTTP_200_OK)
 
 
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular to detect parameters
+@extend_schema(
+    summary="Get Featured Properties",
+    description="Get featured properties (properties marked as featured). Supports optional filtering.",
+    tags=['Properties'],
+    parameters=[
+        OpenApiParameter(
+            name='limit',
+            type=OpenApiTypes.INT,
+            location=OpenApiParameter.QUERY,
+            description='Number of properties to return (default: all, max: 100)',
+            required=False
+        ),
+        OpenApiParameter(
+            name='property_type',
+            type=OpenApiTypes.INT,
+            location=OpenApiParameter.QUERY,
+            description='Filter by property type ID',
+            required=False
+        ),
+        OpenApiParameter(
+            name='category',
+            type=OpenApiTypes.STR,
+            location=OpenApiParameter.QUERY,
+            description="Filter by category name (e.g., 'house', 'hotel', 'lodge', 'venue')",
+            required=False
+        ),
+        OpenApiParameter(
+            name='region',
+            type=OpenApiTypes.INT,
+            location=OpenApiParameter.QUERY,
+            description='Filter by region ID',
+            required=False
+        ),
+    ],
+    responses={200: PropertyListSerializer(many=True)}
+)
 @swagger_auto_schema(
     method='get',
-    operation_description="Get featured properties (properties marked as featured)",
+    operation_description="Get featured properties (properties marked as featured). Supports optional filtering.",
     operation_summary="Get Featured Properties",
     tags=['Properties'],
+    manual_parameters=[
+        openapi.Parameter('limit', openapi.IN_QUERY, description="Number of properties to return (default: all, max: 100)", type=openapi.TYPE_INTEGER, required=False),
+        openapi.Parameter('property_type', openapi.IN_QUERY, description="Filter by property type ID", type=openapi.TYPE_INTEGER, required=False),
+        openapi.Parameter('category', openapi.IN_QUERY, description="Filter by category name (e.g., 'house', 'hotel', 'lodge', 'venue')", type=openapi.TYPE_STRING, required=False),
+        openapi.Parameter('region', openapi.IN_QUERY, description="Filter by region ID", type=openapi.TYPE_INTEGER, required=False),
+    ],
     responses={
         200: PropertyListSerializer(many=True)
     }
@@ -869,24 +1734,100 @@ def property_search(request):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def featured_properties(request):
-    """Get featured properties"""
+    """Get featured properties with optional filtering"""
     properties = Property.objects.filter(
         is_active=True,
         is_approved=True,
         is_featured=True
-    ).select_related('property_type', 'region', 'owner').prefetch_related('images', 'amenities').order_by('-created_at')
+    ).select_related('property_type', 'region', 'owner').prefetch_related('images', 'amenities')
+    
+    # Filter by property_type ID (if provided)
+    property_type_id = request.GET.get('property_type')
+    if property_type_id:
+        try:
+            properties = properties.filter(property_type_id=int(property_type_id))
+        except (ValueError, TypeError):
+            pass
+    
+    # Filter by category name (if provided)
+    category_name = request.GET.get('category')
+    if category_name:
+        category_name = category_name.lower().strip()
+        properties = properties.filter(property_type__name__iexact=category_name)
+    
+    # Filter by region ID (if provided)
+    region_id = request.GET.get('region')
+    if region_id:
+        try:
+            properties = properties.filter(region_id=int(region_id))
+        except (ValueError, TypeError):
+            pass
+    
+    properties = properties.order_by('-created_at')
+    
+    # Optional limit
+    limit = request.GET.get('limit')
+    if limit:
+        try:
+            limit = int(limit)
+            if limit > 100:
+                limit = 100
+            if limit > 0:
+                properties = properties[:limit]
+        except (ValueError, TypeError):
+            pass
     
     serializer = PropertyListSerializer(properties, many=True, context={'request': request})
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular to detect parameters
+@extend_schema(
+    summary="Get Recent Properties",
+    description="Get recently added properties (most recent first). Supports optional filtering.",
+    tags=['Properties'],
+    parameters=[
+        OpenApiParameter(
+            name='limit',
+            type=OpenApiTypes.INT,
+            location=OpenApiParameter.QUERY,
+            description='Number of properties to return (default: 10, max: 100)',
+            required=False
+        ),
+        OpenApiParameter(
+            name='property_type',
+            type=OpenApiTypes.INT,
+            location=OpenApiParameter.QUERY,
+            description='Filter by property type ID',
+            required=False
+        ),
+        OpenApiParameter(
+            name='category',
+            type=OpenApiTypes.STR,
+            location=OpenApiParameter.QUERY,
+            description="Filter by category name (e.g., 'house', 'hotel', 'lodge', 'venue')",
+            required=False
+        ),
+        OpenApiParameter(
+            name='region',
+            type=OpenApiTypes.INT,
+            location=OpenApiParameter.QUERY,
+            description='Filter by region ID',
+            required=False
+        ),
+    ],
+    responses={200: PropertyListSerializer(many=True)}
+)
 @swagger_auto_schema(
     method='get',
-    operation_description="Get recently added properties (most recent first)",
+    operation_description="Get recently added properties (most recent first). Supports optional filtering.",
     operation_summary="Get Recent Properties",
     tags=['Properties'],
     manual_parameters=[
-        openapi.Parameter('limit', openapi.IN_QUERY, description="Number of properties to return (default: 10)", type=openapi.TYPE_INTEGER, required=False),
+        openapi.Parameter('limit', openapi.IN_QUERY, description="Number of properties to return (default: 10, max: 100)", type=openapi.TYPE_INTEGER, required=False),
+        openapi.Parameter('property_type', openapi.IN_QUERY, description="Filter by property type ID", type=openapi.TYPE_INTEGER, required=False),
+        openapi.Parameter('category', openapi.IN_QUERY, description="Filter by category name (e.g., 'house', 'hotel', 'lodge', 'venue')", type=openapi.TYPE_STRING, required=False),
+        openapi.Parameter('region', openapi.IN_QUERY, description="Filter by region ID", type=openapi.TYPE_INTEGER, required=False),
     ],
     responses={
         200: PropertyListSerializer(many=True)
@@ -895,29 +1836,105 @@ def featured_properties(request):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def recent_properties(request):
-    """Get recent properties"""
+    """Get recent properties with optional filtering"""
+    properties = Property.objects.filter(
+        is_active=True,
+        is_approved=True
+    ).select_related('property_type', 'region', 'owner').prefetch_related('images', 'amenities')
+    
+    # Filter by property_type ID (if provided)
+    property_type_id = request.GET.get('property_type')
+    if property_type_id:
+        try:
+            properties = properties.filter(property_type_id=int(property_type_id))
+        except (ValueError, TypeError):
+            pass
+    
+    # Filter by category name (if provided)
+    category_name = request.GET.get('category')
+    if category_name:
+        category_name = category_name.lower().strip()
+        properties = properties.filter(property_type__name__iexact=category_name)
+    
+    # Filter by region ID (if provided)
+    region_id = request.GET.get('region')
+    if region_id:
+        try:
+            properties = properties.filter(region_id=int(region_id))
+        except (ValueError, TypeError):
+            pass
+    
+    properties = properties.order_by('-created_at')
+    
+    # Apply limit
     limit = request.GET.get('limit', 10)
     try:
         limit = int(limit)
         if limit > 100:
             limit = 100
+        if limit < 1:
+            limit = 10
     except (ValueError, TypeError):
         limit = 10
     
-    properties = Property.objects.filter(
-        is_active=True,
-        is_approved=True
-    ).select_related('property_type', 'region', 'owner').prefetch_related('images', 'amenities').order_by('-created_at')[:limit]
+    properties = properties[:limit]
     
     serializer = PropertyListSerializer(properties, many=True, context={'request': request})
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular to detect parameters
+@extend_schema(
+    summary="Get Property Statistics",
+    description="Get property statistics including total properties, available properties, rented properties, average rent, and breakdowns by type and region. Supports optional filtering by region.",
+    tags=['Properties'],
+    parameters=[
+        OpenApiParameter(
+            name='region',
+            type=OpenApiTypes.INT,
+            location=OpenApiParameter.QUERY,
+            description='Filter statistics by region ID (optional)',
+            required=False
+        ),
+        OpenApiParameter(
+            name='property_type',
+            type=OpenApiTypes.INT,
+            location=OpenApiParameter.QUERY,
+            description='Filter statistics by property type ID (optional)',
+            required=False
+        ),
+    ],
+    responses={
+        200: {
+            'description': 'Property statistics',
+            'content': {
+                'application/json': {
+                    'schema': {
+                        'type': 'object',
+                        'properties': {
+                            'total_properties': {'type': 'integer'},
+                            'available_properties': {'type': 'integer'},
+                            'rented_properties': {'type': 'integer'},
+                            'under_maintenance': {'type': 'integer'},
+                            'average_rent': {'type': 'number'},
+                            'properties_by_type': {'type': 'object'},
+                            'properties_by_region': {'type': 'object'},
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
 @swagger_auto_schema(
     method='get',
-    operation_description="Get property statistics including total properties, available properties, rented properties, average rent, and breakdowns by type and region",
+    operation_description="Get property statistics including total properties, available properties, rented properties, average rent, and breakdowns by type and region. Supports optional filtering by region.",
     operation_summary="Get Property Statistics",
     tags=['Properties'],
+    manual_parameters=[
+        openapi.Parameter('region', openapi.IN_QUERY, description="Filter statistics by region ID (optional)", type=openapi.TYPE_INTEGER, required=False),
+        openapi.Parameter('property_type', openapi.IN_QUERY, description="Filter statistics by property type ID (optional)", type=openapi.TYPE_INTEGER, required=False),
+    ],
     responses={
         200: openapi.Response(
             description="Property statistics",
@@ -939,27 +1956,60 @@ def recent_properties(request):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def property_stats(request):
-    """Get property statistics"""
+    """Get property statistics with optional filtering"""
     from django.db.models import Count, Avg
     
-    total_properties = Property.objects.filter(is_approved=True).count()
-    available_properties = Property.objects.filter(status='available', is_active=True, is_approved=True).count()
-    rented_properties = Property.objects.filter(status='rented', is_approved=True).count()
-    under_maintenance = Property.objects.filter(status='under_maintenance', is_approved=True).count()
+    # Base queryset
+    base_filter = {'is_approved': True}
+    
+    # Optional region filter
+    region_id = request.GET.get('region')
+    if region_id:
+        try:
+            base_filter['region_id'] = int(region_id)
+        except (ValueError, TypeError):
+            pass
+    
+    # Optional property_type filter
+    property_type_id = request.GET.get('property_type')
+    if property_type_id:
+        try:
+            base_filter['property_type_id'] = int(property_type_id)
+        except (ValueError, TypeError):
+            pass
+    
+    total_properties = Property.objects.filter(**base_filter).count()
+    available_properties = Property.objects.filter(status='available', is_active=True, **base_filter).count()
+    rented_properties = Property.objects.filter(status='rented', **base_filter).count()
+    under_maintenance = Property.objects.filter(status='under_maintenance', **base_filter).count()
     
     average_rent = Property.objects.filter(
-        is_approved=True,
-        rent_amount__isnull=False
+        rent_amount__isnull=False,
+        **base_filter
     ).aggregate(avg_rent=Avg('rent_amount'))['avg_rent'] or 0
     
-    # Properties by type
+    # Properties by type (with optional filter)
+    type_filter = Q(properties__is_approved=True)
+    if property_type_id:
+        try:
+            type_filter &= Q(properties__property_type_id=int(property_type_id))
+        except (ValueError, TypeError):
+            pass
+    
     properties_by_type = PropertyType.objects.annotate(
-        count=Count('properties', filter=Q(properties__is_approved=True))
+        count=Count('properties', filter=type_filter)
     ).values('id', 'name', 'count')
     
-    # Properties by region
+    # Properties by region (with optional filter)
+    region_filter = Q(properties__is_approved=True)
+    if region_id:
+        try:
+            region_filter &= Q(properties__region_id=int(region_id))
+        except (ValueError, TypeError):
+            pass
+    
     properties_by_region = Region.objects.annotate(
-        count=Count('properties', filter=Q(properties__is_approved=True))
+        count=Count('properties', filter=region_filter)
     ).values('id', 'name', 'count')
     
     return Response({
@@ -1002,13 +2052,92 @@ def property_stats(request):
     },
     security=[{'Bearer': []}]
 )
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular
+@extend_schema(
+    summary="Get Booking Details",
+    description="Get detailed information about a specific booking by ID. User must be the booking tenant or property owner.",
+    tags=['Bookings'],
+    parameters=[
+        OpenApiParameter('booking_id', OpenApiTypes.INT, OpenApiParameter.PATH, description="Booking ID", required=True),
+    ],
+    responses={
+        200: {'description': 'Booking details'},
+        401: {'description': 'Authentication required'},
+        403: {'description': 'Permission denied'},
+        404: {'description': 'Booking not found'}
+    }
+)
+@swagger_auto_schema(
+    method='get',
+    operation_description="Get detailed information about a specific booking by ID. User must be the booking tenant or property owner.",
+    operation_summary="Get Booking Details",
+    tags=['Bookings'],
+    manual_parameters=[
+        openapi.Parameter(
+            'booking_id',
+            openapi.IN_PATH,
+            description="Booking ID",
+            type=openapi.TYPE_INTEGER,
+            required=True
+        )
+    ],
+    responses={
+        200: openapi.Response(
+            description="Booking details",
+            schema=openapi.Schema(type=openapi.TYPE_OBJECT)
+        ),
+        401: "Authentication required",
+        403: "Permission denied",
+        404: "Booking not found"
+    },
+    security=[{'Bearer': []}]
+)
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def booking_details_api(request, booking_id):
-    """Get booking details"""
+    """Get booking details - handles both properties.Booking and documents.Booking"""
     try:
-        from documents.models import Booking
-        booking = get_object_or_404(Booking, pk=booking_id)
+        # Try properties.Booking first (web admin bookings)
+        from .models import Booking as PropertiesBooking
+        try:
+            booking = PropertiesBooking.objects.select_related('customer', 'property_obj', 'created_by').get(pk=booking_id)
+            
+            # Check permissions - created_by or property owner
+            if booking.created_by != request.user and booking.property_obj.owner != request.user and not (request.user.is_staff or request.user.is_superuser):
+                return Response(
+                    {"detail": "You do not have permission to view this booking."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            return Response({
+                'id': booking.id,
+                'booking_reference': booking.booking_reference,
+                'property': booking.property_obj.id,
+                'property_title': booking.property_obj.title,
+                'customer': {
+                    'id': booking.customer.id,
+                    'full_name': booking.customer.full_name,
+                    'email': booking.customer.email,
+                    'phone': booking.customer.phone,
+                },
+                'check_in_date': booking.check_in_date.strftime('%Y-%m-%d'),
+                'check_out_date': booking.check_out_date.strftime('%Y-%m-%d'),
+                'number_of_guests': booking.number_of_guests,
+                'room_number': booking.room_number,
+                'room_type': booking.room_type,
+                'total_amount': float(booking.total_amount),
+                'paid_amount': float(booking.paid_amount),
+                'booking_status': booking.booking_status,
+                'payment_status': booking.payment_status,
+                'special_requests': booking.special_requests,
+                'created_at': booking.created_at.strftime('%Y-%m-%d %H:%M:%S') if booking.created_at else None,
+            }, status=status.HTTP_200_OK)
+        except PropertiesBooking.DoesNotExist:
+            pass
+        
+        # Try documents.Booking (mobile app bookings)
+        from documents.models import Booking as DocumentBooking
+        booking = get_object_or_404(DocumentBooking, pk=booking_id)
         
         # Check permissions - tenant or property owner
         if booking.tenant != request.user and booking.property_ref.owner != request.user and not (request.user.is_staff or request.user.is_superuser):
@@ -1022,33 +2151,73 @@ def booking_details_api(request, booking_id):
             'property': booking.property_ref.id,
             'property_title': booking.property_ref.title,
             'tenant': booking.tenant.username,
-            'check_in': booking.check_in,
-            'check_out': booking.check_out,
+            'check_in': booking.check_in.strftime('%Y-%m-%d') if booking.check_in else None,
+            'check_out': booking.check_out.strftime('%Y-%m-%d') if booking.check_out else None,
             'total_amount': str(booking.total_amount),
             'status': booking.status,
-            'created_at': booking.created_at,
-            'nights': booking.nights,
+            'created_at': booking.created_at.strftime('%Y-%m-%d %H:%M:%S') if booking.created_at else None,
+            'nights': booking.nights if hasattr(booking, 'nights') else None,
         }, status=status.HTTP_200_OK)
     except Exception as e:
+        import traceback
         return Response(
-            {"detail": f"Error retrieving booking: {str(e)}"},
+            {"detail": f"Error retrieving booking: {str(e)}", "traceback": traceback.format_exc()},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
 
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular
+@extend_schema(
+    summary="Update Booking Status",
+    description="Update booking status. User must be property owner or admin. Can use either 'action' (confirm, check_in, check_out, cancel) or 'status' (pending, confirmed, checked_in, checked_out, cancelled).",
+    tags=['Bookings'],
+    parameters=[
+        OpenApiParameter('booking_id', OpenApiTypes.INT, OpenApiParameter.PATH, description="Booking ID", required=True),
+    ],
+    request={
+        'application/json': {
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'action': {
+                        'type': 'string',
+                        'enum': ['confirm', 'check_in', 'check_out', 'cancel'],
+                        'description': 'Action to perform (alternative to status)'
+                    },
+                    'status': {
+                        'type': 'string',
+                        'enum': ['pending', 'confirmed', 'checked_in', 'checked_out', 'cancelled', 'completed'],
+                        'description': 'New booking status (alternative to action)'
+                    }
+                }
+            }
+        }
+    },
+    responses={
+        200: {'description': 'Status updated successfully'},
+        400: {'description': 'Invalid status or action'},
+        401: {'description': 'Authentication required'},
+        403: {'description': 'Permission denied'},
+        404: {'description': 'Booking not found'}
+    }
+)
 @swagger_auto_schema(
     method='post',
-    operation_description="Update booking status. User must be property owner or admin.",
+    operation_description="Update booking status. User must be property owner or admin. Can use either 'action' (confirm, check_in, check_out, cancel) or 'status' (pending, confirmed, checked_in, checked_out, cancelled).",
     operation_summary="Update Booking Status",
     tags=['Bookings'],
     request_body=openapi.Schema(
         type=openapi.TYPE_OBJECT,
-        required=['status'],
         properties={
+            'action': openapi.Schema(
+                type=openapi.TYPE_STRING,
+                enum=['confirm', 'check_in', 'check_out', 'cancel'],
+                description='Action to perform (alternative to status)'
+            ),
             'status': openapi.Schema(
                 type=openapi.TYPE_STRING,
-                enum=['pending', 'confirmed', 'cancelled', 'completed'],
-                description='New booking status'
+                enum=['pending', 'confirmed', 'checked_in', 'checked_out', 'cancelled', 'completed'],
+                description='New booking status (alternative to action)'
             )
         }
     ),
@@ -1066,7 +2235,7 @@ def booking_details_api(request, booking_id):
             description="Status updated successfully",
             schema=openapi.Schema(type=openapi.TYPE_OBJECT)
         ),
-        400: "Invalid status",
+        400: "Invalid status or action",
         401: "Authentication required",
         403: "Permission denied",
         404: "Booking not found"
@@ -1076,10 +2245,79 @@ def booking_details_api(request, booking_id):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def booking_status_update_api(request, booking_id):
-    """Update booking status"""
+    """Update booking status - handles both properties.Booking and documents.Booking"""
     try:
-        from documents.models import Booking
-        booking = get_object_or_404(Booking, pk=booking_id)
+        # Get action or status from request
+        action = request.data.get('action')
+        new_status = request.data.get('status')
+        
+        # Map actions to statuses for properties.Booking
+        action_to_status = {
+            'confirm': 'confirmed',
+            'check_in': 'checked_in',
+            'check_out': 'checked_out',
+            'cancel': 'cancelled'
+        }
+        
+        # Try properties.Booking first (web admin bookings)
+        from .models import Booking as PropertiesBooking
+        try:
+            booking = PropertiesBooking.objects.select_related('property_obj', 'created_by').get(pk=booking_id)
+            
+            # Check permissions - created_by or property owner
+            if booking.created_by != request.user and booking.property_obj.owner != request.user and not (request.user.is_staff or request.user.is_superuser):
+                return Response(
+                    {"detail": "You do not have permission to update this booking."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Determine new status
+            if action and action in action_to_status:
+                new_status = action_to_status[action]
+            elif not new_status:
+                return Response(
+                    {"detail": "Either 'action' or 'status' must be provided"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Validate status
+            valid_statuses = ['pending', 'confirmed', 'checked_in', 'checked_out', 'cancelled', 'no_show']
+            if new_status not in valid_statuses:
+                return Response(
+                    {"detail": f"Invalid status. Must be one of: {', '.join(valid_statuses)}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            booking.booking_status = new_status
+            booking.save()
+            
+            # If booking is cancelled and has a room assigned, sync room status
+            # This applies to both hotel and lodge bookings
+            if new_status == 'cancelled' and booking.room_number and booking.property_obj:
+                try:
+                    from .models import Room
+                    room = Room.objects.get(
+                        property_obj=booking.property_obj,
+                        room_number=booking.room_number
+                    )
+                    # Use the sync method to properly update room status based on all bookings
+                    room.sync_status_from_bookings()
+                except Room.DoesNotExist:
+                    # Room might not exist (e.g., for house bookings), that's okay
+                    pass
+            
+            return Response({
+                'success': True,
+                'id': booking.id,
+                'status': booking.booking_status,
+                'message': f'Booking status updated to {new_status}'
+            }, status=status.HTTP_200_OK)
+        except PropertiesBooking.DoesNotExist:
+            pass
+        
+        # Try documents.Booking (mobile app bookings)
+        from documents.models import Booking as DocumentBooking
+        booking = get_object_or_404(DocumentBooking, pk=booking_id)
         
         # Check permissions - property owner or admin
         if booking.property_ref.owner != request.user and not (request.user.is_staff or request.user.is_superuser):
@@ -1088,7 +2326,15 @@ def booking_status_update_api(request, booking_id):
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        new_status = request.data.get('status')
+        # Determine new status
+        if action and action in action_to_status:
+            new_status = action_to_status[action]
+        elif not new_status:
+            return Response(
+                {"detail": "Either 'action' or 'status' must be provided"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
         if new_status not in ['pending', 'confirmed', 'cancelled', 'completed']:
             return Response(
                 {"detail": "Invalid status. Must be one of: pending, confirmed, cancelled, completed"},
@@ -1099,17 +2345,47 @@ def booking_status_update_api(request, booking_id):
         booking.save()
         
         return Response({
+            'success': True,
             'id': booking.id,
             'status': booking.status,
             'message': f'Booking status updated to {new_status}'
         }, status=status.HTTP_200_OK)
     except Exception as e:
+        import traceback
         return Response(
-            {"detail": f"Error updating booking: {str(e)}"},
+            {"detail": f"Error updating booking: {str(e)}", "traceback": traceback.format_exc()},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
 
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular
+@extend_schema(
+    summary="Edit Booking",
+    description="Edit booking details. User must be property owner or admin.",
+    tags=['Bookings'],
+    parameters=[
+        OpenApiParameter('booking_id', OpenApiTypes.INT, OpenApiParameter.PATH, description="Booking ID", required=True),
+    ],
+    request={
+        'application/json': {
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'check_in': {'type': 'string', 'format': 'date', 'description': 'Check-in date (YYYY-MM-DD)'},
+                    'check_out': {'type': 'string', 'format': 'date', 'description': 'Check-out date (YYYY-MM-DD)'},
+                    'total_amount': {'type': 'number', 'description': 'Total booking amount'}
+                }
+            }
+        }
+    },
+    responses={
+        200: {'description': 'Booking updated successfully'},
+        400: {'description': 'Validation error'},
+        401: {'description': 'Authentication required'},
+        403: {'description': 'Permission denied'},
+        404: {'description': 'Booking not found'}
+    }
+)
 @swagger_auto_schema(
     method='post',
     operation_description="Edit booking details. User must be property owner or admin.",
@@ -1144,14 +2420,100 @@ def booking_status_update_api(request, booking_id):
     },
     security=[{'Bearer': []}]
 )
-@api_view(["POST"])
+@api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def booking_edit_api(request, booking_id):
-    """Edit booking"""
+    """Edit booking - handles both properties.Booking and documents.Booking"""
     try:
-        from documents.models import Booking
         from django.utils.dateparse import parse_date
-        booking = get_object_or_404(Booking, pk=booking_id)
+        
+        # Try properties.Booking first (web admin bookings)
+        from .models import Booking as PropertiesBooking
+        try:
+            booking = PropertiesBooking.objects.select_related('customer', 'property_obj', 'created_by').get(pk=booking_id)
+            
+            # Check permissions - created_by or property owner
+            if booking.created_by != request.user and booking.property_obj.owner != request.user and not (request.user.is_staff or request.user.is_superuser):
+                return Response(
+                    {"detail": "You do not have permission to edit this booking."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # GET request - return booking data
+            if request.method == 'GET':
+                return Response({
+                    'id': booking.id,
+                    'booking_reference': booking.booking_reference,
+                    'customer': {
+                        'id': booking.customer.id,
+                        'first_name': booking.customer.first_name,
+                        'last_name': booking.customer.last_name,
+                        'full_name': booking.customer.full_name,
+                        'email': booking.customer.email,
+                        'phone': booking.customer.phone,
+                        'address': booking.customer.address,
+                    },
+                    'check_in_date': booking.check_in_date.strftime('%Y-%m-%d') if booking.check_in_date else None,
+                    'check_out_date': booking.check_out_date.strftime('%Y-%m-%d') if booking.check_out_date else None,
+                    'number_of_guests': booking.number_of_guests,
+                    'room_number': booking.room_number,
+                    'room_type': booking.room_type,
+                    'total_amount': float(booking.total_amount),
+                    'paid_amount': float(booking.paid_amount),
+                    'booking_status': booking.booking_status,
+                    'payment_status': booking.payment_status,
+                    'special_requests': booking.special_requests,
+                    'notes': getattr(booking, 'notes', ''),
+                }, status=status.HTTP_200_OK)
+            
+            # POST request - update booking
+            if 'check_in_date' in request.data:
+                check_in = parse_date(request.data['check_in_date'])
+                if check_in:
+                    booking.check_in_date = check_in
+            
+            if 'check_out_date' in request.data:
+                check_out = parse_date(request.data['check_out_date'])
+                if check_out:
+                    booking.check_out_date = check_out
+            
+            if 'number_of_guests' in request.data:
+                try:
+                    booking.number_of_guests = int(request.data['number_of_guests'])
+                except (ValueError, TypeError):
+                    pass
+            
+            if 'room_number' in request.data:
+                booking.room_number = request.data['room_number']
+            
+            if 'room_type' in request.data:
+                booking.room_type = request.data['room_type']
+            
+            if 'total_amount' in request.data:
+                try:
+                    booking.total_amount = float(request.data['total_amount'])
+                except (ValueError, TypeError):
+                    return Response(
+                        {"detail": "Invalid total_amount"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            if 'special_requests' in request.data:
+                booking.special_requests = request.data['special_requests']
+            
+            booking.save()
+            
+            return Response({
+                'success': True,
+                'id': booking.id,
+                'message': 'Booking updated successfully'
+            }, status=status.HTTP_200_OK)
+        except PropertiesBooking.DoesNotExist:
+            pass
+        
+        # Try documents.Booking (mobile app bookings)
+        from documents.models import Booking as DocumentBooking
+        booking = get_object_or_404(DocumentBooking, pk=booking_id)
         
         # Check permissions - property owner or admin
         if booking.property_ref.owner != request.user and not (request.user.is_staff or request.user.is_superuser):
@@ -1160,7 +2522,16 @@ def booking_edit_api(request, booking_id):
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        # Update fields if provided
+        # GET request - return booking data
+        if request.method == 'GET':
+            return Response({
+                'id': booking.id,
+                'check_in': booking.check_in.strftime('%Y-%m-%d') if booking.check_in else None,
+                'check_out': booking.check_out.strftime('%Y-%m-%d') if booking.check_out else None,
+                'total_amount': str(booking.total_amount),
+            }, status=status.HTTP_200_OK)
+        
+        # POST request - update booking
         if 'check_in' in request.data:
             check_in = parse_date(request.data['check_in'])
             if check_in:
@@ -1183,15 +2554,17 @@ def booking_edit_api(request, booking_id):
         booking.save()
         
         return Response({
+            'success': True,
             'id': booking.id,
-            'check_in': booking.check_in,
-            'check_out': booking.check_out,
+            'check_in': booking.check_in.strftime('%Y-%m-%d') if booking.check_in else None,
+            'check_out': booking.check_out.strftime('%Y-%m-%d') if booking.check_out else None,
             'total_amount': str(booking.total_amount),
             'message': 'Booking updated successfully'
         }, status=status.HTTP_200_OK)
     except Exception as e:
+        import traceback
         return Response(
-            {"detail": f"Error editing booking: {str(e)}"},
+            {"detail": f"Error editing booking: {str(e)}", "traceback": traceback.format_exc()},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -1200,6 +2573,37 @@ def booking_edit_api(request, booking_id):
 # Visit payment / property visit endpoints
 # ---------------------------------------------------------------------------
 
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular
+@extend_schema(
+    summary="Get Property Visit Status",
+    description="Get property visit payment status. Check if visit payment has been made for a property.",
+    tags=['Properties'],
+    parameters=[
+        OpenApiParameter('property_id', OpenApiTypes.INT, OpenApiParameter.PATH, description="Property ID", required=True),
+    ],
+    responses={
+        200: {
+            'description': 'Visit payment status',
+            'content': {
+                'application/json': {
+                    'schema': {
+                        'type': 'object',
+                        'properties': {
+                            'has_paid': {'type': 'boolean', 'description': 'Whether user has an active (non-expired) visit payment'},
+                            'is_expired': {'type': 'boolean', 'description': 'Whether the visit payment has expired (72 hours from payment)'},
+                            'visit_cost': {'type': 'number'},
+                            'paid_at': {'type': 'string', 'format': 'date-time', 'description': 'When the payment was made'},
+                            'expires_at': {'type': 'string', 'format': 'date-time', 'description': 'When the visit payment expires (72 hours after payment)'},
+                            'message': {'type': 'string'}
+                        }
+                    }
+                }
+            }
+        },
+        401: {'description': 'Authentication required'},
+        404: {'description': 'Property not found'}
+    }
+)
 @swagger_auto_schema(
     method='get',
     operation_description="Get property visit payment status. Check if visit payment has been made for a property.",
@@ -1220,8 +2624,11 @@ def booking_edit_api(request, booking_id):
             schema=openapi.Schema(
                 type=openapi.TYPE_OBJECT,
                 properties={
-                    'has_paid': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                    'has_paid': openapi.Schema(type=openapi.TYPE_BOOLEAN, description='Whether user has an active (non-expired) visit payment'),
+                    'is_expired': openapi.Schema(type=openapi.TYPE_BOOLEAN, description='Whether the visit payment has expired (72 hours from payment)'),
                     'visit_cost': openapi.Schema(type=openapi.TYPE_NUMBER),
+                    'paid_at': openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_DATETIME, description='When the payment was made'),
+                    'expires_at': openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_DATETIME, description='When the visit payment expires (72 hours after payment)'),
                     'message': openapi.Schema(type=openapi.TYPE_STRING)
                 }
             )
@@ -1235,6 +2642,8 @@ def booking_edit_api(request, booking_id):
 @permission_classes([IsAuthenticated])
 def property_visit_status(request, property_id):
     """Get property visit payment status"""
+    from django.utils import timezone
+    
     property_obj = get_object_or_404(Property, pk=property_id)
     
     # Check if user has paid for visit
@@ -1245,16 +2654,55 @@ def property_visit_status(request, property_id):
         status='completed'
     ).first()
     
-    has_paid = visit_payment is not None
+    # Check if payment exists and is still active (not expired)
+    has_paid = visit_payment is not None and visit_payment.is_active()
+    is_expired = visit_payment is not None and visit_payment.is_expired() if visit_payment else False
     visit_cost = property_obj.visit_cost or 0
     
-    return Response({
+    response_data = {
         'has_paid': has_paid,
         'visit_cost': float(visit_cost) if visit_cost else 0,
-        'message': 'Visit payment completed' if has_paid else 'Visit payment pending'
-    }, status=status.HTTP_200_OK)
+        'is_expired': is_expired,
+        'message': 'Visit payment completed' if has_paid else ('Visit payment expired. Please pay again.' if is_expired else 'Visit payment pending')
+    }
+    
+    # Add expiration info if payment exists
+    if visit_payment:
+        expires_at = visit_payment.expires_at()
+        response_data['paid_at'] = visit_payment.paid_at.isoformat() if visit_payment.paid_at else None
+        response_data['expires_at'] = expires_at.isoformat() if expires_at else None
+    
+    return Response(response_data, status=status.HTTP_200_OK)
 
 
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular
+@extend_schema(
+    summary="Initiate Property Visit Payment",
+    description="Initiate a property visit payment. Creates a payment request for visiting the property.",
+    tags=['Properties'],
+    parameters=[
+        OpenApiParameter('property_id', OpenApiTypes.INT, OpenApiParameter.PATH, description="Property ID", required=True),
+    ],
+    request={
+        'application/json': {
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'payment_method': {
+                        'type': 'string',
+                        'description': 'Payment method (e.g., mobile_money, card)'
+                    }
+                }
+            }
+        }
+    },
+    responses={
+        200: {'description': 'Payment initiated successfully'},
+        400: {'description': 'Invalid request'},
+        401: {'description': 'Authentication required'},
+        404: {'description': 'Property not found'}
+    }
+)
 @swagger_auto_schema(
     method='post',
     operation_description="Initiate a property visit payment. Creates a payment request for visiting the property.",
@@ -1298,7 +2746,7 @@ def property_visit_initiate(request, property_id):
             status=status.HTTP_400_BAD_REQUEST
         )
     
-    # Check if already paid
+    # Check if already paid and still active
     from .models import PropertyVisitPayment
     existing_payment = PropertyVisitPayment.objects.filter(
         property=property_obj,
@@ -1306,12 +2754,24 @@ def property_visit_initiate(request, property_id):
         status='completed'
     ).first()
     
-    if existing_payment:
+    # If payment exists and is still active (not expired), return success
+    if existing_payment and existing_payment.is_active():
         return Response({
-            'message': 'Visit payment already completed',
+            'message': 'Visit payment already completed and active',
             'payment_id': existing_payment.id,
-            'status': 'completed'
+            'status': 'completed',
+            'expires_at': existing_payment.expires_at().isoformat() if existing_payment.expires_at() else None
         }, status=status.HTTP_200_OK)
+    
+    # If payment exists but expired, allow re-payment by resetting to pending
+    if existing_payment and existing_payment.is_expired():
+        # Reset to pending to allow new payment
+        existing_payment.status = 'pending'
+        existing_payment.paid_at = None
+        existing_payment.transaction_id = None
+        existing_payment.gateway_reference = None
+        existing_payment.amount = property_obj.visit_cost  # Update amount in case it changed
+        existing_payment.save()
     
     # Create payment record (stub - actual payment processing would go here)
     return Response({
@@ -1322,6 +2782,35 @@ def property_visit_initiate(request, property_id):
     }, status=status.HTTP_200_OK)
 
 
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular
+@extend_schema(
+    summary="Verify Property Visit Payment",
+    description="Verify property visit payment. Confirms that payment has been completed.",
+    tags=['Properties'],
+    parameters=[
+        OpenApiParameter('property_id', OpenApiTypes.INT, OpenApiParameter.PATH, description="Property ID", required=True),
+    ],
+    request={
+        'application/json': {
+            'schema': {
+                'type': 'object',
+                'required': ['payment_reference'],
+                'properties': {
+                    'payment_reference': {
+                        'type': 'string',
+                        'description': 'Payment reference/transaction ID'
+                    }
+                }
+            }
+        }
+    },
+    responses={
+        200: {'description': 'Payment verified successfully'},
+        400: {'description': 'Invalid payment reference'},
+        401: {'description': 'Authentication required'},
+        404: {'description': 'Property not found'}
+    }
+)
 @swagger_auto_schema(
     method='post',
     operation_description="Verify property visit payment. Confirms that payment has been completed.",
@@ -1380,6 +2869,44 @@ def property_visit_verify(request, property_id):
 # New: property availability API (used by booking forms / tests)
 # ---------------------------------------------------------------------------
 
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular
+@extend_schema(
+    summary="Get Property Availability",
+    description="Get property availability information including booked dates and next available date.",
+    tags=['Properties'],
+    parameters=[
+        OpenApiParameter('property_id', OpenApiTypes.INT, OpenApiParameter.PATH, description="Property ID", required=True),
+    ],
+    responses={
+        200: {'description': 'Property availability information'},
+        401: {'description': 'Authentication required'},
+        404: {'description': 'Property not found'}
+    }
+)
+@swagger_auto_schema(
+    method='get',
+    operation_description="Get property availability information including booked dates and next available date.",
+    operation_summary="Get Property Availability",
+    tags=['Properties'],
+    manual_parameters=[
+        openapi.Parameter(
+            'property_id',
+            openapi.IN_PATH,
+            description="Property ID",
+            type=openapi.TYPE_INTEGER,
+            required=True
+        )
+    ],
+    responses={
+        200: openapi.Response(
+            description="Property availability information",
+            schema=openapi.Schema(type=openapi.TYPE_OBJECT)
+        ),
+        401: "Authentication required",
+        404: "Property not found"
+    },
+    security=[{'Bearer': []}]
+)
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def property_availability_api(request, property_id):
@@ -1487,4 +3014,278 @@ def property_availability_api(request, property_id):
         return Response(
             {"error": f"Failed to fetch availability: {str(e)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Available Rooms API for Mobile App (Hotels/Lodges)
+# ---------------------------------------------------------------------------
+
+# Note: extend_schema, OpenApiParameter, and OpenApiTypes are already imported at the top of the file
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular to detect parameters
+@extend_schema(
+    summary="Get Available Rooms",
+    description="""
+    Get available rooms for a hotel or lodge property.
+    
+    This endpoint returns rooms that are currently available for booking.
+    Optionally filter by check-in and check-out dates to see which rooms
+    are available for a specific date range.
+    
+    **Query Parameters:**
+    - `property_id` (required): The ID of the hotel/lodge property
+    - `check_in_date` (optional): Check-in date in YYYY-MM-DD format
+    - `check_out_date` (optional): Check-out date in YYYY-MM-DD format
+    
+    **Response:**
+    Returns a list of available rooms with details including:
+    - Room number, type, floor, capacity
+    - Bed type, amenities, base rate
+    - Availability status
+    """,
+    tags=['Properties'],
+    parameters=[
+        OpenApiParameter(
+            name='property_id',
+            type=OpenApiTypes.INT,
+            location=OpenApiParameter.QUERY,
+            description='Property ID (required)',
+            required=True
+        ),
+        OpenApiParameter(
+            name='check_in_date',
+            type=OpenApiTypes.STR,
+            location=OpenApiParameter.QUERY,
+            description='Check-in date (YYYY-MM-DD) - optional',
+            required=False
+        ),
+        OpenApiParameter(
+            name='check_out_date',
+            type=OpenApiTypes.STR,
+            location=OpenApiParameter.QUERY,
+            description='Check-out date (YYYY-MM-DD) - optional',
+            required=False
+        ),
+    ],
+    responses={
+        200: {
+            'description': 'List of available rooms',
+            'content': {
+                'application/json': {
+                    'schema': {
+                        'type': 'object',
+                        'properties': {
+                            'property_id': {'type': 'integer'},
+                            'property_title': {'type': 'string'},
+                            'property_type': {'type': 'string'},
+                            'total_rooms': {'type': 'integer'},
+                            'available_count': {'type': 'integer'},
+                            'check_in_date': {'type': 'string', 'format': 'date', 'nullable': True},
+                            'check_out_date': {'type': 'string', 'format': 'date', 'nullable': True},
+                            'rooms': {
+                                'type': 'array',
+                                'items': {'type': 'object'}
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        400: {'description': 'Bad request'},
+        404: {'description': 'Property not found'}
+    }
+)
+@swagger_auto_schema(
+    method='get',
+    operation_description="""
+    Get available rooms for a hotel or lodge property.
+    
+    This endpoint returns rooms that are currently available for booking.
+    Optionally filter by check-in and check-out dates to see which rooms
+    are available for a specific date range.
+    
+    Query Parameters:
+    - property_id (required): The ID of the hotel/lodge property
+    - check_in_date (optional): Check-in date in YYYY-MM-DD format
+    - check_out_date (optional): Check-out date in YYYY-MM-DD format
+    """,
+    operation_summary="Get Available Rooms",
+    tags=['Properties'],
+    manual_parameters=[
+        openapi.Parameter(
+            'property_id',
+            openapi.IN_QUERY,
+            description="Property ID (required)",
+            type=openapi.TYPE_INTEGER,
+            required=True
+        ),
+        openapi.Parameter(
+            'check_in_date',
+            openapi.IN_QUERY,
+            description="Check-in date (YYYY-MM-DD) - optional",
+            type=openapi.TYPE_STRING,
+            required=False
+        ),
+        openapi.Parameter(
+            'check_out_date',
+            openapi.IN_QUERY,
+            description="Check-out date (YYYY-MM-DD) - optional",
+            type=openapi.TYPE_STRING,
+            required=False
+        ),
+    ],
+    responses={
+        200: openapi.Response(
+            description="List of available rooms",
+            schema=openapi.Schema(type=openapi.TYPE_OBJECT)
+        ),
+        400: "Bad request",
+        404: "Property not found"
+    }
+)
+@api_view(["GET"])
+@permission_classes([AllowAny])  # Public endpoint - customers need to see available rooms
+def available_rooms_api(request):
+    """
+    REST API endpoint to get available rooms for hotels and lodges.
+    
+    This is specifically designed for mobile apps to display available rooms
+    so customers can choose which room to book.
+    
+    Query Parameters:
+    - property_id (required): ID of the property
+    - check_in_date (optional): Filter by check-in date (YYYY-MM-DD)
+    - check_out_date (optional): Filter by check-out date (YYYY-MM-DD)
+    """
+    from datetime import datetime
+    
+    try:
+        # Get property_id from query parameters
+        property_id = request.query_params.get('property_id')
+        if not property_id:
+            return Response(
+                {"error": "property_id is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            property_id = int(property_id)
+        except (ValueError, TypeError):
+            return Response(
+                {"error": "property_id must be a valid integer"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get the property
+        property_obj = get_object_or_404(Property, pk=property_id)
+        
+        # Check if it's a hotel or lodge
+        property_type_name = property_obj.property_type.name.lower() if property_obj.property_type else ''
+        if property_type_name not in ['hotel', 'lodge']:
+            return Response(
+                {
+                    "error": "This endpoint is only available for hotel and lodge properties",
+                    "property_type": property_type_name
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Parse optional date parameters
+        check_in_date = None
+        check_out_date = None
+        
+        check_in_str = request.query_params.get('check_in_date')
+        check_out_str = request.query_params.get('check_out_date')
+        
+        if check_in_str:
+            try:
+                check_in_date = datetime.strptime(check_in_str, '%Y-%m-%d').date()
+            except (ValueError, TypeError):
+                return Response(
+                    {"error": "check_in_date must be in YYYY-MM-DD format"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        if check_out_str:
+            try:
+                check_out_date = datetime.strptime(check_out_str, '%Y-%m-%d').date()
+            except (ValueError, TypeError):
+                return Response(
+                    {"error": "check_out_date must be in YYYY-MM-DD format"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        # Validate date range if both dates provided
+        if check_in_date and check_out_date:
+            if check_out_date <= check_in_date:
+                return Response(
+                    {"error": "check_out_date must be after check_in_date"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        # Get all active rooms for this property
+        rooms = Room.objects.filter(
+            property_obj=property_obj,
+            is_active=True
+        ).order_by('room_number')
+        
+        # Filter available rooms
+        available_rooms_list = []
+        
+        for room in rooms:
+            # Sync room status to ensure it's up-to-date with bookings
+            # This fixes cases where current_booking points to cancelled bookings
+            room.sync_status_from_bookings()
+            
+            # Basic availability check: status must be 'available'
+            if room.status != 'available':
+                continue
+            
+            # If room has a current booking, it's not available
+            if room.current_booking:
+                continue
+            
+            # If date range is provided, check for booking conflicts
+            if check_in_date and check_out_date:
+                # Check if room has any bookings that conflict with the requested dates
+                conflicting_bookings = Booking.objects.filter(
+                    property_obj=property_obj,
+                    room_number=room.room_number,
+                    booking_status__in=['pending', 'confirmed', 'checked_in'],
+                    check_in_date__lt=check_out_date,
+                    check_out_date__gt=check_in_date
+                ).exists()
+                
+                if conflicting_bookings:
+                    continue
+            
+            # Room is available, add to list
+            available_rooms_list.append(room)
+        
+        # Serialize available rooms
+        serializer = RoomSerializer(available_rooms_list, many=True, context={'request': request})
+        
+        return Response(
+            {
+                "property_id": property_obj.id,
+                "property_title": property_obj.title,
+                "property_type": property_type_name,
+                "total_rooms": rooms.count(),
+                "available_count": len(available_rooms_list),
+                "check_in_date": check_in_str if check_in_str else None,
+                "check_out_date": check_out_str if check_out_str else None,
+                "rooms": serializer.data
+            },
+            status=status.HTTP_200_OK
+        )
+        
+    except Property.DoesNotExist:
+        return Response(
+            {"error": "Property not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {"error": f"Failed to fetch available rooms: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

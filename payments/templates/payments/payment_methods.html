@@ -122,16 +122,24 @@
         <h5 class="mb-0">Payment Providers</h5>
       </div>
       <div class="col-auto">
-        <div class="d-flex gap-2">
-          <input type="text" id="providers-search-input" class="form-control form-control-sm" placeholder="Search providers..." value="{{ provider_search|default:'' }}">
-          <select id="providers-status-filter" class="form-select form-select-sm">
+        <div class="d-flex align-items-center gap-2">
+          <div class="input-group input-group-sm" style="width: 260px;">
+            <input type="search" class="form-control" id="providers-search-input" placeholder="Search providers..." value="{{ provider_search|default:'' }}">
+            <button class="btn btn-outline-secondary" id="providers-search-clear">Clear</button>
+          </div>
+          <select id="providers-status-filter" class="form-select form-select-sm" style="width: auto;">
             <option value="">All Status</option>
-            <option value="active" {% if provider_status_filter == 'active' %}selected{% endif %}>Active</option>
-            <option value="inactive" {% if provider_status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
+            <option value="active" {% if provider_status == 'active' %}selected{% endif %}>Active</option>
+            <option value="inactive" {% if provider_status == 'inactive' %}selected{% endif %}>Inactive</option>
           </select>
-          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearProvidersFilters()">
-            <i class="fas fa-times"></i> Clear
-          </button>
+          <label class="form-label mb-0">Items per page:</label>
+          <select class="form-select form-select-sm" id="providerPageSizeSelect" style="width: auto;">
+            <option value="5" {% if provider_current_page_size == 5 %}selected{% endif %}>5</option>
+            <option value="10" {% if provider_current_page_size == 10 %}selected{% endif %}>10</option>
+            <option value="25" {% if provider_current_page_size == 25 %}selected{% endif %}>25</option>
+            <option value="50" {% if provider_current_page_size == 50 %}selected{% endif %}>50</option>
+            <option value="100" {% if provider_current_page_size == 100 %}selected{% endif %}>100</option>
+          </select>
         </div>
       </div>
     </div>
@@ -154,23 +162,31 @@
             <h5 class="mb-0">Transactions</h5>
           </div>
           <div class="col-auto">
-            <div class="d-flex gap-2">
-              <input type="text" id="methods-transactions-search" class="form-control form-control-sm" placeholder="Search..." value="{{ search_query|default:'' }}">
-              <select id="methods-transactions-status" class="form-select form-select-sm">
+            <div class="d-flex align-items-center gap-2">
+              <div class="input-group input-group-sm" style="width: 260px;">
+                <input type="search" class="form-control" id="methods-transactions-search" placeholder="Search transactions..." value="{{ search_query|default:'' }}">
+                <button class="btn btn-outline-secondary" id="methods-transactions-search-clear">Clear</button>
+              </div>
+              <select id="methods-transactions-status" class="form-select form-select-sm" style="width: auto;">
                 <option value="">All Status</option>
                 {% for value, label in status_choices %}
                 <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
               </select>
-              <select id="methods-transactions-provider" class="form-select form-select-sm">
+              <select id="methods-transactions-provider" class="form-select form-select-sm" style="width: auto;">
                 <option value="">All Providers</option>
                 {% for provider in providers %}
                 <option value="{{ provider.id }}" {% if provider_filter == provider.id|stringformat:"s" %}selected{% endif %}>{{ provider.name }}</option>
                 {% endfor %}
               </select>
-              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearMethodsFilters()">
-                <i class="fas fa-times"></i> Clear
-              </button>
+              <label class="form-label mb-0">Items per page:</label>
+              <select class="form-select form-select-sm" id="transactionPageSizeSelect" style="width: auto;">
+                <option value="5" {% if transaction_current_page_size == 5 %}selected{% endif %}>5</option>
+                <option value="10" {% if transaction_current_page_size == 10 %}selected{% endif %}>10</option>
+                <option value="25" {% if transaction_current_page_size == 25 %}selected{% endif %}>25</option>
+                <option value="50" {% if transaction_current_page_size == 50 %}selected{% endif %}>50</option>
+                <option value="100" {% if transaction_current_page_size == 100 %}selected{% endif %}>100</option>
+              </select>
             </div>
           </div>
         </div>
@@ -201,6 +217,7 @@ function initializeMethodsTransactions() {
         var search = $('#methods-transactions-search').val() || '';
         var status = $('#methods-transactions-status').val() || '';
         var provider = $('#methods-transactions-provider').val() || '';
+        var pageSize = $('#transactionPageSizeSelect').val() || '5';
         
         $('#methods-transactions-container').html('<div class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">Loading...</p></div>');
         
@@ -212,6 +229,7 @@ function initializeMethodsTransactions() {
                 'status': status,
                 'provider': provider,
                 'page': page,
+                'transaction_page_size': pageSize,
                 'table': 'transactions'
             },
             headers: {
@@ -226,13 +244,18 @@ function initializeMethodsTransactions() {
         });
     }
     
-    // Search input handler
+    // Debounced search
     var searchTimeout;
     $('#methods-transactions-search').on('input', function() {
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(function() {
             loadMethodsTransactionsTable(1);
-        }, 500);
+        }, 400);
+    });
+    
+    $('#methods-transactions-search-clear').on('click', function() {
+        $('#methods-transactions-search').val('');
+        loadMethodsTransactionsTable(1);
     });
     
     // Filter change handlers
@@ -241,6 +264,11 @@ function initializeMethodsTransactions() {
     });
     
     $('#methods-transactions-provider').on('change', function() {
+        loadMethodsTransactionsTable(1);
+    });
+    
+    // Page size change handler
+    $('#transactionPageSizeSelect').on('change', function() {
         loadMethodsTransactionsTable(1);
     });
     
@@ -254,6 +282,7 @@ function initializeMethodsTransactions() {
         $('#methods-transactions-search').val('');
         $('#methods-transactions-status').val('');
         $('#methods-transactions-provider').val('');
+        $('#transactionPageSizeSelect').val('5');
         loadMethodsTransactionsTable(1);
     };
 }
@@ -349,6 +378,7 @@ function initializeProviders() {
     function loadProvidersTable(page = 1) {
         var search = $('#providers-search-input').val() || '';
         var status = $('#providers-status-filter').val() || '';
+        var pageSize = $('#providerPageSizeSelect').val() || '5';
         
         $('#providers-table-container').html('<div class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">Loading...</p></div>');
         
@@ -359,6 +389,7 @@ function initializeProviders() {
                 'provider_search': search,
                 'provider_status': status,
                 'provider_page': page,
+                'provider_page_size': pageSize,
                 'table': 'providers'
             },
             headers: {
@@ -373,17 +404,27 @@ function initializeProviders() {
         });
     }
     
-    // Search input handler
+    // Debounced search
     var searchTimeout;
     $('#providers-search-input').on('input', function() {
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(function() {
             loadProvidersTable(1);
-        }, 500);
+        }, 400);
+    });
+    
+    $('#providers-search-clear').on('click', function() {
+        $('#providers-search-input').val('');
+        loadProvidersTable(1);
     });
     
     // Status filter handler
     $('#providers-status-filter').on('change', function() {
+        loadProvidersTable(1);
+    });
+    
+    // Page size change handler
+    $('#providerPageSizeSelect').on('change', function() {
         loadProvidersTable(1);
     });
     
@@ -396,6 +437,7 @@ function initializeProviders() {
     window.clearProvidersFilters = function() {
         $('#providers-search-input').val('');
         $('#providers-status-filter').val('');
+        $('#providerPageSizeSelect').val('5');
         loadProvidersTable(1);
     };
 }

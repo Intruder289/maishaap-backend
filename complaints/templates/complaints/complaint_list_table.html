@@ -104,12 +104,15 @@
               <li><a class="dropdown-item" href="#" onclick="openMarkResolvedModal({{ complaint.id }})">
                 <i class="fas fa-check me-2"></i>Mark Resolved
               </a></li>
-              {% if complaint.status == 'resolved' %}
               <li><hr class="dropdown-divider"></li>
               <li><a class="dropdown-item text-danger" href="#" onclick="openDeleteModal({{ complaint.id }})">
                 <i class="fas fa-trash me-2"></i>Delete
               </a></li>
-              {% endif %}
+              {% elif complaint.user == user %}
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item text-danger" href="#" onclick="openDeleteModal({{ complaint.id }})">
+                <i class="fas fa-trash me-2"></i>Delete
+              </a></li>
               {% endif %}
             </ul>
           </div>

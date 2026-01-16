@@ -11,32 +11,158 @@ from rent.models import RentInvoice, RentPayment
 from maintenance.models import MaintenanceRequest
 from properties.models import Property
 from django.contrib.auth.models import User
-from drf_yasg.utils import swagger_auto_schema
-from drf_yasg import openapi
+# Swagger documentation - using drf-spectacular
+try:
+    from drf_yasg.utils import swagger_auto_schema
+    from drf_yasg import openapi
+except ImportError:
+    # drf-yasg not installed, use drf-spectacular instead
+    from drf_spectacular.utils import extend_schema, OpenApiParameter
+    from drf_spectacular.types import OpenApiTypes
+    
+    # Create a wrapper to convert swagger_auto_schema to extend_schema for drf-spectacular
+    def swagger_auto_schema(*args, **kwargs):
+        # Handle method parameter - drf-spectacular doesn't need it
+        method = kwargs.pop('method', None)
+        
+        # Extract parameters from manual_parameters if present
+        manual_params = kwargs.get('manual_parameters', [])
+        spectacular_params = []
+        
+        if manual_params:
+            # Convert drf-yasg parameters to drf-spectacular parameters
+            for param in manual_params:
+                if param is None:
+                    continue
+                if callable(param) and not hasattr(param, 'name'):
+                    continue
+                
+                param_name = None
+                param_type = OpenApiTypes.STR
+                param_location = OpenApiParameter.QUERY
+                param_description = ''
+                param_required = False
+                
+                if hasattr(param, 'name') and param.name:
+                    param_name = param.name
+                    param_description = getattr(param, 'description', '') or ''
+                    param_required = getattr(param, 'required', False)
+                    
+                    param_type_attr = getattr(param, 'type', None)
+                    type_str = str(param_type_attr).lower() if param_type_attr else ''
+                    
+                    if (param_type_attr == openapi.TYPE_INTEGER or 'integer' in type_str):
+                        param_type = OpenApiTypes.INT
+                    elif (param_type_attr == openapi.TYPE_NUMBER or 'number' in type_str):
+                        param_type = OpenApiTypes.NUMBER
+                    elif (param_type_attr == openapi.TYPE_BOOLEAN or 'boolean' in type_str):
+                        param_type = OpenApiTypes.BOOL
+                    else:
+                        param_type = OpenApiTypes.STR
+                    
+                    param_in = getattr(param, 'in_', None)
+                    in_str = str(param_in).lower() if param_in else ''
+                    
+                    if (param_in == openapi.IN_QUERY or 'query' in in_str):
+                        param_location = OpenApiParameter.QUERY
+                    elif (param_in == openapi.IN_PATH or 'path' in in_str):
+                        param_location = OpenApiParameter.PATH
+                    else:
+                        param_location = OpenApiParameter.QUERY
+                    
+                    spectacular_params.append(
+                        OpenApiParameter(
+                            name=param_name,
+                            type=param_type,
+                            location=param_location,
+                            description=param_description,
+                            required=param_required
+                        )
+                    )
+        
+        return extend_schema(
+            summary=kwargs.get('operation_summary', ''),
+            description=kwargs.get('operation_description', ''),
+            tags=kwargs.get('tags', []),
+            parameters=spectacular_params if spectacular_params else None,
+            responses=kwargs.get('responses', {})
+        )
+    
+    class openapi:
+        class Response:
+            def __init__(self, *args, **kwargs):
+                pass
+        class Schema:
+            def __init__(self, *args, **kwargs):
+                pass
+        class Items:
+            def __init__(self, *args, **kwargs):
+                pass
+        class Contact:
+            def __init__(self, *args, **kwargs):
+                pass
+        class License:
+            def __init__(self, *args, **kwargs):
+                pass
+        class Info:
+            def __init__(self, *args, **kwargs):
+                pass
+        TYPE_OBJECT = 'object'
+        TYPE_STRING = 'string'
+        TYPE_INTEGER = 'integer'
+        TYPE_NUMBER = 'number'
+        TYPE_BOOLEAN = 'boolean'
+        TYPE_ARRAY = 'array'
+        FORMAT_EMAIL = 'email'
+        FORMAT_DATE = 'date'
+        FORMAT_DATETIME = 'date-time'
+        FORMAT_DECIMAL = 'decimal'
+        FORMAT_URI = 'uri'
+        FORMAT_UUID = 'uuid'
+        IN_QUERY = 'query'
+        IN_PATH = 'path'
+        IN_BODY = 'body'
+        IN_FORM = 'formData'
+        IN_HEADER = 'header'
+        
+        # Create a proper Parameter class that stores arguments
+        class Parameter:
+            def __init__(self, name, in_, description=None, type=None, required=False, **kwargs):
+                self.name = name
+                self.in_ = in_
+                self.description = description or ''
+                self.type = type or 'string'
+                self.required = required
+                # Store all kwargs for compatibility
+                for key, value in kwargs.items():
+                    setattr(self, key, value)
 
 
-@swagger_auto_schema(
-    method='get',
-    operation_description="Get financial summary for dashboard including total revenue, expenses, net income, rent collected, and pending payments",
-    operation_summary="Get Financial Summary",
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular
+@extend_schema(
+    summary="Get Financial Summary",
+    description="Get financial summary for dashboard including total revenue, expenses, net income, rent collected, and pending payments",
     tags=['Reports'],
     responses={
-        200: openapi.Response(
-            description="Financial summary data",
-            schema=openapi.Schema(
-                type=openapi.TYPE_OBJECT,
-                properties={
-                    'total_revenue': openapi.Schema(type=openapi.TYPE_NUMBER),
-                    'total_expenses': openapi.Schema(type=openapi.TYPE_NUMBER),
-                    'net_income': openapi.Schema(type=openapi.TYPE_NUMBER),
-                    'rent_collected': openapi.Schema(type=openapi.TYPE_NUMBER),
-                    'pending_payments': openapi.Schema(type=openapi.TYPE_NUMBER),
+        200: {
+            'description': 'Financial summary data',
+            'content': {
+                'application/json': {
+                    'schema': {
+                        'type': 'object',
+                        'properties': {
+                            'total_revenue': {'type': 'number'},
+                            'total_expenses': {'type': 'number'},
+                            'net_income': {'type': 'number'},
+                            'rent_collected': {'type': 'number'},
+                            'pending_payments': {'type': 'number'}
+                        }
+                    }
                 }
-            )
-        ),
-        401: "Authentication required"
-    },
-    security=[{'Bearer': []}]
+            }
+        },
+        401: {'description': 'Authentication required'}
+    }
 )
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -110,27 +236,30 @@ def FinancialSummaryView(request):
     })
 
 
-@swagger_auto_schema(
-    method='get',
-    operation_description="Get rent collection report including collection rate, total collected, pending amount, and overdue amount",
-    operation_summary="Get Rent Collection Report",
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular
+@extend_schema(
+    summary="Get Rent Collection Report",
+    description="Get rent collection report including collection rate, total collected, pending amount, and overdue amount",
     tags=['Reports'],
     responses={
-        200: openapi.Response(
-            description="Rent collection report data",
-            schema=openapi.Schema(
-                type=openapi.TYPE_OBJECT,
-                properties={
-                    'collection_rate': openapi.Schema(type=openapi.TYPE_NUMBER),
-                    'total_collected': openapi.Schema(type=openapi.TYPE_NUMBER),
-                    'pending_amount': openapi.Schema(type=openapi.TYPE_NUMBER),
-                    'overdue_amount': openapi.Schema(type=openapi.TYPE_NUMBER),
+        200: {
+            'description': 'Rent collection report data',
+            'content': {
+                'application/json': {
+                    'schema': {
+                        'type': 'object',
+                        'properties': {
+                            'collection_rate': {'type': 'number'},
+                            'total_collected': {'type': 'number'},
+                            'pending_amount': {'type': 'number'},
+                            'overdue_amount': {'type': 'number'}
+                        }
+                    }
                 }
-            )
-        ),
-        401: "Authentication required"
-    },
-    security=[{'Bearer': []}]
+            }
+        },
+        401: {'description': 'Authentication required'}
+    }
 )
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -193,26 +322,29 @@ def RentCollectionReportView(request):
     })
 
 
-@swagger_auto_schema(
-    method='get',
-    operation_description="Get expense report including total expenses, breakdown by categories, and monthly trends",
-    operation_summary="Get Expense Report",
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular
+@extend_schema(
+    summary="Get Expense Report",
+    description="Get expense report including total expenses, breakdown by categories, and monthly trends",
     tags=['Reports'],
     responses={
-        200: openapi.Response(
-            description="Expense report data",
-            schema=openapi.Schema(
-                type=openapi.TYPE_OBJECT,
-                properties={
-                    'total_expenses': openapi.Schema(type=openapi.TYPE_NUMBER),
-                    'categories': openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Schema(type=openapi.TYPE_OBJECT)),
-                    'monthly_trend': openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Schema(type=openapi.TYPE_OBJECT)),
+        200: {
+            'description': 'Expense report data',
+            'content': {
+                'application/json': {
+                    'schema': {
+                        'type': 'object',
+                        'properties': {
+                            'total_expenses': {'type': 'number'},
+                            'categories': {'type': 'array', 'items': {'type': 'object'}},
+                            'monthly_trend': {'type': 'array', 'items': {'type': 'object'}}
+                        }
+                    }
                 }
-            )
-        ),
-        401: "Authentication required"
-    },
-    security=[{'Bearer': []}]
+            }
+        },
+        401: {'description': 'Authentication required'}
+    }
 )
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -281,27 +413,30 @@ def ExpenseReportView(request):
     })
 
 
-@swagger_auto_schema(
-    method='get',
-    operation_description="Get property occupancy report including occupancy rate, occupied units, vacant units, and total units",
-    operation_summary="Get Property Occupancy Report",
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular
+@extend_schema(
+    summary="Get Property Occupancy Report",
+    description="Get property occupancy report including occupancy rate, occupied units, vacant units, and total units",
     tags=['Reports'],
     responses={
-        200: openapi.Response(
-            description="Property occupancy report data",
-            schema=openapi.Schema(
-                type=openapi.TYPE_OBJECT,
-                properties={
-                    'occupancy_rate': openapi.Schema(type=openapi.TYPE_NUMBER),
-                    'occupied_units': openapi.Schema(type=openapi.TYPE_INTEGER),
-                    'vacant_units': openapi.Schema(type=openapi.TYPE_INTEGER),
-                    'total_units': openapi.Schema(type=openapi.TYPE_INTEGER),
+        200: {
+            'description': 'Property occupancy report data',
+            'content': {
+                'application/json': {
+                    'schema': {
+                        'type': 'object',
+                        'properties': {
+                            'occupancy_rate': {'type': 'number'},
+                            'occupied_units': {'type': 'integer'},
+                            'vacant_units': {'type': 'integer'},
+                            'total_units': {'type': 'integer'}
+                        }
+                    }
                 }
-            )
-        ),
-        401: "Authentication required"
-    },
-    security=[{'Bearer': []}]
+            }
+        },
+        401: {'description': 'Authentication required'}
+    }
 )
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -346,6 +481,32 @@ def PropertyOccupancyReportView(request):
     })
 
 
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular
+@extend_schema(
+    summary="Get Maintenance Report",
+    description="Get maintenance report including total requests, completed, pending, in progress, and average completion time",
+    tags=['Reports'],
+    responses={
+        200: {
+            'description': 'Maintenance report data',
+            'content': {
+                'application/json': {
+                    'schema': {
+                        'type': 'object',
+                        'properties': {
+                            'total_requests': {'type': 'integer'},
+                            'completed': {'type': 'integer'},
+                            'pending': {'type': 'integer'},
+                            'in_progress': {'type': 'integer'},
+                            'average_completion_time': {'type': 'number'},
+                        }
+                    }
+                }
+            }
+        },
+        401: {'description': 'Authentication required'}
+    }
+)
 @swagger_auto_schema(
     method='get',
     operation_description="Get maintenance report including total requests, completed, pending, in progress, and average completion time",
@@ -422,27 +583,30 @@ def MaintenanceReportView(request):
     })
 
 
-@swagger_auto_schema(
-    method='get',
-    operation_description="Get dashboard statistics including properties count, tenants count, maintenance requests, and monthly revenue",
-    operation_summary="Get Dashboard Statistics",
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular
+@extend_schema(
+    summary="Get Dashboard Statistics",
+    description="Get dashboard statistics including properties count, tenants count, maintenance requests, and monthly revenue",
     tags=['Reports'],
     responses={
-        200: openapi.Response(
-            description="Dashboard statistics",
-            schema=openapi.Schema(
-                type=openapi.TYPE_OBJECT,
-                properties={
-                    'properties': openapi.Schema(type=openapi.TYPE_INTEGER),
-                    'tenants': openapi.Schema(type=openapi.TYPE_INTEGER),
-                    'maintenance_requests': openapi.Schema(type=openapi.TYPE_INTEGER),
-                    'monthly_revenue': openapi.Schema(type=openapi.TYPE_NUMBER),
+        200: {
+            'description': 'Dashboard statistics',
+            'content': {
+                'application/json': {
+                    'schema': {
+                        'type': 'object',
+                        'properties': {
+                            'properties': {'type': 'integer'},
+                            'tenants': {'type': 'integer'},
+                            'maintenance_requests': {'type': 'integer'},
+                            'monthly_revenue': {'type': 'number'}
+                        }
+                    }
                 }
-            )
-        ),
-        401: "Authentication required"
-    },
-    security=[{'Bearer': []}]
+            }
+        },
+        401: {'description': 'Authentication required'}
+    }
 )
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -519,26 +683,29 @@ def DashboardStatsView(request):
     })
 
 
-@swagger_auto_schema(
-    method='get',
-    operation_description="Get dashboard chart data including revenue chart, occupancy chart, and maintenance chart",
-    operation_summary="Get Dashboard Chart Data",
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular
+@extend_schema(
+    summary="Get Dashboard Chart Data",
+    description="Get dashboard chart data including revenue chart, occupancy chart, and maintenance chart",
     tags=['Reports'],
     responses={
-        200: openapi.Response(
-            description="Dashboard chart data",
-            schema=openapi.Schema(
-                type=openapi.TYPE_OBJECT,
-                properties={
-                    'revenue_chart': openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Schema(type=openapi.TYPE_OBJECT)),
-                    'occupancy_chart': openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Schema(type=openapi.TYPE_OBJECT)),
-                    'maintenance_chart': openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Schema(type=openapi.TYPE_OBJECT)),
+        200: {
+            'description': 'Dashboard chart data',
+            'content': {
+                'application/json': {
+                    'schema': {
+                        'type': 'object',
+                        'properties': {
+                            'revenue_chart': {'type': 'array', 'items': {'type': 'object'}},
+                            'occupancy_chart': {'type': 'array', 'items': {'type': 'object'}},
+                            'maintenance_chart': {'type': 'array', 'items': {'type': 'object'}}
+                        }
+                    }
                 }
-            )
-        ),
-        401: "Authentication required"
-    },
-    security=[{'Bearer': []}]
+            }
+        },
+        401: {'description': 'Authentication required'}
+    }
 )
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

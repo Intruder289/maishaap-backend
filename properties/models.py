@@ -227,12 +227,39 @@ class Property(models.Model):
         """
         Automatically synchronize the property status based on active bookings or leases.
         Only toggles between 'available' and 'rented' so other manual statuses stay intact.
+        
+        For hotels/lodges: Status reflects room occupancy (rented if no available rooms)
+        For houses: Status reflects active bookings/leases (rented if has active booking/lease)
         """
-        has_activity = any([
-            self.has_active_property_booking(),
-            self.has_active_document_booking(),
-            self.has_active_lease()
-        ])
+        # For hotels and lodges, check room availability instead of just bookings
+        if self.is_hotel or (hasattr(self, 'property_type') and self.property_type.name.lower() == 'lodge'):
+            from properties.models import Room
+            total_rooms = Room.objects.filter(property_obj=self, is_active=True).count()
+            if total_rooms > 0:
+                # Count available rooms (status='available' and no current booking)
+                available_rooms = Room.objects.filter(
+                    property_obj=self,
+                    is_active=True,
+                    status='available'
+                ).exclude(current_booking__isnull=False).count()
+                
+                # Property is "rented" if there are NO available rooms
+                # Property is "available" if there are ANY available rooms
+                has_activity = (available_rooms == 0)
+            else:
+                # No rooms defined yet, fall back to booking-based logic
+                has_activity = any([
+                    self.has_active_property_booking(),
+                    self.has_active_document_booking(),
+                    self.has_active_lease()
+                ])
+        else:
+            # For houses and other property types, use booking/lease-based logic
+            has_activity = any([
+                self.has_active_property_booking(),
+                self.has_active_document_booking(),
+                self.has_active_lease()
+            ])
 
         desired_status = 'rented' if has_activity else 'available'
 
@@ -471,6 +498,33 @@ class PropertyVisitPayment(models.Model):
     
     def __str__(self):
         return f"Visit Payment - {self.user.username} - {self.property.title} - {self.status}"
+    
+    def expires_at(self):
+        """Calculate expiration datetime (72 hours from paid_at)"""
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        if not self.paid_at:
+            return None
+        
+        return self.paid_at + timedelta(hours=72)
+    
+    def is_expired(self):
+        """Check if visit payment has expired (72 hours from payment)"""
+        from django.utils import timezone
+        
+        if not self.paid_at or self.status != 'completed':
+            return False
+        
+        expiration_time = self.expires_at()
+        if not expiration_time:
+            return False
+        
+        return timezone.now() > expiration_time
+    
+    def is_active(self):
+        """Check if visit payment is active (completed and not expired)"""
+        return self.status == 'completed' and not self.is_expired()
 
 
 # Booking and Customer Management Models
@@ -573,6 +627,11 @@ class Booking(models.Model):
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_property_bookings')
     assigned_staff = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_property_bookings')
     
+    # Soft Delete (for admin to hide completed/cancelled bookings)
+    is_deleted = models.BooleanField(default=False, help_text="Soft delete flag - hides booking from main lists")
+    deleted_at = models.DateTimeField(blank=True, null=True, help_text="When the booking was soft deleted")
+    deleted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='deleted_bookings', help_text="Admin who soft deleted this booking")
+    
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -601,9 +660,35 @@ class Booking(models.Model):
     
     @property
     def base_rate(self):
-        """Get the base rate from property (rent_amount)"""
+        """
+        Get the base rate from room if assigned.
+        For hotel/lodge bookings, room assignment is mandatory, so we ONLY use room's base_rate.
+        For venues, use property's rent_amount (venues don't have rooms but have daily rates).
+        No fallback to property rent_amount for hotels/lodges - each room has its own price.
+        """
         if not self.property_obj:
             return 0
+        
+        # If a room is assigned, use ONLY the room's base_rate
+        if self.room_number:
+            try:
+                room = Room.objects.get(property_obj=self.property_obj, room_number=self.room_number)
+                # Return room's base_rate - this is the ONLY source of pricing for rooms
+                return room.base_rate or 0
+            except Room.DoesNotExist:
+                # Room not found - return 0 (should not happen for valid bookings)
+                return 0
+        
+        # For venues, use property's rent_amount (venues don't have rooms but have daily rates)
+        if self.property_obj.property_type.name.lower() == 'venue':
+            return self.property_obj.rent_amount or 0
+        
+        # For hotel/lodge bookings without room assignment, return 0
+        # (room assignment should be mandatory, but handle gracefully)
+        if self.property_obj.property_type.name.lower() in ['hotel', 'lodge']:
+            return 0
+        
+        # Only for house properties (which don't use rooms), fall back to property rent_amount
         return self.property_obj.rent_amount or 0
     
     @property
@@ -663,8 +748,15 @@ class Booking(models.Model):
         - 'month': base_rate × duration_months (houses)
         - 'week': base_rate × weeks (weekly rentals)
         - 'year': base_rate × years (yearly rentals)
+        
+        NOTE: For VENUES, this calculation is NOT used. Venues use manually entered total_amount
+        calculated from start_time/end_time, which is different from hotel/lodge date-based calculation.
         """
         try:
+            # For venues, return stored total_amount - DO NOT calculate (venues use time-based calculation)
+            if self.property_obj and self.property_obj.property_type.name.lower() == 'venue':
+                return self.total_amount if hasattr(self, 'total_amount') and self.total_amount else 0
+            
             base_rate = self.base_rate or 0
             duration_days = self.duration_days or 0
             
@@ -672,7 +764,7 @@ class Booking(models.Model):
                 return base_rate  # Return base rate if invalid duration
             
             if self.rent_period == 'day':
-                # Hotels, Lodges, Venues: daily_rate × nights
+                # Hotels, Lodges ONLY: daily_rate × nights (NOT venues - venues use time-based calculation)
                 return base_rate * duration_days
             elif self.rent_period == 'month':
                 # Houses: monthly_rate × months
@@ -773,6 +865,21 @@ class Booking(models.Model):
         if self.is_expired():
             self.booking_status = 'cancelled'
             self.save(update_fields=['booking_status'])
+            
+            # If booking has a room assigned, sync room status
+            # This applies to both hotel and lodge bookings
+            if self.room_number and self.property_obj:
+                try:
+                    room = Room.objects.get(
+                        property_obj=self.property_obj,
+                        room_number=self.room_number
+                    )
+                    # Use the sync method to properly update room status based on all bookings
+                    room.sync_status_from_bookings()
+                except Room.DoesNotExist:
+                    # Room might not exist (e.g., for house bookings), that's okay
+                    pass
+            
             return True
         return False
     
@@ -793,6 +900,15 @@ class Booking(models.Model):
         """Check if payment amount matches calculated amount"""
         return self.paid_amount >= self.calculated_total_amount
     
+    @property
+    def remaining_amount(self):
+        """Calculate remaining amount to be paid"""
+        from decimal import Decimal
+        total = self.calculated_total_amount if self.calculated_total_amount and self.calculated_total_amount > 0 else (self.total_amount or 0)
+        paid = self.paid_amount or 0
+        remaining = max(Decimal('0'), Decimal(str(total)) - paid)
+        return remaining
+    
     def calculate_and_update_total(self):
         """Calculate and update the total amount based on duration and monthly rate"""
         self.total_amount = self.calculated_total_amount
@@ -805,6 +921,8 @@ class Booking(models.Model):
         total = self.calculated_total_amount if self.calculated_total_amount and self.calculated_total_amount > 0 else (self.total_amount or 0)
         paid = self.paid_amount or 0
         
+        # Update payment status
+        # Note: Overpayments are not allowed - validation should prevent paid > total
         if total > 0 and paid >= total:
             self.payment_status = 'paid'
         elif paid > 0:
@@ -906,6 +1024,61 @@ class Room(models.Model):
     @property
     def is_available(self):
         return self.status == 'available' and self.current_booking is None
+    
+    def sync_status_from_bookings(self):
+        """
+        Sync room status based on active bookings.
+        If current_booking points to a cancelled/checked_out booking, clear it.
+        If there are active bookings, set status to occupied.
+        If no active bookings, set status to available (unless manually set to maintenance/out_of_order).
+        """
+        from django.utils import timezone
+        today = timezone.now().date()
+        
+        # Clear current_booking if it points to a cancelled or checked_out booking
+        if self.current_booking:
+            if self.current_booking.booking_status in ['cancelled', 'checked_out']:
+                self.current_booking = None
+        
+        # Check for active bookings for this room (exclude cancelled and checked_out)
+        active_bookings = Booking.objects.filter(
+            property_obj=self.property_obj,
+            room_number=self.room_number,
+            booking_status__in=['pending', 'confirmed', 'checked_in'],
+            check_out_date__gte=today
+        ).exclude(
+            booking_status__in=['cancelled', 'checked_out', 'no_show']  # Exclude cancelled/checked_out bookings
+        )
+        
+        has_active_bookings = active_bookings.exists()
+        
+        # Track if status changed
+        status_changed = False
+        
+        # Only update status if it's not manually set to maintenance or out_of_order
+        if self.status not in ['maintenance', 'out_of_order']:
+            if has_active_bookings:
+                # Set to occupied if there are active bookings
+                if self.status != 'occupied':
+                    self.status = 'occupied'
+                    status_changed = True
+                # Update current_booking to the most recent active booking
+                latest_booking = active_bookings.order_by('-check_in_date').first()
+                if latest_booking:
+                    self.current_booking = latest_booking
+            else:
+                # Set to available if no active bookings
+                if self.status != 'available':
+                    self.status = 'available'
+                    status_changed = True
+                # Clear current_booking
+                self.current_booking = None
+        
+        self.save()
+        
+        # If room status changed and property is hotel/lodge, refresh property status
+        if status_changed and (self.property_obj.is_hotel or (hasattr(self.property_obj, 'property_type') and self.property_obj.property_type.name.lower() == 'lodge')):
+            self.property_obj.refresh_status_from_activity()
     
     class Meta:
         db_table = 'property_rooms'

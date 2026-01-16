@@ -262,29 +262,25 @@
         <h5 class="mb-0">Payment Records</h5>
       </div>
       <div class="col-auto">
-        <div class="d-flex gap-2">
-          <!-- Search -->
-          <div class="search-box">
-            <div class="position-relative">
-              <input class="form-control search-input" type="search" 
-                     id="dashboard-search-input"
-                     placeholder="Search payments..." 
-                     value="{{ search_query|default:'' }}">
-              <span class="fas fa-search search-box-icon"></span>
-            </div>
+        <div class="d-flex align-items-center gap-2">
+          <div class="input-group input-group-sm" style="width: 260px;">
+            <input type="search" class="form-control" id="dashboard-search-input" placeholder="Search payments..." value="{{ search_query|default:'' }}">
+            <button class="btn btn-outline-secondary" id="dashboard-search-clear">Clear</button>
           </div>
-          <!-- Status Filter -->
-          <select class="form-select form-select-sm" id="dashboard-status-filter">
+          <select class="form-select form-select-sm" id="dashboard-status-filter" style="width: auto;">
             <option value="">All Status</option>
             {% for value, label in status_choices %}
-            <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>
-              {{ label }}
-            </option>
+            <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
           </select>
-          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearDashboardFilters()">
-            <i class="fas fa-times"></i> Clear
-          </button>
+          <label class="form-label mb-0">Items per page:</label>
+          <select class="form-select form-select-sm" id="dashboardPageSizeSelect" style="width: auto;">
+            <option value="5" {% if current_page_size == 5 %}selected{% endif %}>5</option>
+            <option value="10" {% if current_page_size == 10 %}selected{% endif %}>10</option>
+            <option value="25" {% if current_page_size == 25 %}selected{% endif %}>25</option>
+            <option value="50" {% if current_page_size == 50 %}selected{% endif %}>50</option>
+            <option value="100" {% if current_page_size == 100 %}selected{% endif %}>100</option>
+          </select>
         </div>
       </div>
     </div>
@@ -306,29 +302,25 @@
         <h5 class="mb-0">Invoice Records</h5>
       </div>
       <div class="col-auto">
-        <div class="d-flex gap-2">
-          <!-- Search -->
-          <div class="search-box">
-            <div class="position-relative">
-              <input class="form-control form-control-sm search-input" type="search" 
-                     id="invoice-search-input"
-                     placeholder="Search invoices..." 
-                     value="{{ invoice_search_query|default:'' }}">
-              <span class="fas fa-search search-box-icon"></span>
-            </div>
+        <div class="d-flex align-items-center gap-2">
+          <div class="input-group input-group-sm" style="width: 260px;">
+            <input type="search" class="form-control" id="invoice-search-input" placeholder="Search invoices..." value="{{ invoice_search_query|default:'' }}">
+            <button class="btn btn-outline-secondary" id="invoice-search-clear">Clear</button>
           </div>
-          <!-- Status Filter -->
-          <select class="form-select form-select-sm" id="invoice-status-filter">
+          <select class="form-select form-select-sm" id="invoice-status-filter" style="width: auto;">
             <option value="">All Status</option>
             {% for value, label in invoice_status_choices %}
-            <option value="{{ value }}" {% if invoice_status_filter == value %}selected{% endif %}>
-              {{ label }}
-            </option>
+            <option value="{{ value }}" {% if invoice_status_filter == value %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
           </select>
-          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearInvoiceFilters()">
-            <i class="fas fa-times"></i> Clear
-          </button>
+          <label class="form-label mb-0">Items per page:</label>
+          <select class="form-select form-select-sm" id="invoicePageSizeSelect" style="width: auto;">
+            <option value="5" {% if invoice_current_page_size == 5 %}selected{% endif %}>5</option>
+            <option value="10" {% if invoice_current_page_size == 10 %}selected{% endif %}>10</option>
+            <option value="25" {% if invoice_current_page_size == 25 %}selected{% endif %}>25</option>
+            <option value="50" {% if invoice_current_page_size == 50 %}selected{% endif %}>50</option>
+            <option value="100" {% if invoice_current_page_size == 100 %}selected{% endif %}>100</option>
+          </select>
         </div>
       </div>
     </div>
@@ -355,6 +347,7 @@ function initializeDashboard() {
     function loadDashboardTable(page = 1) {
         var search = $('#dashboard-search-input').val() || '';
         var status = $('#dashboard-status-filter').val() || '';
+        var pageSize = $('#dashboardPageSizeSelect').val() || '5';
         
         $('#dashboard-table-container').html('<div class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">Loading...</p></div>');
         
@@ -365,6 +358,7 @@ function initializeDashboard() {
                 'search': search,
                 'status': status,
                 'page': page,
+                'page_size': pageSize,
                 'table_type': 'payments'
             },
             headers: {
@@ -409,6 +403,7 @@ function initializeDashboard() {
     function loadInvoiceTable(page = 1) {
         var search = $('#invoice-search-input').val() || '';
         var status = $('#invoice-status-filter').val() || '';
+        var pageSize = $('#invoicePageSizeSelect').val() || '5';
         
         $('#invoice-table-container').html('<div class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">Loading...</p></div>');
         
@@ -419,6 +414,7 @@ function initializeDashboard() {
                 'invoice_search': search,
                 'invoice_status': status,
                 'invoice_page': page,
+                'invoice_page_size': pageSize,
                 'table_type': 'invoices'
             },
             headers: {
@@ -433,13 +429,18 @@ function initializeDashboard() {
         });
     }
     
-    // Payment Records Table - Search input handler
+    // Payment Records Table - Debounced search
     var searchTimeout;
     $('#dashboard-search-input').on('input', function() {
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(function() {
             loadDashboardTable(1);
-        }, 500);
+        }, 400);
+    });
+    
+    $('#dashboard-search-clear').on('click', function() {
+        $('#dashboard-search-input').val('');
+        loadDashboardTable(1);
     });
     
     // Payment Records Table - Status filter handler
@@ -447,26 +448,41 @@ function initializeDashboard() {
         loadDashboardTable(1);
     });
     
-    // Recent Payments Table - Search input handler
+    // Payment Records Table - Page size handler
+    $('#dashboardPageSizeSelect').on('change', function() {
+        loadDashboardTable(1);
+    });
+    
+    // Recent Payments Table - Debounced search
     var recentPaymentsSearchTimeout;
     $('#recent-payments-search-input').on('input', function() {
         clearTimeout(recentPaymentsSearchTimeout);
         recentPaymentsSearchTimeout = setTimeout(function() {
             loadRecentPaymentsTable(1);
-        }, 500);
+        }, 400);
     });
     
-    // Invoice Records Table - Search input handler
+    // Invoice Records Table - Debounced search
     var invoiceSearchTimeout;
     $('#invoice-search-input').on('input', function() {
         clearTimeout(invoiceSearchTimeout);
         invoiceSearchTimeout = setTimeout(function() {
             loadInvoiceTable(1);
-        }, 500);
+        }, 400);
+    });
+    
+    $('#invoice-search-clear').on('click', function() {
+        $('#invoice-search-input').val('');
+        loadInvoiceTable(1);
     });
     
     // Invoice Records Table - Status filter handler
     $('#invoice-status-filter').on('change', function() {
+        loadInvoiceTable(1);
+    });
+    
+    // Invoice Records Table - Page size handler
+    $('#invoicePageSizeSelect').on('change', function() {
         loadInvoiceTable(1);
     });
     
@@ -487,12 +503,14 @@ function initializeDashboard() {
     window.clearDashboardFilters = function() {
         $('#dashboard-search-input').val('');
         $('#dashboard-status-filter').val('');
+        $('#dashboardPageSizeSelect').val('5');
         loadDashboardTable(1);
     };
     
     window.clearInvoiceFilters = function() {
         $('#invoice-search-input').val('');
         $('#invoice-status-filter').val('');
+        $('#invoicePageSizeSelect').val('5');
         loadInvoiceTable(1);
     };
 }

@@ -8,8 +8,67 @@ from django.utils import timezone
 from . import models, serializers
 from .gateway_service import PaymentGatewayService
 from django.shortcuts import get_object_or_404
-from drf_yasg.utils import swagger_auto_schema
-from drf_yasg import openapi
+# Swagger documentation - using drf-spectacular (auto-discovery)
+# Provide no-op decorator for backward compatibility with existing @swagger_auto_schema decorators
+try:
+    from drf_yasg.utils import swagger_auto_schema
+    from drf_yasg import openapi
+except ImportError:
+    # drf-yasg not installed, use drf-spectacular instead
+    # Decorators will be ignored - drf-spectacular auto-discovers endpoints
+    def swagger_auto_schema(*args, **kwargs):
+        def decorator(func):
+            return func
+        return decorator
+    
+    class openapi:
+        class Response:
+            def __init__(self, *args, **kwargs):
+                pass
+        class Schema:
+            def __init__(self, *args, **kwargs):
+                pass
+        class Items:
+            def __init__(self, *args, **kwargs):
+                pass
+        class Contact:
+            def __init__(self, *args, **kwargs):
+                pass
+        class License:
+            def __init__(self, *args, **kwargs):
+                pass
+        class Info:
+            def __init__(self, *args, **kwargs):
+                pass
+        TYPE_OBJECT = 'object'
+        TYPE_STRING = 'string'
+        TYPE_INTEGER = 'integer'
+        TYPE_NUMBER = 'number'
+        TYPE_BOOLEAN = 'boolean'
+        TYPE_ARRAY = 'array'
+        FORMAT_EMAIL = 'email'
+        FORMAT_DATE = 'date'
+        FORMAT_DATETIME = 'date-time'
+        FORMAT_DECIMAL = 'decimal'
+        FORMAT_URI = 'uri'
+        FORMAT_UUID = 'uuid'
+        IN_QUERY = 'query'
+        IN_PATH = 'path'
+        IN_BODY = 'body'
+        IN_FORM = 'formData'
+        IN_HEADER = 'header'
+        
+        # Create a proper Parameter class that stores arguments
+        class Parameter:
+            def __init__(self, name, in_, description=None, type=None, required=False, **kwargs):
+                self.name = name
+                self.in_ = in_
+                self.description = description or ''
+                self.type = type or 'string'
+                self.required = required
+                # Store all kwargs for compatibility
+                for key, value in kwargs.items():
+                    setattr(self, key, value)
 import json
 
 
@@ -475,9 +534,10 @@ def azam_pay_webhook(request):
         if payment.booking and payment.status == 'completed':
             from django.db.models import Sum
             # Calculate total paid from unified payments
+            # Note: Payment model uses 'completed' status, not 'successful'
             total_paid = models.Payment.objects.filter(
                 booking=payment.booking,
-                status__in=['completed', 'successful']
+                status='completed'
             ).aggregate(total=Sum('amount'))['total'] or 0
             
             # Also include old property payments if they exist
@@ -492,6 +552,16 @@ def azam_pay_webhook(request):
             payment.booking.paid_amount = total_paid
             payment.booking.update_payment_status()
             payment.booking.save()
+        
+        # Update visit payment if this is a visit payment
+        if payment.status == 'completed':
+            from properties.models import PropertyVisitPayment
+            visit_payment = PropertyVisitPayment.objects.filter(payment=payment).first()
+            if visit_payment:
+                visit_payment.status = 'completed'
+                visit_payment.paid_at = timezone.now()
+                visit_payment.save()
+                logger.info(f"Visit payment {visit_payment.id} marked as completed with expiration at {visit_payment.expires_at()}")
         
         return JsonResponse({
             'success': True,

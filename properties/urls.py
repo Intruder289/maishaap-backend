@@ -78,6 +78,9 @@ urlpatterns = [
     # Payment API endpoints
     path('api/payment-details/<int:payment_id>/', views.api_payment_details, name='api_payment_details'),
     path('api/booking-status/<int:booking_id>/', views.api_booking_status, name='api_booking_status'),
+    path('api/booking/<int:booking_id>/cancel/', views.api_booking_cancel, name='api_booking_cancel'),
+    path('api/booking/<int:booking_id>/soft-delete/', views.api_booking_soft_delete, name='api_booking_soft_delete'),
+    path('api/booking/<int:booking_id>/restore/', views.api_booking_restore, name='api_booking_restore'),
     path('api/available-rooms/', views.api_available_rooms, name='api_available_rooms'),
     path('api/create-booking/', views.api_create_booking, name='api_create_booking'),
     path('api/collect-payment/', views.api_collect_payment, name='api_collect_payment'),
@@ -133,6 +136,9 @@ urlpatterns = [
     # Property availability API endpoint
     path('api/property/<int:property_id>/availability/', views.api_property_availability, name='api_property_availability'),
     
+    # Hotel room status summary API endpoint
+    path('api/hotel/<int:property_id>/room-status-summary/', views.api_hotel_room_status_summary, name='api_hotel_room_status_summary'),
+    
     # Booking API endpoints for modals
     path('api/booking/<int:booking_id>/details/', views.api_booking_details, name='api_booking_details'),
     path('api/booking/<int:booking_id>/edit/', views.api_booking_edit, name='api_booking_edit'),
@@ -177,6 +183,7 @@ urlpatterns = [
     path('api/visit-payment/<int:property_id>/verify/', views.api_visit_payment_verify, name='api_visit_payment_verify'),
     
     # Venue Management API endpoints
+    path('api/venue/<int:venue_id>/details/', views.api_venue_details, name='api_venue_details'),
     path('api/venue/availability/', views.api_venue_availability, name='api_venue_availability'),
     path('api/venue/booking/<int:booking_id>/status/', views.api_venue_booking_status, name='api_venue_booking_status'),
     path('api/venue/capacity-check/', views.api_venue_capacity_check, name='api_venue_capacity_check'),

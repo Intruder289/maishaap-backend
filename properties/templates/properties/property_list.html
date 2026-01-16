@@ -881,8 +881,8 @@ $(document).ready(function() {
         }
     }
     
-    // Event listeners for filtering
-    $('#propertySearch, #propertyTypeFilter, #statusFilter, #activeFilter').on('change keyup', applyFilters);
+    // Event listeners for filtering are handled by initializePropertyListFilters() function
+    // which is called on document ready
     
     // Bulk actions functionality
     const selectAllCheckbox = document.getElementById('selectAll');
@@ -1019,42 +1019,99 @@ $(document).ready(function() {
     // Initialize bulk actions state
     updateBulkActions();
     
-    // Assign Property Owner functionality
+    // Assign Property Owner functionality - using event delegation for AJAX-loaded content
+    // This handler works for both initial page load and AJAX-loaded content
     $(document).on('click', '.assign-owner-action', function(e) {
         e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        
+        console.log('Assign owner clicked - handler fired');
+        
+        // Close dropdown manually
+        const $dropdown = $(this).closest('.dropdown');
+        $dropdown.find('.dropdown-menu').removeClass('show');
+        $dropdown.find('.dropdown-toggle').attr('aria-expanded', 'false');
+        
         const propertyId = $(this).data('property-id');
         const propertyTitle = $(this).data('property-title');
+        const currentOwnerId = $(this).data('current-owner-id');
         const currentOwner = $(this).data('current-owner');
+        
+        console.log('Property ID:', propertyId, 'Title:', propertyTitle, 'Current owner:', currentOwner);
+        
+        if (!propertyId) {
+            alert('Error: Property ID not found');
+            return false;
+        }
+        
+        // Check if modal exists
+        const modalElement = document.getElementById('assignOwnerModal');
+        if (!modalElement) {
+            console.error('Modal element not found');
+            alert('Error: Modal not found. Please refresh the page.');
+            return false;
+        }
+        
+        // Show loading state in modal
+        $('#assignOwnerSelect').html('<option value="">Loading owners...</option>');
+        $('#assignOwnerPropertyTitle').text(propertyTitle);
+        $('#assignOwnerCurrentOwner').text(currentOwner || 'No owner assigned (Admin)');
+        
+        // Show modal first
+        try {
+            const modal = new bootstrap.Modal(modalElement);
+            modal.show();
+            console.log('Modal shown');
+        } catch (error) {
+            console.error('Error showing modal:', error);
+            alert('Error opening modal. Please refresh the page.');
+            return false;
+        }
         
         // Load property owners
         $.ajax({
             url: '/api/property-owners/',
             method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
             success: function(response) {
+                console.log('Property owners response:', response);
                 if (response.success) {
                     // Populate owner select
                     const select = $('#assignOwnerSelect');
                     select.empty();
                     select.append('<option value="">Select Property Owner</option>');
-                    response.owners.forEach(function(owner) {
-                        const selected = owner.id == currentOwner ? 'selected' : '';
-                        select.append(`<option value="${owner.id}" ${selected}>${owner.full_name} (${owner.email}) - ${owner.properties_count} properties</option>`);
-                    });
                     
-                    // Set modal data
+                    if (response.owners && response.owners.length > 0) {
+                        response.owners.forEach(function(owner) {
+                            // Select current owner if exists
+                            const selected = (currentOwnerId && owner.id == currentOwnerId) ? 'selected' : '';
+                            select.append(`<option value="${owner.id}" ${selected}>${owner.full_name} (${owner.email}) - ${owner.properties_count} properties</option>`);
+                        });
+                    } else {
+                        select.append('<option value="" disabled>No property owners found. Please create property owner accounts first.</option>');
+                    }
+                    
+                    // Set modal data (already set above, but update current owner display)
                     $('#assignOwnerModal').data('property-id', propertyId);
-                    $('#assignOwnerPropertyTitle').text(propertyTitle);
-                    $('#assignOwnerCurrentOwner').text(currentOwner || 'Admin');
-                    
-                    // Show modal
-                    const modal = new bootstrap.Modal(document.getElementById('assignOwnerModal'));
-                    modal.show();
+                    $('#assignOwnerCurrentOwner').text(currentOwner || 'No owner assigned (Admin)');
                 } else {
-                    alert('Error loading property owners: ' + response.message);
+                    alert('Error loading property owners: ' + (response.message || 'Unknown error'));
                 }
             },
-            error: function() {
-                alert('Error loading property owners. Please try again.');
+            error: function(xhr, status, error) {
+                console.error('Error loading property owners:', error, xhr);
+                let errorMsg = 'Error loading property owners. Please try again.';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg = xhr.responseJSON.message;
+                } else if (xhr.status === 403) {
+                    errorMsg = 'Permission denied. Only admins can assign property owners.';
+                } else if (xhr.status === 404) {
+                    errorMsg = 'API endpoint not found. Please check the URL configuration.';
+                }
+                alert(errorMsg);
             }
         });
     });
@@ -1092,10 +1149,30 @@ $(document).ready(function() {
             }),
             success: function(response) {
                 if (response.success) {
-                    alert(response.message);
-                    location.reload();
+                    // Show success message
+                    if (typeof toastr !== 'undefined') {
+                        toastr.success(response.message);
+                    } else {
+                        alert(response.message);
+                    }
+                    
+                    // Close modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('assignOwnerModal'));
+                    if (modal) {
+                        modal.hide();
+                    }
+                    
+                    // Reload page to show updated owner
+                    setTimeout(function() {
+                        location.reload();
+                    }, 500);
                 } else {
-                    alert('Error: ' + response.message);
+                    const errorMsg = response.message || 'Error assigning property owner';
+                    if (typeof toastr !== 'undefined') {
+                        toastr.error(errorMsg);
+                    } else {
+                        alert('Error: ' + errorMsg);
+                    }
                     submitBtn.prop('disabled', false);
                     submitBtn.html('<i class="fas fa-user-tag me-2"></i>Assign Owner');
                 }
@@ -1169,6 +1246,10 @@ function initializePropertyListFilters() {
             },
             success: function(html) {
                 $tableContainer.html(html);
+                // Initialize Bootstrap dropdowns after AJAX load
+                $('.dropdown-toggle').each(function() {
+                    new bootstrap.Dropdown(this);
+                });
             },
             error: function(xhr, status, error) {
                 console.error('Error loading properties table:', error, xhr.responseText);
@@ -1305,7 +1386,10 @@ function exportProperties() {
                         <select class="form-select" id="assignOwnerSelect" required>
                             <option value="">Loading...</option>
                         </select>
-                        <div class="form-text">Select a property owner from the list. Only users with Property Owner role are shown.</div>
+                        <div class="form-text">
+                            <i class="fas fa-info-circle me-1"></i>Select a property owner from the list. Only users with Property Owner role are shown.
+                            <br><small class="text-muted"><strong>Note:</strong> Each property can only have one owner. Assigning a new owner will replace the current owner.</small>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">

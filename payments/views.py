@@ -65,8 +65,16 @@ def payment_dashboard(request):
             Q(transaction_ref__icontains=search_query)
         )
     
-    # Pagination for Payment Records Table
-    paginator = Paginator(payment_records, 5)
+    # Pagination for Payment Records Table - with page_size support
+    page_size = request.GET.get('page_size', '5')
+    try:
+        page_size = int(page_size)
+        if page_size not in [5, 10, 25, 50, 100]:
+            page_size = 5
+    except (ValueError, TypeError):
+        page_size = 5
+    
+    paginator = Paginator(payment_records, page_size)
     page_number = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_number)
     
@@ -81,7 +89,7 @@ def payment_dashboard(request):
             Q(tenant__last_name__icontains=recent_payments_search) |
             Q(transaction_ref__icontains=recent_payments_search)
         )
-    recent_payments_paginator = Paginator(recent_payments_query, 5)
+    recent_payments_paginator = Paginator(recent_payments_query, page_size)
     recent_payments_page = request.GET.get('recent_payments_page', 1)
     recent_payments_page_obj = recent_payments_paginator.get_page(recent_payments_page)
     
@@ -105,8 +113,16 @@ def payment_dashboard(request):
     if invoice_status_filter:
         all_invoices = all_invoices.filter(status=invoice_status_filter)
     
-    # Pagination for Invoice Records Table
-    invoice_paginator = Paginator(all_invoices, 5)
+    # Pagination for Invoice Records Table - with page_size support
+    invoice_page_size = request.GET.get('invoice_page_size', '5')
+    try:
+        invoice_page_size = int(invoice_page_size)
+        if invoice_page_size not in [5, 10, 25, 50, 100]:
+            invoice_page_size = 5
+    except (ValueError, TypeError):
+        invoice_page_size = 5
+    
+    invoice_paginator = Paginator(all_invoices, invoice_page_size)
     invoice_page = request.GET.get('invoice_page', 1)
     invoice_page_obj = invoice_paginator.get_page(invoice_page)
     
@@ -126,8 +142,10 @@ def payment_dashboard(request):
         'recent_payments': recent_payments_page_obj,
         'recent_invoices': recent_invoices,
         'page_obj': page_obj,
+        'paginator': paginator,
         'payment_records': payment_records,
         'invoice_page_obj': invoice_page_obj,
+        'invoice_paginator': invoice_paginator,
         'all_invoices': all_invoices,
         'status_choices': models.Payment.STATUS_CHOICES,
         'invoice_status_choices': models.Invoice.STATUS_CHOICES,
@@ -136,6 +154,8 @@ def payment_dashboard(request):
         'recent_payments_search': recent_payments_search,
         'invoice_search_query': invoice_search_query,
         'invoice_status_filter': invoice_status_filter,
+        'current_page_size': page_size,
+        'invoice_current_page_size': invoice_page_size,
         'today': today,
     }
     
@@ -176,8 +196,16 @@ def invoice_list(request):
             Q(id__icontains=search_query)
         )
     
-    # Pagination
-    paginator = Paginator(invoices, 15)
+    # Pagination - with page_size support (default 5)
+    page_size = request.GET.get('page_size', '5')
+    try:
+        page_size = int(page_size)
+        if page_size not in [5, 10, 25, 50, 100]:
+            page_size = 5
+    except (ValueError, TypeError):
+        page_size = 5
+    
+    paginator = Paginator(invoices, page_size)
     page_number = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_number)
     
@@ -221,6 +249,7 @@ def invoice_list(request):
     
     context = {
         'page_obj': page_obj,
+        'paginator': paginator,
         'invoices': invoices,
         'total_invoices': total_invoices,
         'paid_invoices': paid_invoices,
@@ -232,6 +261,7 @@ def invoice_list(request):
         'status_choices': models.Invoice.STATUS_CHOICES,
         'invoices_change_percent': round(invoices_change_percent, 1),
         'payment_rate': round(payment_rate, 1),
+        'current_page_size': page_size,
     }
     
     # Handle AJAX requests
@@ -391,8 +421,16 @@ def payment_list(request):
             Q(rent_invoice__lease__property_ref__title__icontains=search_query)
         )
     
-    # Pagination
-    paginator = Paginator(payments, 10)
+    # Pagination - with page_size support (default 5)
+    page_size = request.GET.get('page_size', '5')
+    try:
+        page_size = int(page_size)
+        if page_size not in [5, 10, 25, 50, 100]:
+            page_size = 5
+    except (ValueError, TypeError):
+        page_size = 5
+    
+    paginator = Paginator(payments, page_size)
     page_number = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_number)
     
@@ -488,6 +526,7 @@ def payment_list(request):
     
     context = {
         'page_obj': page_obj,
+        'paginator': paginator,
         'payments': payments,
         'total_payments': total_payments,
         'successful_payments': successful_payments,
@@ -500,6 +539,10 @@ def payment_list(request):
         'revenue_change_percent': revenue_change_percent,
         'status_choices': status_choices,
         'method_choices': method_choices,
+        'status_filter': status_filter,
+        'method_filter': method_filter,
+        'search_query': search_query,
+        'current_page_size': page_size,
         'use_rent_payments': False,  # Always False - using unified model
     }
     
@@ -534,8 +577,16 @@ def payment_methods(request):
         elif provider_status == 'inactive':
             providers = providers.filter(is_active=False)
     
-    # Pagination for providers
-    provider_paginator = Paginator(providers, 10)
+    # Pagination for providers - with page_size support (default 5)
+    provider_page_size = request.GET.get('provider_page_size', '5')
+    try:
+        provider_page_size = int(provider_page_size)
+        if provider_page_size not in [5, 10, 25, 50, 100]:
+            provider_page_size = 5
+    except (ValueError, TypeError):
+        provider_page_size = 5
+    
+    provider_paginator = Paginator(providers, provider_page_size)
     provider_page = request.GET.get('provider_page', 1)
     provider_page_obj = provider_paginator.get_page(provider_page)
     
@@ -568,8 +619,16 @@ def payment_methods(request):
             Q(azam_reference__icontains=search_query)
         )
     
-    # Pagination for transactions
-    transaction_paginator = Paginator(transactions, 10)
+    # Pagination for transactions - with page_size support (default 5)
+    transaction_page_size = request.GET.get('transaction_page_size', '5')
+    try:
+        transaction_page_size = int(transaction_page_size)
+        if transaction_page_size not in [5, 10, 25, 50, 100]:
+            transaction_page_size = 5
+    except (ValueError, TypeError):
+        transaction_page_size = 5
+    
+    transaction_paginator = Paginator(transactions, transaction_page_size)
     transaction_page = request.GET.get('page', 1)
     transaction_page_obj = transaction_paginator.get_page(transaction_page)
     
@@ -606,11 +665,13 @@ def payment_methods(request):
     
     context = {
         'provider_page_obj': provider_page_obj,
+        'provider_paginator': provider_paginator,
         'providers': providers,
         'total_providers': total_providers,
         'active_providers': active_providers,
         'inactive_providers': inactive_providers,
         'page_obj': transaction_page_obj,
+        'paginator': transaction_paginator,
         'recent_transactions': transactions[:10],  # For backward compatibility
         'provider_stats': provider_stats,
         'status_filter': status_filter,
@@ -618,6 +679,8 @@ def payment_methods(request):
         'search_query': search_query,
         'provider_search': provider_search,
         'provider_status': provider_status,
+        'provider_current_page_size': provider_page_size,
+        'transaction_current_page_size': transaction_page_size,
         'status_choices': [
             ('initiated', 'Initiated'),
             ('pending', 'Pending'),
@@ -672,8 +735,16 @@ def payment_transactions(request):
             Q(payment__transaction_ref__icontains=search_query)
         )
     
-    # Pagination
-    paginator = Paginator(transactions, 20)
+    # Pagination - with page_size support (default 5)
+    page_size = request.GET.get('page_size', '5')
+    try:
+        page_size = int(page_size)
+        if page_size not in [5, 10, 25, 50, 100]:
+            page_size = 5
+    except (ValueError, TypeError):
+        page_size = 5
+    
+    paginator = Paginator(transactions, page_size)
     page_number = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_number)
     
@@ -699,6 +770,7 @@ def payment_transactions(request):
     
     context = {
         'page_obj': page_obj,
+        'paginator': paginator,
         'transactions': transactions,
         'total_transactions': total_transactions,
         'successful_transactions': successful_transactions,
@@ -710,6 +782,7 @@ def payment_transactions(request):
         'status_filter': status_filter,
         'provider_filter': provider_filter,
         'search_query': search_query,
+        'current_page_size': page_size,
     }
     
     # Handle AJAX requests
@@ -880,6 +953,38 @@ def transaction_view_details(request, transaction_id):
         return redirect('payments:payment_transactions')
 
 
+def transaction_delete(request, transaction_id):
+    """Delete transaction - GET shows confirmation, POST deletes"""
+    from django.shortcuts import get_object_or_404, redirect
+    from django.contrib import messages
+    from django.http import JsonResponse
+    
+    transaction = get_object_or_404(
+        models.PaymentTransaction.objects.select_related('payment__tenant', 'provider', 'payment'),
+        id=transaction_id
+    )
+    
+    if request.method == 'POST':
+        transaction_id_str = str(transaction.id)
+        transaction.delete()
+        
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': True,
+                'message': f'Transaction #{transaction_id_str} deleted successfully.'
+            })
+        
+        messages.success(request, f'Transaction #{transaction_id_str} deleted successfully.')
+        return redirect('payments:payment_transactions')
+    
+    # GET request - show confirmation
+    context = {
+        'transaction': transaction,
+    }
+    
+    return render(request, 'payments/modals/transaction_delete_confirm.html', context)
+
+
 def transaction_verify(request, transaction_id):
     """Verify transaction status with payment gateway"""
     from django.shortcuts import get_object_or_404
@@ -979,6 +1084,11 @@ def provider_view_details(request, provider_id):
             status='successful'
         ).aggregate(total=Sum('payment__amount'))['total'] or 0
         
+        # Calculate success rate
+        success_rate = 0
+        if transaction_count > 0:
+            success_rate = round((successful_count / transaction_count) * 100, 2)
+        
         # Get recent transactions
         recent_transactions = provider_transactions.select_related('payment__tenant').order_by('-created_at')[:5]
         
@@ -989,6 +1099,7 @@ def provider_view_details(request, provider_id):
             'failed_count': failed_count,
             'pending_count': pending_count,
             'total_revenue': total_revenue,
+            'success_rate': success_rate,
             'recent_transactions': recent_transactions,
         }
         
@@ -1057,116 +1168,6 @@ def provider_toggle_status(request, provider_id):
         return JsonResponse({
             'success': True,
             'message': f'Provider "{provider.name}" {status_text} successfully.',
-            'is_active': provider.is_active
-        })
-    except Exception as e:
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.error(f'Error toggling provider {provider_id}: {str(e)}')
-        return JsonResponse({
-            'success': False,
-            'message': f'Error updating provider: {str(e)}'
-        }, status=500)
-
-
-# Payment Provider Action Views
-def provider_view_details(request, provider_id):
-    """View provider details in a modal"""
-    from django.shortcuts import get_object_or_404
-    from django.http import JsonResponse
-    
-    try:
-        provider = get_object_or_404(models.PaymentProvider, id=provider_id)
-        
-        # Get provider statistics
-        provider_transactions = models.PaymentTransaction.objects.filter(provider=provider)
-        transaction_count = provider_transactions.count()
-        successful_count = provider_transactions.filter(status='successful').count()
-        failed_count = provider_transactions.filter(status='failed').count()
-        pending_count = provider_transactions.filter(status__in=['pending', 'initiated', 'processing']).count()
-        
-        # Calculate success rate
-        success_rate = 0
-        if transaction_count > 0:
-            success_rate = round((successful_count / transaction_count) * 100, 2)
-        
-        # Get recent transactions
-        recent_transactions = provider_transactions.select_related('payment__tenant').order_by('-created_at')[:5]
-        
-        context = {
-            'provider': provider,
-            'transaction_count': transaction_count,
-            'successful_count': successful_count,
-            'failed_count': failed_count,
-            'pending_count': pending_count,
-            'success_rate': success_rate,
-            'recent_transactions': recent_transactions,
-        }
-        
-        return render(request, 'payments/modals/provider_view_details.html', context)
-    except Exception as e:
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return JsonResponse({'success': False, 'message': str(e)}, status=404)
-        from django.contrib import messages
-        messages.error(request, f'Provider not found: {str(e)}')
-        from django.shortcuts import redirect
-        return redirect('payments:payment_methods')
-
-
-def provider_edit(request, provider_id):
-    """Edit provider - GET shows form, POST updates"""
-    from django.shortcuts import get_object_or_404, redirect
-    from django.contrib import messages
-    from django.http import JsonResponse
-    from decimal import Decimal
-    
-    provider = get_object_or_404(models.PaymentProvider, id=provider_id)
-    
-    if request.method == 'POST':
-        try:
-            provider.name = request.POST.get('name', provider.name)
-            provider.description = request.POST.get('description', provider.description)
-            provider.provider_type = request.POST.get('provider_type', provider.provider_type)
-            provider.transaction_fee = Decimal(str(request.POST.get('transaction_fee', provider.transaction_fee)))
-            provider.save()
-            
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({'success': True, 'message': 'Provider updated successfully'})
-            
-            messages.success(request, f'Provider "{provider.name}" updated successfully.')
-            return redirect('payments:payment_methods')
-        except Exception as e:
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({'success': False, 'message': str(e)}, status=400)
-            messages.error(request, f'Error updating provider: {str(e)}')
-    
-    # GET request - show edit form
-    context = {
-        'provider': provider,
-        'provider_type_choices': models.PaymentProvider.PROVIDER_TYPE_CHOICES,
-    }
-    
-    return render(request, 'payments/modals/provider_edit.html', context)
-
-
-def provider_toggle_active(request, provider_id):
-    """Toggle provider active status"""
-    from django.shortcuts import get_object_or_404
-    from django.http import JsonResponse
-    
-    if request.method != 'POST':
-        return JsonResponse({'success': False, 'message': 'POST method required'}, status=405)
-    
-    try:
-        provider = get_object_or_404(models.PaymentProvider, id=provider_id)
-        provider.is_active = not provider.is_active
-        provider.save()
-        
-        status_text = 'enabled' if provider.is_active else 'disabled'
-        
-        return JsonResponse({
-            'success': True,
-            'message': f'Provider "{provider.name}" has been {status_text}.',
             'is_active': provider.is_active
         })
     except Exception as e:

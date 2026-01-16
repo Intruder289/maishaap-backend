@@ -93,13 +93,13 @@
               {% if user.is_staff or user.is_superuser %}
               <li><hr class="dropdown-divider"></li>
               <li>
-                <a class="dropdown-item assign-owner-action"
-                   href="#"
+                <button type="button" class="dropdown-item assign-owner-action"
                    data-property-id="{{ property.id }}"
-                   data-property-title="{{ property.title }}"
-                   data-current-owner="{{ property.owner.get_full_name|default:property.owner.username }}">
+                   data-property-title="{{ property.title|escapejs }}"
+                   data-current-owner-id="{{ property.owner.id|default:'' }}"
+                   data-current-owner="{{ property.owner.get_full_name|default:property.owner.username|escapejs }}">
                   <i class="fas fa-user-tag me-2 text-info"></i>Assign Property Owner
-                </a>
+                </button>
               </li>
               {% endif %}
               <li><hr class="dropdown-divider"></li>

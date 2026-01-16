@@ -16,11 +16,11 @@
   <div class="col-lg-8">
     <!-- Property Types List -->
     <div class="card">
-      <div class="card-header bg-warning text-dark">
+      <div class="card-header">
         <div class="row flex-between-center">
           <div class="col-auto">
             <h5 class="mb-0">Property Types 
-              <span class="badge bg-primary-subtle text-primary ms-2">{{ paginator.count }}</span>
+              <span class="badge bg-secondary ms-2">{{ paginator.count }}</span>
             </h5>
           </div>
           <div class="col-auto">
@@ -59,7 +59,7 @@
                 <td>
                   <h6 class="mb-0">{{ property_type.name }}</h6>
                 </td>
-                <td class="text-600">
+                <td>
                   {% if property_type.description %}
                     {{ property_type.description|truncatechars:50 }}
                   {% else %}
@@ -67,7 +67,7 @@
                   {% endif %}
                 </td>
                 <td>
-                  <span class="badge bg-info-subtle text-info">{{ property_type.properties.count }}</span>
+                  <span class="badge bg-secondary">{{ property_type.properties.count }}</span>
                 </td>
                 <td>
                   <div class="dropdown">
@@ -91,11 +91,11 @@
               </tr>
               {% empty %}
               <tr>
-                <td colspan="4" class="text-center text-600 py-5">
+                <td colspan="4" class="text-center py-5">
                   <div class="py-4">
-                    <i class="fas fa-home fs-1 text-300 mb-3"></i>
+                    <i class="fas fa-home fs-1 text-muted mb-3"></i>
                     <h5>No property types found</h5>
-                    <p class="text-600">Get started by adding your first property type.</p>
+                    <p class="text-muted">Get started by adding your first property type.</p>
                   </div>
                 </td>
               </tr>
@@ -202,7 +202,7 @@
 <div class="modal fade" id="editPropertyTypeModal" tabindex="-1" aria-labelledby="editPropertyTypeModalLabel" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
-      <div class="modal-header bg-warning text-dark">
+      <div class="modal-header">
         <h5 class="modal-title" id="editPropertyTypeModalLabel">Edit Property Type</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>

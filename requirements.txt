@@ -15,11 +15,8 @@ PyJWT==2.10.1
 django-cors-headers==4.3.1
 
 # Swagger/OpenAPI documentation
-drf-yasg==1.21.7
-inflection==0.5.1
-uritemplate==4.2.0
+drf-spectacular==0.27.2
 PyYAML==6.0.3
-packaging>=20,<25
 
 # API filtering
 django-filter==24.3

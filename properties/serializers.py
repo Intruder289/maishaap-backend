@@ -2,8 +2,10 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import (
     Property, PropertyType, Region, District, Amenity, 
-    PropertyImage, PropertyView, PropertyFavorite, PropertyAmenity
+    PropertyImage, PropertyView, PropertyFavorite, PropertyAmenity, Room, Booking
 )
+from django.utils import timezone
+from datetime import datetime
 
 
 class RegionSerializer(serializers.ModelSerializer):
@@ -127,6 +129,7 @@ class PropertyDetailSerializer(serializers.ModelSerializer):
     owner = OwnerSerializer(read_only=True)
     is_favorited = serializers.SerializerMethodField()
     views_count = serializers.SerializerMethodField()
+    available_rooms = serializers.SerializerMethodField()
     
     class Meta:
         model = Property
@@ -137,8 +140,8 @@ class PropertyDetailSerializer(serializers.ModelSerializer):
             'capacity', 'venue_type', 'rent_amount', 'rent_period', 'deposit_amount',
             'utilities_included', 'visit_cost', 'status', 'is_featured', 'is_furnished',
             'pets_allowed', 'smoking_allowed', 'available_from', 'amenities',
-            'images', 'owner', 'is_favorited', 'views_count', 'created_at', 
-            'updated_at', 'is_active'
+            'images', 'owner', 'is_favorited', 'views_count', 'available_rooms',
+            'created_at', 'updated_at', 'is_active'
         ]
     
     def get_is_favorited(self, obj):
@@ -154,6 +157,72 @@ class PropertyDetailSerializer(serializers.ModelSerializer):
     def get_views_count(self, obj):
         """Get total views count for this property"""
         return obj.views.count()
+    
+    def get_available_rooms(self, obj):
+        """Get available rooms for hotel and lodge properties"""
+        # Only return available rooms for hotel and lodge properties
+        property_type_name = obj.property_type.name.lower() if obj.property_type else ''
+        if property_type_name not in ['hotel', 'lodge']:
+            return []
+        
+        # Get query parameters for date filtering (optional)
+        request = self.context.get('request')
+        check_in_date = None
+        check_out_date = None
+        
+        if request:
+            check_in_str = request.query_params.get('check_in_date')
+            check_out_str = request.query_params.get('check_out_date')
+            
+            if check_in_str:
+                try:
+                    check_in_date = datetime.strptime(check_in_str, '%Y-%m-%d').date()
+                except (ValueError, TypeError):
+                    pass
+            
+            if check_out_str:
+                try:
+                    check_out_date = datetime.strptime(check_out_str, '%Y-%m-%d').date()
+                except (ValueError, TypeError):
+                    pass
+        
+        # Get all rooms for this property
+        rooms = Room.objects.filter(
+            property_obj=obj,
+            is_active=True
+        ).order_by('room_number')
+        
+        # Filter available rooms
+        available_rooms_list = []
+        
+        for room in rooms:
+            # Basic availability check: status must be 'available'
+            if room.status != 'available':
+                continue
+            
+            # If room has a current booking, it's not available
+            if room.current_booking:
+                continue
+            
+            # If date range is provided, check for booking conflicts
+            if check_in_date and check_out_date:
+                # Check if room has any bookings that conflict with the requested dates
+                conflicting_bookings = Booking.objects.filter(
+                    property_obj=obj,
+                    room_number=room.room_number,
+                    booking_status__in=['pending', 'confirmed', 'checked_in'],
+                    check_in_date__lt=check_out_date,
+                    check_out_date__gt=check_in_date
+                ).exists()
+                
+                if conflicting_bookings:
+                    continue
+            
+            # Room is available, add to list
+            available_rooms_list.append(room)
+        
+        # Serialize available rooms
+        return RoomSerializer(available_rooms_list, many=True, context=self.context).data
 
 
 class PropertyCreateUpdateSerializer(serializers.ModelSerializer):
@@ -277,6 +346,23 @@ class PropertyViewSerializer(serializers.ModelSerializer):
         model = PropertyView
         fields = ['id', 'property', 'property_title', 'user', 'user_name', 'ip_address', 'viewed_at']
         read_only_fields = ['id', 'viewed_at']
+
+
+class RoomSerializer(serializers.ModelSerializer):
+    """Serializer for Room model - used for available rooms in property details"""
+    is_available = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Room
+        fields = [
+            'id', 'room_number', 'room_type', 'floor_number', 'capacity',
+            'bed_type', 'amenities', 'base_rate', 'status', 'is_available'
+        ]
+        read_only_fields = ['id', 'status', 'is_available']
+    
+    def get_is_available(self, obj):
+        """Check if room is currently available"""
+        return obj.is_available
 
 
 class PropertySearchSerializer(serializers.Serializer):

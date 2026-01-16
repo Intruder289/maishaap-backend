@@ -122,17 +122,25 @@
         <h5 class="mb-0">Invoices</h5>
       </div>
       <div class="col-auto">
-        <div class="d-flex gap-2">
-          <input type="text" id="invoices-search-input" class="form-control form-control-sm" placeholder="Search invoices..." value="{{ search_query|default:'' }}">
-          <select id="invoices-status-filter" class="form-select form-select-sm">
+        <div class="d-flex align-items-center gap-2">
+          <div class="input-group input-group-sm" style="width: 260px;">
+            <input type="search" class="form-control" id="invoices-search-input" placeholder="Search invoices..." value="{{ search_query|default:'' }}">
+            <button class="btn btn-outline-secondary" id="invoices-search-clear">Clear</button>
+          </div>
+          <select id="invoices-status-filter" class="form-select form-select-sm" style="width: auto;">
             <option value="">All Status</option>
             {% for value, label in status_choices %}
             <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
           </select>
-          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearInvoicesFilters()">
-            <i class="fas fa-times"></i> Clear
-          </button>
+          <label class="form-label mb-0">Items per page:</label>
+          <select class="form-select form-select-sm" id="pageSizeSelect" style="width: auto;">
+            <option value="5" {% if current_page_size == 5 %}selected{% endif %}>5</option>
+            <option value="10" {% if current_page_size == 10 %}selected{% endif %}>10</option>
+            <option value="25" {% if current_page_size == 25 %}selected{% endif %}>25</option>
+            <option value="50" {% if current_page_size == 50 %}selected{% endif %}>50</option>
+            <option value="100" {% if current_page_size == 100 %}selected{% endif %}>100</option>
+          </select>
         </div>
       </div>
     </div>
@@ -159,6 +167,7 @@ function initializeInvoices() {
     function loadInvoicesTable(page = 1) {
         var search = $('#invoices-search-input').val() || '';
         var status = $('#invoices-status-filter').val() || '';
+        var pageSize = $('#pageSizeSelect').val() || '5';
         
         $('#invoices-table-container').html('<div class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">Loading...</p></div>');
         
@@ -168,7 +177,8 @@ function initializeInvoices() {
             data: {
                 'search': search,
                 'status': status,
-                'page': page
+                'page': page,
+                'page_size': pageSize
             },
             headers: {
                 'X-Requested-With': 'XMLHttpRequest'
@@ -182,17 +192,27 @@ function initializeInvoices() {
         });
     }
     
-    // Search input handler
+    // Debounced search
     var searchTimeout;
     $('#invoices-search-input').on('input', function() {
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(function() {
             loadInvoicesTable(1);
-        }, 500);
+        }, 400);
+    });
+    
+    $('#invoices-search-clear').on('click', function() {
+        $('#invoices-search-input').val('');
+        loadInvoicesTable(1);
     });
     
     // Status filter handler
     $('#invoices-status-filter').on('change', function() {
+        loadInvoicesTable(1);
+    });
+    
+    // Page size change handler
+    $('#pageSizeSelect').on('change', function() {
         loadInvoicesTable(1);
     });
     
@@ -205,6 +225,7 @@ function initializeInvoices() {
     window.clearInvoicesFilters = function() {
         $('#invoices-search-input').val('');
         $('#invoices-status-filter').val('');
+        $('#pageSizeSelect').val('5');
         loadInvoicesTable(1);
     };
 }

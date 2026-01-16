@@ -1,7 +1,8 @@
 from django.contrib import admin
 from .models import (
     Region, PropertyType, Amenity, Property, 
-    PropertyAmenity, PropertyImage, PropertyView, PropertyFavorite
+    PropertyAmenity, PropertyImage, PropertyView, PropertyFavorite,
+    PropertyVisitPayment
 )
 
 
@@ -102,3 +103,52 @@ class PropertyFavoriteAdmin(admin.ModelAdmin):
     list_display = ['user', 'property', 'created_at']
     list_filter = ['created_at']
     search_fields = ['user__username', 'property__title']
+
+
+@admin.register(PropertyVisitPayment)
+class PropertyVisitPaymentAdmin(admin.ModelAdmin):
+    list_display = ['id', 'property', 'user', 'amount', 'status', 'paid_at', 'is_active', 'expires_at_display', 'created_at']
+    list_filter = ['status', 'created_at', 'paid_at']
+    search_fields = ['property__title', 'user__username', 'user__email', 'transaction_id', 'gateway_reference']
+    readonly_fields = ['created_at', 'updated_at', 'expires_at_display', 'is_active_display', 'is_expired_display']
+    date_hierarchy = 'created_at'
+    
+    fieldsets = (
+        ('Payment Information', {
+            'fields': ('property', 'user', 'amount', 'status')
+        }),
+        ('Payment Details', {
+            'fields': ('payment', 'transaction_id', 'gateway_reference')
+        }),
+        ('Timestamps', {
+            'fields': ('paid_at', 'created_at', 'updated_at')
+        }),
+        ('Expiration Information', {
+            'fields': ('expires_at_display', 'is_active_display', 'is_expired_display'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def expires_at_display(self, obj):
+        """Display expiration datetime"""
+        if obj.paid_at:
+            expires_at = obj.expires_at()
+            if expires_at:
+                from django.utils import timezone
+                if timezone.now() > expires_at:
+                    return f"{expires_at.strftime('%Y-%m-%d %H:%M:%S')} (Expired)"
+                return expires_at.strftime('%Y-%m-%d %H:%M:%S')
+        return "N/A"
+    expires_at_display.short_description = 'Expires At'
+    
+    def is_active_display(self, obj):
+        """Display if payment is active"""
+        return "Yes" if obj.is_active() else "No"
+    is_active_display.short_description = 'Is Active'
+    is_active_display.boolean = True
+    
+    def is_expired_display(self, obj):
+        """Display if payment is expired"""
+        return "Yes" if obj.is_expired() else "No"
+    is_expired_display.short_description = 'Is Expired'
+    is_expired_display.boolean = True

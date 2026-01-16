@@ -12,7 +12,9 @@
         <div class="mb-3">
             <label class="form-label fw-bold">Payment Type</label>
             <p class="mb-0">
-                {% if payment.payment_type == 'rent' %}
+                {% if payment_type == 'visit' %}
+                    <span class="badge bg-primary">Visit Payment</span>
+                {% elif payment.payment_type == 'rent' %}
                     <span class="badge bg-info">Monthly Rent</span>
                 {% elif payment.payment_type == 'deposit' %}
                     <span class="badge bg-warning">Security Deposit</span>
@@ -62,16 +64,54 @@
         <h6 class="text-muted mb-3">Transaction Details</h6>
         <div class="mb-3">
             <label class="form-label fw-bold">Payment Date</label>
-            <p class="mb-0">{{ payment.payment_date|date:"M d, Y H:i" }}</p>
+            <p class="mb-0">
+                {% if payment_type == 'visit' and payment.visit_payment.paid_at %}
+                    {{ payment.visit_payment.paid_at|date:"M d, Y H:i" }}
+                {% elif payment.payment_date %}
+                    {{ payment.payment_date|date:"M d, Y H:i" }}
+                {% elif payment.paid_date %}
+                    {{ payment.paid_date|date:"M d, Y" }}
+                {% else %}
+                    N/A
+                {% endif %}
+            </p>
         </div>
         <div class="mb-3">
             <label class="form-label fw-bold">Transaction Reference</label>
-            <p class="mb-0">{{ payment.transaction_reference|default:"N/A" }}</p>
+            <p class="mb-0">
+                {% if payment_type == 'visit' and payment.visit_payment.gateway_reference %}
+                    {{ payment.visit_payment.gateway_reference }}
+                {% elif payment.transaction_reference %}
+                    {{ payment.transaction_reference }}
+                {% else %}
+                    N/A
+                {% endif %}
+            </p>
         </div>
+        {% if payment_type == 'visit' and visit_payment.paid_at %}
+        <div class="mb-3">
+            <label class="form-label fw-bold">Expires At</label>
+            <p class="mb-0">
+                {% if visit_payment_expires_at %}
+                    <span class="{% if visit_payment_is_expired %}text-danger{% else %}text-success{% endif %}">
+                        {{ visit_payment_expires_at|date:"M d, Y H:i" }}
+                        {% if visit_payment_is_expired %}
+                            <span class="badge bg-danger ms-2">Expired</span>
+                        {% else %}
+                            <span class="badge bg-success ms-2">Active</span>
+                        {% endif %}
+                    </span>
+                {% else %}
+                    N/A
+                {% endif %}
+            </p>
+        </div>
+        {% else %}
         <div class="mb-3">
             <label class="form-label fw-bold">Due Date</label>
             <p class="mb-0">{{ payment.due_date|date:"M d, Y"|default:"N/A" }}</p>
         </div>
+        {% endif %}
         <div class="mb-3">
             <label class="form-label fw-bold">Currency</label>
             <p class="mb-0">{{ payment.currency|default:"TZS" }}</p>
@@ -89,6 +129,30 @@
     <div class="col-12">
         <h6 class="text-muted mb-3">Related Information</h6>
         <div class="row">
+            {% if payment_type == 'visit' %}
+            <div class="col-md-6">
+                <div class="card border">
+                    <div class="card-body">
+                        <h6 class="card-title">User</h6>
+                        <p class="mb-1"><strong>{{ payment.tenant.get_full_name|default:payment.tenant.username }}</strong></p>
+                        <p class="mb-1 text-muted">{{ payment.tenant.email }}</p>
+                        {% if payment.tenant.profile.phone %}
+                        <p class="mb-0 text-muted">{{ payment.tenant.profile.phone }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card border">
+                    <div class="card-body">
+                        <h6 class="card-title">Property</h6>
+                        <p class="mb-1"><strong>{{ payment.property.title }}</strong></p>
+                        <p class="mb-1 text-muted">{{ payment.property.address }}</p>
+                        <p class="mb-0 text-muted">{{ payment.property.property_type.name }}</p>
+                    </div>
+                </div>
+            </div>
+            {% else %}
             <div class="col-md-6">
                 <div class="card border">
                     <div class="card-body">
@@ -109,6 +173,7 @@
                     </div>
                 </div>
             </div>
+            {% endif %}
         </div>
     </div>
 </div>

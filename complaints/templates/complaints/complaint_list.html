@@ -158,12 +158,15 @@
               <li><a class="dropdown-item" href="#" onclick="openMarkResolvedModal({{ complaint.id }})">
                 <i class="fas fa-check me-2"></i>Mark Resolved
                   </a></li>
-              {% if complaint.status == 'resolved' %}
               <li><hr class="dropdown-divider"></li>
               <li><a class="dropdown-item text-danger" href="#" onclick="openDeleteModal({{ complaint.id }})">
                 <i class="fas fa-trash me-2"></i>Delete
                   </a></li>
-                  {% endif %}
+              {% elif complaint.user == user %}
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item text-danger" href="#" onclick="openDeleteModal({{ complaint.id }})">
+                <i class="fas fa-trash me-2"></i>Delete
+                  </a></li>
               {% endif %}
                 </ul>
               </div>
@@ -730,12 +733,26 @@ function initializeComplaintsPage() {
             },
             success: function(response) {
                 $('#deleteModal').modal('hide');
+                $('#deleteComplaintId').val('');
                 loadTable();
-                alert('Complaint deleted successfully!');
+                // Show success message
+                if (typeof toastr !== 'undefined') {
+                    toastr.success(response.message || 'Complaint deleted successfully!');
+                } else {
+                    alert(response.message || 'Complaint deleted successfully!');
+                }
             },
             error: function(xhr, status, error) {
                 console.log('Error deleting complaint:', error);
-                alert('Error deleting complaint. Please try again.');
+                var errorMessage = 'Error deleting complaint. Please try again.';
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    errorMessage = xhr.responseJSON.error;
+                }
+                if (typeof toastr !== 'undefined') {
+                    toastr.error(errorMessage);
+                } else {
+                    alert(errorMessage);
+                }
             }
         });
     });

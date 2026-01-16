@@ -32,7 +32,7 @@
             
             <!-- Stats Cards -->
             <div class="row mb-4">
-                <div class="col-md-3">
+                <div class="col-md-3 col-sm-6 mb-3">
                     <div class="card bg-primary text-white">
                         <div class="card-body">
                             <div class="d-flex justify-content-between">
@@ -47,7 +47,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-3 col-sm-6 mb-3">
                     <div class="card bg-success text-white">
                         <div class="card-body">
                             <div class="d-flex justify-content-between">
@@ -62,7 +62,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-3 col-sm-6 mb-3">
                     <div class="card bg-warning text-white">
                         <div class="card-body">
                             <div class="d-flex justify-content-between">
@@ -77,7 +77,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-3 col-sm-6 mb-3">
                     <div class="card bg-info text-white">
                         <div class="card-body">
                             <div class="d-flex justify-content-between">
@@ -87,6 +87,123 @@
                                 </div>
                                 <div class="align-self-center">
                                     <i class="fas fa-dollar-sign fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Additional Stats Cards -->
+            <div class="row mb-4">
+                <div class="col-md-3 col-sm-6 mb-3">
+                    <div class="card bg-secondary text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-0">{{ total_bookings }}</h4>
+                                    <p class="mb-0">Total Bookings</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-calendar-check fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6 mb-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-0">{{ active_bookings }}</h4>
+                                    <p class="mb-0">Active Bookings</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-calendar-alt fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6 mb-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-0">Tsh{{ total_revenue|floatformat:0 }}</h4>
+                                    <p class="mb-0">Total Revenue</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-money-bill-wave fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6 mb-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="mb-0">Tsh{{ monthly_revenue|floatformat:0 }}</h4>
+                                    <p class="mb-0">This Month</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-chart-line fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Quick Stats Row -->
+            <div class="row mb-4">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <i class="fas fa-info-circle me-2"></i>Quick Statistics
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3 col-sm-6 mb-3">
+                                    <div class="text-center p-3 border rounded">
+                                        <h3 class="text-primary mb-1">{{ maintenance_properties }}</h3>
+                                        <p class="text-muted mb-0">Under Maintenance</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 col-sm-6 mb-3">
+                                    <div class="text-center p-3 border rounded">
+                                        <h3 class="text-success mb-1">{{ completed_bookings }}</h3>
+                                        <p class="text-muted mb-0">Completed Bookings</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 col-sm-6 mb-3">
+                                    <div class="text-center p-3 border rounded">
+                                        <h3 class="text-warning mb-1">{{ pending_bookings }}</h3>
+                                        <p class="text-muted mb-0">Pending Bookings</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 col-sm-6 mb-3">
+                                    <div class="text-center p-3 border rounded">
+                                        <h3 class="text-info mb-1">{{ upcoming_bookings }}</h3>
+                                        <p class="text-muted mb-0">Upcoming (7 days)</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 col-sm-6 mb-3">
+                                    <div class="text-center p-3 border rounded">
+                                        <h3 class="text-primary mb-1">{{ todays_checkins }}</h3>
+                                        <p class="text-muted mb-0">Today's Check-ins</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 col-sm-6 mb-3">
+                                    <div class="text-center p-3 border rounded">
+                                        <h3 class="text-danger mb-1">{{ todays_checkouts }}</h3>
+                                        <p class="text-muted mb-0">Today's Check-outs</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -211,9 +328,87 @@
                 </div>
             </div>
             
-            <!-- Recent Properties -->
+            <!-- Recent Bookings and Properties -->
             <div class="row mt-4">
-                <div class="col-12">
+                <!-- Recent Bookings -->
+                <div class="col-md-6 mb-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="row flex-between-center">
+                                <div class="col">
+                                    <h6 class="mb-2">Recent Bookings</h6>
+                                    <h5 class="mb-0">Latest booking activity</h5>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            {% if recent_bookings %}
+                                <div class="table-responsive">
+                                    <table class="table table-hover mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Booking Ref</th>
+                                                <th>Property</th>
+                                                <th>Customer</th>
+                                                <th>Amount</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for booking in recent_bookings %}
+                                            <tr>
+                                                <td>
+                                                    <span class="badge bg-primary">{{ booking.booking_reference }}</span>
+                                                </td>
+                                                <td>
+                                                    <div class="text-muted small">
+                                                        {{ booking.property_obj.title|truncatechars:20 }}
+                                                    </div>
+                                                    {% if booking.property_obj.property_type %}
+                                                        <span class="badge bg-info">{{ booking.property_obj.property_type.name }}</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if booking.customer %}
+                                                        <div>{{ booking.customer.get_full_name|default:booking.customer.first_name }}</div>
+                                                        <div class="text-muted small">{{ booking.customer.phone|default:"" }}</div>
+                                                    {% else %}
+                                                        <span class="text-muted">N/A</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    <div class="fw-bold">Tsh{{ booking.total_amount|floatformat:0 }}</div>
+                                                </td>
+                                                <td>
+                                                    {% if booking.booking_status == 'confirmed' %}
+                                                        <span class="badge bg-success">Confirmed</span>
+                                                    {% elif booking.booking_status == 'checked_in' %}
+                                                        <span class="badge bg-primary">Checked In</span>
+                                                    {% elif booking.booking_status == 'checked_out' %}
+                                                        <span class="badge bg-secondary">Checked Out</span>
+                                                    {% elif booking.booking_status == 'pending' %}
+                                                        <span class="badge bg-warning">Pending</span>
+                                                    {% else %}
+                                                        <span class="badge bg-secondary">{{ booking.get_booking_status_display|default:booking.booking_status }}</span>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <div class="text-center text-muted p-4">
+                                    <i class="fas fa-calendar-check fa-3x mb-3"></i>
+                                    <p>No recent bookings found</p>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Recent Properties -->
+                <div class="col-md-6 mb-4">
                     <div class="card">
                         <div class="card-header">
                             <div class="row flex-between-center">

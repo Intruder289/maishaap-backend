@@ -8,53 +8,42 @@
   <div class="row">
     <div class="col-12">
       <div class="card mb-3">
-        <div class="card-header bg-light">
+        <div class="card-header">
           <div class="row flex-between-center">
             <div class="col-auto">
               <h5 class="mb-0">Payment Transactions</h5>
-              <p class="text-600 mb-0">View all payment gateway transactions</p>
             </div>
             <div class="col-auto">
-              <div class="d-flex gap-2">
-                <span class="badge bg-primary">{{ total_transactions }} Total</span>
-                <span class="badge bg-success">{{ successful_transactions }} Successful</span>
-                <span class="badge bg-warning">{{ pending_transactions }} Pending</span>
-                <span class="badge bg-danger">{{ failed_transactions }} Failed</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="card-body">
-          <!-- Filters -->
-          <div class="mb-3">
-            <div class="row g-2">
-              <div class="col-md-3">
-                <input type="text" id="transactions-search-input" class="form-control" placeholder="Search..." value="{{ search_query|default:'' }}">
-              </div>
-              <div class="col-md-2">
-                <select id="transactions-status-filter" class="form-select">
+              <div class="d-flex align-items-center gap-2">
+                <div class="input-group input-group-sm" style="width: 260px;">
+                  <input type="search" class="form-control" id="transactions-search-input" placeholder="Search transactions..." value="{{ search_query|default:'' }}">
+                  <button class="btn btn-outline-secondary" id="transactions-search-clear">Clear</button>
+                </div>
+                <select id="transactions-status-filter" class="form-select form-select-sm" style="width: auto;">
                   <option value="">All Status</option>
                   {% for value, label in status_choices %}
                   <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
                   {% endfor %}
                 </select>
-              </div>
-              <div class="col-md-2">
-                <select id="transactions-provider-filter" class="form-select">
+                <select id="transactions-provider-filter" class="form-select form-select-sm" style="width: auto;">
                   <option value="">All Providers</option>
                   {% for provider in providers %}
                   <option value="{{ provider.id }}" {% if provider_filter == provider.id|stringformat:"s" %}selected{% endif %}>{{ provider.name }}</option>
                   {% endfor %}
                 </select>
-              </div>
-              <div class="col-md-2">
-                <button type="button" class="btn btn-primary w-100" onclick="loadTransactionsTable(1)">Filter</button>
-              </div>
-              <div class="col-md-2">
-                <button type="button" class="btn btn-outline-secondary w-100" onclick="clearTransactionsFilters()">Clear</button>
+                <label class="form-label mb-0">Items per page:</label>
+                <select class="form-select form-select-sm" id="pageSizeSelect" style="width: auto;">
+                  <option value="5" {% if current_page_size == 5 %}selected{% endif %}>5</option>
+                  <option value="10" {% if current_page_size == 10 %}selected{% endif %}>10</option>
+                  <option value="25" {% if current_page_size == 25 %}selected{% endif %}>25</option>
+                  <option value="50" {% if current_page_size == 50 %}selected{% endif %}>50</option>
+                  <option value="100" {% if current_page_size == 100 %}selected{% endif %}>100</option>
+                </select>
               </div>
             </div>
           </div>
+        </div>
+        <div class="card-body p-0">
 
           <!-- Transactions Table -->
           <div id="transactions-table-container">
@@ -82,6 +71,7 @@ function initializeTransactions() {
         var search = $('#transactions-search-input').val() || '';
         var status = $('#transactions-status-filter').val() || '';
         var provider = $('#transactions-provider-filter').val() || '';
+        var pageSize = $('#pageSizeSelect').val() || '5';
         
         $('#transactions-table-container').html('<div class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">Loading...</p></div>');
         
@@ -92,13 +82,24 @@ function initializeTransactions() {
                 'search': search,
                 'status': status,
                 'provider': provider,
-                'page': page
+                'page': page,
+                'page_size': pageSize
             },
             headers: {
                 'X-Requested-With': 'XMLHttpRequest'
             },
             success: function(data) {
                 $('#transactions-table-container').html(data);
+                // Initialize Bootstrap tooltips for truncated text
+                var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+                var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                    return new bootstrap.Tooltip(tooltipTriggerEl);
+                });
+                // Initialize Bootstrap dropdowns
+                var dropdownElementList = [].slice.call(document.querySelectorAll('#transactions-table-container .dropdown-toggle'));
+                dropdownElementList.map(function (dropdownToggleEl) {
+                    return new bootstrap.Dropdown(dropdownToggleEl);
+                });
             },
             error: function(xhr, status, error) {
                 $('#transactions-table-container').html('<div class="text-center py-5"><p class="text-danger">Error loading data: ' + error + '</p></div>');
@@ -106,13 +107,18 @@ function initializeTransactions() {
         });
     }
     
-    // Search input handler
+    // Debounced search
     var searchTimeout;
     $('#transactions-search-input').on('input', function() {
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(function() {
             loadTransactionsTable(1);
-        }, 500);
+        }, 400);
+    });
+    
+    $('#transactions-search-clear').on('click', function() {
+        $('#transactions-search-input').val('');
+        loadTransactionsTable(1);
     });
     
     // Filter change handlers
@@ -121,6 +127,11 @@ function initializeTransactions() {
     });
     
     $('#transactions-provider-filter').on('change', function() {
+        loadTransactionsTable(1);
+    });
+    
+    // Page size change handler
+    $('#pageSizeSelect').on('change', function() {
         loadTransactionsTable(1);
     });
     
@@ -134,6 +145,7 @@ function initializeTransactions() {
         $('#transactions-search-input').val('');
         $('#transactions-status-filter').val('');
         $('#transactions-provider-filter').val('');
+        $('#pageSizeSelect').val('5');
         loadTransactionsTable(1);
     };
 }
@@ -145,9 +157,31 @@ function viewTransaction(transactionId) {
             $('body').append('<div class="modal fade" id="transactionViewModal" tabindex="-1"><div class="modal-dialog modal-xl"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Transaction Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="transactionViewContent"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div></div></div></div>');
         }
         $('#transactionViewContent').html(data);
-        $('#transactionViewModal').modal('show');
+        var modal = new bootstrap.Modal(document.getElementById('transactionViewModal'));
+        modal.show();
     }).fail(function() {
-        alert('Failed to load transaction details.');
+        if (typeof toastr !== 'undefined') {
+            toastr.error('Failed to load transaction details.');
+        } else {
+            alert('Failed to load transaction details.');
+        }
+    });
+}
+
+function deleteTransaction(transactionId) {
+    $.get('/payments/api/transaction/' + transactionId + '/delete/', function(data) {
+        if ($('#transactionDeleteModal').length === 0) {
+            $('body').append('<div class="modal fade" id="transactionDeleteModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Delete Transaction</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="transactionDeleteContent"></div></div></div></div>');
+        }
+        $('#transactionDeleteContent').html(data);
+        var modal = new bootstrap.Modal(document.getElementById('transactionDeleteModal'));
+        modal.show();
+    }).fail(function() {
+        if (typeof toastr !== 'undefined') {
+            toastr.error('Failed to load delete confirmation.');
+        } else {
+            alert('Failed to load delete confirmation.');
+        }
     });
 }
 
@@ -174,6 +208,12 @@ function verifyTransaction(transactionId) {
     if ($('#transactions-table-container').length) {
         $('#transactions-table-container').prepend(loadingMsg);
     }
+    
+    // Initialize Bootstrap tooltips for truncated text
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
     
     $.ajax({
         url: '/payments/api/transaction/' + transactionId + '/verify/',
@@ -274,5 +314,27 @@ function viewPayment(paymentId) {
 
 // Start initialization
 waitForJQuery();
+
+// Initialize Bootstrap tooltips on page load
+function initializeTooltips() {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+}
+
+// Initialize Bootstrap dropdowns
+function initializeDropdowns() {
+    var dropdownElementList = [].slice.call(document.querySelectorAll('.dropdown-toggle'));
+    dropdownElementList.map(function (dropdownToggleEl) {
+        return new bootstrap.Dropdown(dropdownToggleEl);
+    });
+}
+
+// Initialize tooltips and dropdowns when jQuery is ready
+$(document).ready(function() {
+    initializeTooltips();
+    initializeDropdowns();
+});
 </script>
 {% endblock %}

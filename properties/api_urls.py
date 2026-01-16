@@ -51,4 +51,7 @@ urlpatterns = [
     path('properties/<int:property_id>/visit/status/', api_views.property_visit_status, name='property_visit_status'),
     path('properties/<int:property_id>/visit/initiate/', api_views.property_visit_initiate, name='property_visit_initiate'),
     path('properties/<int:property_id>/visit/verify/', api_views.property_visit_verify, name='property_visit_verify'),
+    
+    # Available rooms endpoint (hotels/lodges only)
+    path('available-rooms/', api_views.available_rooms_api, name='available_rooms_api'),
 ]

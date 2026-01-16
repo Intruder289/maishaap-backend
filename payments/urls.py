@@ -22,6 +22,7 @@ urlpatterns = [
     
     # Transaction Action API endpoints
     path('api/transaction/<int:transaction_id>/view-details/', views.transaction_view_details, name='transaction_view_details'),
+    path('api/transaction/<int:transaction_id>/delete/', views.transaction_delete, name='transaction_delete'),
     path('api/transaction/<int:transaction_id>/verify/', views.transaction_verify, name='transaction_verify'),
     
     # Payment Provider Action API endpoints

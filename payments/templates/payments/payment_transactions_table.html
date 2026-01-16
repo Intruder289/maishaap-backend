@@ -1,102 +1,123 @@
 <!-- AJAX Payment Transactions Table Content -->
+<style>
+  #transactions-table-container .table-responsive {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  #transactions-table-container table {
+    width: 100%;
+    table-layout: fixed;
+  }
+  #transactions-table-container table td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #transactions-table-container .dropdown {
+    position: static;
+  }
+  #transactions-table-container .dropdown-menu {
+    z-index: 1050;
+    position: absolute;
+  }
+</style>
 <div class="table-responsive">
-  <table class="table table-hover">
+  <table class="table table-hover mb-0 table-sm">
     <thead class="table-light">
       <tr>
-        <th>Transaction ID</th>
-        <th>Payment</th>
-        <th>Tenant</th>
-        <th>Provider</th>
-        <th>Amount</th>
-        <th>Status</th>
-        <th>Gateway ID</th>
-        <th>AZAM Reference</th>
-        <th>Date</th>
-        <th>Actions</th>
+        <th style="width: 8%;">Payment</th>
+        <th style="width: 14%;">Tenant</th>
+        <th style="width: 9%;">Provider</th>
+        <th style="width: 10%;">Amount</th>
+        <th style="width: 9%;">Status</th>
+        <th style="width: 14%;">Gateway ID</th>
+        <th style="width: 17%;">AZAM Reference</th>
+        <th style="width: 12%;">Date</th>
+        <th style="width: 7%;">Actions</th>
       </tr>
     </thead>
     <tbody>
       {% for transaction in page_obj %}
       <tr>
         <td>
-          <span class="fw-bold">#{{ transaction.id }}</span>
-        </td>
-        <td>
-          <a href="#" class="text-decoration-none" onclick="viewPayment({{ transaction.payment.id }}); return false;">
-            Payment #{{ transaction.payment.id }}
+          <a href="#" class="text-decoration-none small" onclick="viewPayment({{ transaction.payment.id }}); return false;" title="View Payment #{{ transaction.payment.id }}">
+            #{{ transaction.payment.id }}
           </a>
         </td>
-        <td>
-          <div>
-            <div class="fw-bold">{{ transaction.payment.tenant.get_full_name|default:transaction.payment.tenant.username }}</div>
-            <div class="text-muted small">{{ transaction.payment.tenant.email }}</div>
+        <td style="overflow: hidden;">
+          <div style="min-width: 0; max-width: 100%;">
+            <div class="fw-bold text-truncate" style="max-width: 100%;" title="{{ transaction.payment.tenant.get_full_name|default:transaction.payment.tenant.username }}">
+              {{ transaction.payment.tenant.get_full_name|default:transaction.payment.tenant.username }}
+            </div>
+            <div class="text-muted small text-truncate" style="max-width: 100%;" title="{{ transaction.payment.tenant.email }}">
+              {{ transaction.payment.tenant.email }}
+            </div>
           </div>
         </td>
-        <td>
-          <span class="badge bg-info-subtle text-info">{{ transaction.provider.name|default:"N/A" }}</span>
+        <td style="overflow: hidden;">
+          <span class="badge bg-info-subtle text-info small">{{ transaction.provider.name|default:"N/A" }}</span>
         </td>
-        <td>
-          <span class="fw-bold text-success">Tsh{{ transaction.payment.amount|floatformat:2 }}</span>
+        <td style="overflow: hidden;">
+          <span class="fw-bold text-success small">Tsh{{ transaction.payment.amount|floatformat:2 }}</span>
         </td>
-        <td>
+        <td style="overflow: hidden;">
           {% if transaction.status == 'successful' %}
-          <span class="badge bg-success">Successful</span>
+          <span class="badge bg-success small">Successful</span>
           {% elif transaction.status == 'pending' %}
-          <span class="badge bg-warning">Pending</span>
+          <span class="badge bg-warning small">Pending</span>
           {% elif transaction.status == 'initiated' %}
-          <span class="badge bg-info">Initiated</span>
+          <span class="badge bg-info small">Initiated</span>
           {% elif transaction.status == 'processing' %}
-          <span class="badge bg-primary">Processing</span>
+          <span class="badge bg-primary small">Processing</span>
           {% elif transaction.status == 'failed' %}
-          <span class="badge bg-danger">Failed</span>
+          <span class="badge bg-danger small">Failed</span>
           {% else %}
-          <span class="badge bg-secondary">{{ transaction.status|title }}</span>
+          <span class="badge bg-secondary small">{{ transaction.status|title }}</span>
           {% endif %}
         </td>
-        <td>
+        <td style="overflow: hidden;">
           {% if transaction.gateway_transaction_id %}
-          <code class="text-primary">{{ transaction.gateway_transaction_id|truncatechars:20 }}</code>
+          <code class="text-primary d-inline-block text-truncate" style="max-width: 100%; font-size: 0.8em;" title="{{ transaction.gateway_transaction_id }}" data-bs-toggle="tooltip" data-bs-placement="top">
+            {{ transaction.gateway_transaction_id|truncatechars:12 }}
+          </code>
           {% else %}
           <span class="text-muted">-</span>
           {% endif %}
         </td>
-        <td>
+        <td style="overflow: hidden;">
           {% if transaction.azam_reference %}
-          <code class="text-info">{{ transaction.azam_reference|truncatechars:20 }}</code>
+          <code class="text-info d-inline-block text-truncate" style="max-width: 100%; font-size: 0.8em;" title="{{ transaction.azam_reference }}" data-bs-toggle="tooltip" data-bs-placement="top">
+            {{ transaction.azam_reference|truncatechars:15 }}
+          </code>
           {% else %}
           <span class="text-muted">-</span>
           {% endif %}
         </td>
-        <td>
-          <div class="text-600 small">
-            {{ transaction.created_at|date:"M j, Y" }}<br>
-            {{ transaction.created_at|date:"g:i A" }}
+        <td style="overflow: hidden;">
+          <div class="text-muted small" style="font-size: 0.8em; line-height: 1.2; white-space: nowrap;">
+            {{ transaction.created_at|date:"M j" }}<br>
+            <span class="text-600">{{ transaction.created_at|date:"g:i A" }}</span>
           </div>
         </td>
-        <td>
+        <td style="overflow: visible; position: relative;">
           <div class="dropdown">
-            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="dropdownMenuButton{{ transaction.id }}" data-bs-toggle="dropdown" aria-expanded="false">
               <i class="fas fa-ellipsis-v"></i>
             </button>
-            <ul class="dropdown-menu">
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdownMenuButton{{ transaction.id }}">
               <li><a class="dropdown-item" href="#" onclick="viewTransaction({{ transaction.id }}); return false;">
-                <i class="fas fa-eye me-2"></i>View Details
+                <i class="fas fa-eye me-2"></i>View
               </a></li>
-              <li><a class="dropdown-item" href="#" onclick="viewPayment({{ transaction.payment.id }}); return false;">
-                <i class="fas fa-credit-card me-2"></i>View Payment
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item text-danger" href="#" onclick="deleteTransaction({{ transaction.id }}); return false;">
+                <i class="fas fa-trash me-2"></i>Delete
               </a></li>
-              {% if transaction.status == 'pending' or transaction.status == 'initiated' or transaction.status == 'processing' %}
-              <li><a class="dropdown-item" href="#" onclick="verifyTransaction({{ transaction.id }}); return false;">
-                <i class="fas fa-sync me-2"></i>Verify Status
-              </a></li>
-              {% endif %}
             </ul>
           </div>
         </td>
       </tr>
       {% empty %}
       <tr>
-        <td colspan="10" class="text-center py-4">
+        <td colspan="9" class="text-center py-4">
           <div class="text-muted">
             <i class="fas fa-inbox fa-2x mb-2"></i>
             <p>No transactions found</p>

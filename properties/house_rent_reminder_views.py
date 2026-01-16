@@ -45,8 +45,12 @@ def house_rent_reminders_dashboard(request):
             selected_property = Property.objects.get(id=selected_property_id, property_type__name__iexact='house')
             request.session['selected_house_property_id'] = selected_property_id
             
-            # Get reminders for selected property
-            reminders = HouseRentReminder.objects.filter(property_obj=selected_property)
+            # Get reminders for selected property with optimized queries
+            reminders = HouseRentReminder.objects.filter(
+                property_obj=selected_property
+            ).select_related(
+                'property_obj', 'customer', 'booking', 'created_by'
+            ).prefetch_related('booking__property_obj')
             settings_obj = HouseRentReminderSettings.objects.filter(property_obj=selected_property).first()
             
         except Property.DoesNotExist:
@@ -55,8 +59,12 @@ def house_rent_reminders_dashboard(request):
             settings_obj = None
     else:
         selected_property = None
-        # Get reminders for all house properties
-        reminders = HouseRentReminder.objects.filter(property_obj__property_type__name__iexact='house')
+        # Get reminders for all house properties with optimized queries
+        reminders = HouseRentReminder.objects.filter(
+            property_obj__property_type__name__iexact='house'
+        ).select_related(
+            'property_obj', 'customer', 'booking', 'created_by'
+        ).prefetch_related('booking__property_obj')
         settings_obj = None
     
     # Calculate statistics
@@ -76,17 +84,17 @@ def house_rent_reminders_dashboard(request):
         created_at__gte=timezone.now() - timedelta(days=7)
     ).count()
     
-    # Get upcoming reminders (next 7 days)
+    # Get upcoming reminders (next 7 days) with optimized query
     upcoming_reminders = reminders.filter(
         scheduled_date__lte=timezone.now() + timedelta(days=7),
         scheduled_date__gte=timezone.now(),
         reminder_status='scheduled'
-    ).order_by('scheduled_date')[:10]
+    ).select_related('property_obj', 'customer', 'booking').order_by('scheduled_date')[:10]
     
-    # Get recent reminder logs
+    # Get recent reminder logs with optimized query
     recent_logs = HouseRentReminderLog.objects.filter(
         reminder__property_obj__in=house_properties
-    ).order_by('-created_at')[:10]
+    ).select_related('reminder', 'reminder__property_obj', 'performed_by').order_by('-created_at')[:10]
     
     context = {
         'house_properties': house_properties,
@@ -116,22 +124,26 @@ def house_rent_reminders_list(request):
     # Get house properties
     house_properties = Property.objects.filter(property_type__name__iexact='house')
     
-    # Base queryset
+    # Base queryset with optimized queries
     if selected_property_id:
         try:
             selected_property = Property.objects.get(id=selected_property_id, property_type__name__iexact='house')
             request.session['selected_house_property_id'] = selected_property_id
-            reminders = HouseRentReminder.objects.filter(property_obj=selected_property)
+            reminders = HouseRentReminder.objects.filter(
+                property_obj=selected_property
+            ).select_related('property_obj', 'customer', 'booking', 'created_by')
         except Property.DoesNotExist:
             selected_property = None
             reminders = HouseRentReminder.objects.none()
     else:
         selected_property = None
-        reminders = HouseRentReminder.objects.filter(property_obj__property_type__name__iexact='house')
+        reminders = HouseRentReminder.objects.filter(
+            property_obj__property_type__name__iexact='house'
+        ).select_related('property_obj', 'customer', 'booking', 'created_by')
     
     # Apply filters
     status_filter = request.GET.get('status')
-    type_filter = request.GET.get('type')
+    type_filter = request.GET.get('type') or request.GET.get('reminder_type')  # Support both field names
     search_query = request.GET.get('search')
     overdue_only = request.GET.get('overdue_only')
     
@@ -178,10 +190,17 @@ def house_rent_reminders_list(request):
 @login_required
 def house_rent_reminder_detail(request, reminder_id):
     """Detail view for a specific rent reminder"""
-    reminder = get_object_or_404(HouseRentReminder, id=reminder_id)
+    reminder = get_object_or_404(
+        HouseRentReminder.objects.select_related(
+            'property_obj', 'customer', 'booking', 'created_by'
+        ),
+        id=reminder_id
+    )
     
-    # Get reminder logs
-    logs = HouseRentReminderLog.objects.filter(reminder=reminder).order_by('-created_at')
+    # Get reminder logs with optimized query
+    logs = HouseRentReminderLog.objects.filter(
+        reminder=reminder
+    ).select_related('performed_by').order_by('-created_at')
     
     context = {
         'reminder': reminder,

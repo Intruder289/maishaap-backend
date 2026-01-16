@@ -106,6 +106,50 @@
     <input type="hidden" id="selectedPropertyId" name="property_id">
 </form>
 
+<!-- Hotel Room Status Summary Modal -->
+{% if property_type == 'hotel' %}
+<div class="modal fade" id="hotelRoomStatusModal" tabindex="-1" aria-labelledby="hotelRoomStatusModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="hotelRoomStatusModalLabel">
+                    <i class="fas fa-hotel text-primary me-2"></i>Room Status Summary
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="hotelRoomStatusContent">
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2 text-muted">Loading room status...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="selectHotelFromModal" style="display: none;" onclick="selectPropertyFromModal()">
+                    <i class="fas fa-check me-1"></i>Select This Hotel
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_css %}
+{% if property_type == 'hotel' %}
+<style>
+.hotel-room-status-summary .card {
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+.hotel-room-status-summary .list-group-item {
+    border-left: 3px solid #ffc107;
+}
+</style>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}
@@ -188,6 +232,184 @@ $(document).ready(function() {
     window.loadPropertySelectionPage = function(page) {
         loadPropertySelectionTable(page);
     };
+    
+    {% if property_type == 'hotel' %}
+    // Initialize Bootstrap dropdowns after AJAX loads
+    $(document).on('DOMNodeInserted', function(e) {
+        if ($(e.target).find('.dropdown-toggle').length) {
+            var dropdownElementList = [].slice.call($(e.target).find('.dropdown-toggle'));
+            dropdownElementList.map(function (dropdownToggleEl) {
+                return new bootstrap.Dropdown(dropdownToggleEl);
+            });
+        }
+    });
+    {% endif %}
 });
+
+{% if property_type == 'hotel' %}
+// Store selected property ID for modal
+var selectedPropertyIdFromModal = null;
+
+function viewHotelRoomStatus(propertyId, propertyTitle) {
+    selectedPropertyIdFromModal = propertyId;
+    
+    // Show modal
+    var modal = new bootstrap.Modal(document.getElementById('hotelRoomStatusModal'));
+    modal.show();
+    
+    // Update modal title
+    $('#hotelRoomStatusModalLabel').html('<i class="fas fa-hotel text-primary me-2"></i>Room Status - ' + propertyTitle);
+    
+    // Show loading state
+    $('#hotelRoomStatusContent').html(
+        '<div class="text-center py-4">' +
+            '<div class="spinner-border text-primary" role="status">' +
+                '<span class="visually-hidden">Loading...</span>' +
+            '</div>' +
+            '<p class="mt-2 text-muted">Loading room status...</p>' +
+        '</div>'
+    );
+    
+    // Fetch room status data
+    $.ajax({
+        url: '/properties/api/hotel/' + propertyId + '/room-status-summary/',
+        type: 'GET',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        success: function(data) {
+            if (data.success) {
+                renderRoomStatusSummary(data);
+                $('#selectHotelFromModal').show();
+            } else {
+                $('#hotelRoomStatusContent').html(
+                    '<div class="alert alert-danger">' +
+                        '<i class="fas fa-exclamation-triangle me-2"></i>' +
+                        (data.error || 'Failed to load room status') +
+                    '</div>'
+                );
+            }
+        },
+        error: function(xhr, status, error) {
+            $('#hotelRoomStatusContent').html(
+                '<div class="alert alert-danger">' +
+                    '<i class="fas fa-exclamation-triangle me-2"></i>' +
+                    'Error loading room status. Please try again.' +
+                '</div>'
+            );
+        }
+    });
+}
+
+function renderRoomStatusSummary(data) {
+    var html = '<div class="hotel-room-status-summary">';
+    
+    // Property Info
+    html += '<div class="card bg-light mb-3">';
+    html += '<div class="card-body">';
+    html += '<h6 class="mb-2"><i class="fas fa-building me-2"></i>' + data.property.title + '</h6>';
+    html += '<p class="text-muted mb-0 small"><i class="fas fa-map-marker-alt me-1"></i>' + data.property.address + '</p>';
+    html += '</div>';
+    html += '</div>';
+    
+    // Summary Statistics
+    html += '<div class="row mb-4">';
+    html += '<div class="col-md-3"><div class="card text-center"><div class="card-body"><h4 class="mb-0 text-primary">' + data.summary.total_rooms + '</h4><small class="text-muted">Total Rooms</small></div></div></div>';
+    html += '<div class="col-md-3"><div class="card text-center"><div class="card-body"><h4 class="mb-0 text-success">' + data.summary.available_count + '</h4><small class="text-muted">Available</small></div></div></div>';
+    html += '<div class="col-md-3"><div class="card text-center"><div class="card-body"><h4 class="mb-0 text-warning">' + data.summary.occupied_count + '</h4><small class="text-muted">Occupied</small></div></div></div>';
+    html += '<div class="col-md-3"><div class="card text-center"><div class="card-body"><h4 class="mb-0 text-danger">' + (data.summary.maintenance_count + data.summary.out_of_order_count) + '</h4><small class="text-muted">Unavailable</small></div></div></div>';
+    html += '</div>';
+    
+    // Available Rooms
+    if (data.rooms.available.length > 0) {
+        html += '<div class="mb-3">';
+        html += '<h6 class="text-success mb-2"><i class="fas fa-check-circle me-2"></i>Available Rooms (' + data.rooms.available.length + ')</h6>';
+        html += '<div class="d-flex flex-wrap gap-2">';
+        data.rooms.available.forEach(function(room) {
+            html += '<span class="badge bg-success">Room ' + room.room_number + 
+                    (room.room_type ? ' - ' + room.room_type : '') +
+                    (room.floor_number ? ' (Floor ' + room.floor_number + ')' : '') +
+                    '</span>';
+        });
+        html += '</div>';
+        html += '</div>';
+    }
+    
+    // Occupied Rooms
+    if (data.rooms.occupied.length > 0) {
+        html += '<div class="mb-3">';
+        html += '<h6 class="text-warning mb-2"><i class="fas fa-bed me-2"></i>Occupied Rooms (' + data.rooms.occupied.length + ')</h6>';
+        html += '<div class="list-group">';
+        data.rooms.occupied.forEach(function(room) {
+            html += '<div class="list-group-item">';
+            html += '<div class="d-flex justify-content-between align-items-start">';
+            html += '<div>';
+            html += '<strong>Room ' + room.room_number + '</strong>';
+            if (room.room_type) {
+                html += '<span class="badge bg-secondary ms-2">' + room.room_type + '</span>';
+            }
+            if (room.booking) {
+                html += '<div class="small text-muted mt-1">';
+                html += '<i class="fas fa-user me-1"></i>' + room.booking.customer_name;
+                html += '<br><i class="fas fa-calendar me-1"></i>' + room.booking.check_in + ' - ' + room.booking.check_out;
+                html += '</div>';
+            }
+            html += '</div>';
+            html += '<span class="badge bg-warning">Occupied</span>';
+            html += '</div>';
+            html += '</div>';
+        });
+        html += '</div>';
+        html += '</div>';
+    }
+    
+    // Maintenance Rooms
+    if (data.rooms.maintenance.length > 0) {
+        html += '<div class="mb-3">';
+        html += '<h6 class="text-info mb-2"><i class="fas fa-tools me-2"></i>Under Maintenance (' + data.rooms.maintenance.length + ')</h6>';
+        html += '<div class="d-flex flex-wrap gap-2">';
+        data.rooms.maintenance.forEach(function(room) {
+            html += '<span class="badge bg-info">Room ' + room.room_number + '</span>';
+        });
+        html += '</div>';
+        html += '</div>';
+    }
+    
+    // Out of Order Rooms
+    if (data.rooms.out_of_order.length > 0) {
+        html += '<div class="mb-3">';
+        html += '<h6 class="text-danger mb-2"><i class="fas fa-ban me-2"></i>Out of Order (' + data.rooms.out_of_order.length + ')</h6>';
+        html += '<div class="d-flex flex-wrap gap-2">';
+        data.rooms.out_of_order.forEach(function(room) {
+            html += '<span class="badge bg-danger">Room ' + room.room_number + '</span>';
+        });
+        html += '</div>';
+        html += '</div>';
+    }
+    
+    // No rooms message
+    if (data.summary.total_rooms === 0) {
+        html += '<div class="alert alert-info text-center">';
+        html += '<i class="fas fa-info-circle fa-2x mb-2"></i>';
+        html += '<p class="mb-0">No rooms configured for this hotel yet.</p>';
+        html += '</div>';
+    }
+    
+    html += '</div>';
+    
+    $('#hotelRoomStatusContent').html(html);
+}
+
+function selectPropertyFromModal() {
+    if (selectedPropertyIdFromModal) {
+        selectProperty(selectedPropertyIdFromModal);
+        // Close modal
+        var modal = bootstrap.Modal.getInstance(document.getElementById('hotelRoomStatusModal'));
+        if (modal) {
+            modal.hide();
+        }
+    }
+}
+{% endif %}
 </script>
 {% endblock %}

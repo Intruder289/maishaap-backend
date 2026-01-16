@@ -7,12 +7,62 @@ document.addEventListener('DOMContentLoaded', function() {
         // Handle toggle status action
         if (e.target.closest('.toggle-status-action')) {
             e.preventDefault();
+            e.stopPropagation(); // Prevent dropdown from closing
             const link = e.target.closest('.toggle-status-action');
             const url = link.dataset.url;
             const itemId = link.dataset.itemId;
             
+            if (!url || !itemId) {
+                console.error('Missing URL or itemId for status action');
+                showNotification('Invalid action configuration', 'error');
+                return;
+            }
+            
             if (confirm('Are you sure you want to change the status of this item?')) {
                 toggleItemStatus(url, itemId, link);
+            }
+        }
+        
+        // Handle toggle approval action
+        if (e.target.closest('.toggle-approval-action')) {
+            e.preventDefault();
+            e.stopPropagation(); // Prevent dropdown from closing
+            const link = e.target.closest('.toggle-approval-action');
+            const url = link.dataset.url;
+            const itemId = link.dataset.itemId;
+            
+            if (!url || !itemId) {
+                console.error('Missing URL or itemId for approval action');
+                showNotification('Invalid action configuration', 'error');
+                return;
+            }
+            
+            const isApproved = link.textContent.trim().includes('Unapprove');
+            const confirmMessage = isApproved 
+                ? 'Are you sure you want to unapprove this user? They will not be able to login until approved again.'
+                : 'Are you sure you want to approve this user? They will be able to login immediately.';
+            
+            if (confirm(confirmMessage)) {
+                toggleUserApproval(url, itemId, link);
+            }
+        }
+        
+        // Handle reset password action
+        if (e.target.closest('.reset-password-action')) {
+            e.preventDefault();
+            e.stopPropagation();
+            const link = e.target.closest('.reset-password-action');
+            const url = link.dataset.url;
+            const itemId = link.dataset.itemId;
+            
+            if (!url || !itemId) {
+                console.error('Missing URL or itemId for reset password action');
+                showNotification('Invalid action configuration', 'error');
+                return;
+            }
+            
+            if (confirm('Are you sure you want to reset this user\'s password to the default? The new password will be: DefaultPass@12')) {
+                resetUserPassword(url, itemId, link);
             }
         }
         
@@ -42,14 +92,31 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function toggleItemStatus(url, itemId, linkElement) {
+    console.log('toggleItemStatus called', { url, itemId });
+    const csrfToken = getCSRFToken();
+    if (!csrfToken) {
+        console.error('CSRF token not found');
+        showNotification('Security token not found. Please refresh the page.', 'error');
+        return;
+    }
+    
+    console.log('Sending status request to:', url);
     fetch(url, {
         method: 'POST',
         headers: {
-            'X-CSRFToken': getCSRFToken(),
+            'X-CSRFToken': csrfToken,
             'Content-Type': 'application/json',
-        }
+        },
+        credentials: 'same-origin'
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => {
+                throw new Error(data.message || 'Server error');
+            });
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             // Update the link text and icon
@@ -66,20 +133,134 @@ function toggleItemStatus(url, itemId, linkElement) {
             
             // Update status badge in the row
             const row = linkElement.closest('tr');
-            const statusBadge = row.querySelector('.status-badge');
+            const statusBadge = row.querySelector('td:nth-child(4) .badge'); // Status column
             if (statusBadge && data.new_status) {
                 statusBadge.className = `badge ${data.new_status.class}`;
-                statusBadge.textContent = data.new_status.text;
+                statusBadge.innerHTML = `<i class="fas fa-${data.is_active ? 'check' : 'times'}-circle me-1"></i>${data.new_status.text}`;
             }
             
-            showNotification('Status updated successfully', 'success');
+            if (data.message) {
+                showNotification(data.message, data.status_corrected ? 'warning' : 'success');
+            } else {
+                showNotification('Status updated successfully', 'success');
+            }
+            
+            // Reload page after 1 second to refresh all data
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
         } else {
             showNotification(data.message || 'Failed to update status', 'error');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        showNotification('An error occurred while updating status', 'error');
+        showNotification(error.message || 'An error occurred while updating status', 'error');
+    });
+}
+
+function toggleUserApproval(url, itemId, linkElement) {
+    console.log('toggleUserApproval called', { url, itemId });
+    const csrfToken = getCSRFToken();
+    if (!csrfToken) {
+        console.error('CSRF token not found');
+        showNotification('Security token not found. Please refresh the page.', 'error');
+        return;
+    }
+    
+    console.log('Sending approval request to:', url);
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrfToken,
+            'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => {
+                throw new Error(data.message || 'Server error');
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            // Update the link text and icon
+            if (data.is_approved) {
+                linkElement.innerHTML = '<i class="fas fa-check-circle me-2 text-success"></i>Unapprove';
+            } else {
+                linkElement.innerHTML = '<i class="fas fa-clock me-2 text-warning"></i>Approve';
+            }
+            
+            // Update approval badge in the row
+            const row = linkElement.closest('tr');
+            const approvalBadge = row.querySelector('td:nth-child(5) .badge'); // Approval column
+            if (approvalBadge && data.new_status) {
+                approvalBadge.className = `badge ${data.new_status.class}`;
+                approvalBadge.innerHTML = `<i class="fas ${data.new_status.icon} me-1"></i>${data.new_status.text}`;
+            }
+            
+            showNotification(`User ${data.is_approved ? 'approved' : 'unapproved'} successfully`, 'success');
+            
+            // Reload page after 1 second to refresh all data
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            showNotification(data.message || 'Failed to update approval status', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification(error.message || 'An error occurred while updating approval status', 'error');
+    });
+}
+
+function resetUserPassword(url, itemId, linkElement) {
+    const csrfToken = getCSRFToken();
+    if (!csrfToken) {
+        console.error('CSRF token not found');
+        showNotification('Security token not found. Please refresh the page.', 'error');
+        return;
+    }
+    
+    console.log('Resetting password for user:', itemId);
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrfToken,
+            'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => {
+                throw new Error(data.message || 'Server error');
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            const message = `Password reset successfully! New password: ${data.default_password || 'DefaultPass@12'}`;
+            showNotification(message, 'success');
+            
+            // Optionally copy password to clipboard
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(data.default_password || 'DefaultPass@12').then(() => {
+                    console.log('Password copied to clipboard');
+                });
+            }
+        } else {
+            showNotification(data.message || 'Failed to reset password', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification(error.message || 'An error occurred while resetting password', 'error');
     });
 }
 
@@ -178,6 +359,15 @@ function showNotification(message, type = 'info') {
         }
     }, 5000);
 }
+
+
+
+
+
+
+
+
+
 
 
 

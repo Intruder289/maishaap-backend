@@ -23,8 +23,131 @@ from accounts.serializers import (
     AdminApprovalSerializer,
     PendingUserSerializer
 )
-from drf_yasg.utils import swagger_auto_schema
-from drf_yasg import openapi
+# Swagger documentation - using drf-spectacular
+try:
+    from drf_yasg.utils import swagger_auto_schema
+    from drf_yasg import openapi
+except ImportError:
+    # drf-yasg not installed, use drf-spectacular instead
+    from drf_spectacular.utils import extend_schema, OpenApiParameter
+    from drf_spectacular.types import OpenApiTypes
+    
+    # Create a wrapper to convert swagger_auto_schema to extend_schema for drf-spectacular
+    def swagger_auto_schema(*args, **kwargs):
+        # Handle method parameter - drf-spectacular doesn't need it
+        method = kwargs.pop('method', None)
+        
+        # Extract parameters from manual_parameters if present
+        manual_params = kwargs.get('manual_parameters', [])
+        spectacular_params = []
+        
+        if manual_params:
+            # Convert drf-yasg parameters to drf-spectacular parameters
+            for param in manual_params:
+                if param is None:
+                    continue
+                if callable(param) and not hasattr(param, 'name'):
+                    continue
+                
+                param_name = None
+                param_type = OpenApiTypes.STR
+                param_location = OpenApiParameter.QUERY
+                param_description = ''
+                param_required = False
+                
+                if hasattr(param, 'name') and param.name:
+                    param_name = param.name
+                    param_description = getattr(param, 'description', '') or ''
+                    param_required = getattr(param, 'required', False)
+                    
+                    param_type_attr = getattr(param, 'type', None)
+                    type_str = str(param_type_attr).lower() if param_type_attr else ''
+                    
+                    if (param_type_attr == openapi.TYPE_INTEGER or 'integer' in type_str):
+                        param_type = OpenApiTypes.INT
+                    elif (param_type_attr == openapi.TYPE_NUMBER or 'number' in type_str):
+                        param_type = OpenApiTypes.NUMBER
+                    elif (param_type_attr == openapi.TYPE_BOOLEAN or 'boolean' in type_str):
+                        param_type = OpenApiTypes.BOOL
+                    else:
+                        param_type = OpenApiTypes.STR
+                    
+                    param_in = getattr(param, 'in_', None)
+                    in_str = str(param_in).lower() if param_in else ''
+                    
+                    if (param_in == openapi.IN_QUERY or 'query' in in_str):
+                        param_location = OpenApiParameter.QUERY
+                    elif (param_in == openapi.IN_PATH or 'path' in in_str):
+                        param_location = OpenApiParameter.PATH
+                    else:
+                        param_location = OpenApiParameter.QUERY
+                    
+                    spectacular_params.append(
+                        OpenApiParameter(
+                            name=param_name,
+                            type=param_type,
+                            location=param_location,
+                            description=param_description,
+                            required=param_required
+                        )
+                    )
+        
+        return extend_schema(
+            summary=kwargs.get('operation_summary', ''),
+            description=kwargs.get('operation_description', ''),
+            tags=kwargs.get('tags', []),
+            parameters=spectacular_params if spectacular_params else None,
+            responses=kwargs.get('responses', {})
+        )
+    
+    class openapi:
+        class Response:
+            def __init__(self, *args, **kwargs):
+                pass
+        class Schema:
+            def __init__(self, *args, **kwargs):
+                pass
+        class Items:
+            def __init__(self, *args, **kwargs):
+                pass
+        class Contact:
+            def __init__(self, *args, **kwargs):
+                pass
+        class License:
+            def __init__(self, *args, **kwargs):
+                pass
+        class Info:
+            def __init__(self, *args, **kwargs):
+                pass
+        TYPE_OBJECT = 'object'
+        TYPE_STRING = 'string'
+        TYPE_INTEGER = 'integer'
+        TYPE_NUMBER = 'number'
+        TYPE_BOOLEAN = 'boolean'
+        TYPE_ARRAY = 'array'
+        FORMAT_EMAIL = 'email'
+        FORMAT_DATE = 'date'
+        FORMAT_DATETIME = 'date-time'
+        FORMAT_DECIMAL = 'decimal'
+        FORMAT_URI = 'uri'
+        FORMAT_UUID = 'uuid'
+        IN_QUERY = 'query'
+        IN_PATH = 'path'
+        IN_BODY = 'body'
+        IN_FORM = 'formData'
+        IN_HEADER = 'header'
+        
+        # Create a proper Parameter class that stores arguments
+        class Parameter:
+            def __init__(self, name, in_, description=None, type=None, required=False, **kwargs):
+                self.name = name
+                self.in_ = in_
+                self.description = description or ''
+                self.type = type or 'string'
+                self.required = required
+                # Store all kwargs for compatibility
+                for key, value in kwargs.items():
+                    setattr(self, key, value)
 import logging
 
 logger = logging.getLogger(__name__)
@@ -41,16 +164,27 @@ class SearchRateThrottle(UserRateThrottle):
     rate = '30/minute'
 
 
-@swagger_auto_schema(
-    method='get',
-    operation_description="API root endpoint - returns available endpoints and API information",
-    operation_summary="API Root",
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular
+try:
+    from drf_spectacular.utils import extend_schema
+    from drf_spectacular.types import OpenApiTypes
+except ImportError:
+    extend_schema = lambda *args, **kwargs: lambda f: f
+    OpenApiTypes = None
+
+@extend_schema(
+    summary="API Root",
+    description="API root endpoint - returns available endpoints and API information",
     tags=['API Info'],
     responses={
-        200: openapi.Response(
-            description="API information",
-            schema=openapi.Schema(type=openapi.TYPE_OBJECT)
-        )
+        200: {
+            'description': 'API information',
+            'content': {
+                'application/json': {
+                    'schema': {'type': 'object'}
+                }
+            }
+        }
     }
 )
 @api_view(['GET'])
@@ -82,16 +216,20 @@ def api_root(request):
     })
 
 
-@swagger_auto_schema(
-    method='get',
-    operation_description="Simple test endpoint to verify API is working",
-    operation_summary="API Test",
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular
+@extend_schema(
+    summary="API Test",
+    description="Simple test endpoint to verify API is working",
     tags=['API Info'],
     responses={
-        200: openapi.Response(
-            description="API test response",
-            schema=openapi.Schema(type=openapi.TYPE_OBJECT)
-        )
+        200: {
+            'description': 'API test response',
+            'content': {
+                'application/json': {
+                    'schema': {'type': 'object'}
+                }
+            }
+        }
     }
 )
 @api_view(['GET'])
@@ -113,15 +251,15 @@ def get_tokens_for_user(user):
     }
 
 
-@swagger_auto_schema(
-    method='post',
-    operation_description="Register a new user account as tenant or property owner. Account is automatically approved for immediate login.",
-    operation_summary="User Signup (Tenant/Owner)",
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular
+@extend_schema(
+    summary="User Signup (Tenant/Owner)",
+    description="Register a new user account as tenant or property owner. Account is automatically approved for immediate login.",
     tags=['Authentication'],
-    request_body=TenantSignupSerializer,
+    request=TenantSignupSerializer,
     responses={
-        201: "Account created successfully - auto-approved",
-        400: "Validation failed"
+        201: {'description': 'Account created successfully - auto-approved'},
+        400: {'description': 'Validation failed'}
     }
 )
 @csrf_exempt
@@ -253,15 +391,15 @@ def tenant_signup(request):
         return Response(error_response, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@swagger_auto_schema(
-    method='post',
-    operation_description="Login with email+password or phone+password. Works for all registered mobile app users.",
-    operation_summary="User Login (Tenant/Owner) via email or phone",
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular
+@extend_schema(
+    summary="User Login (Tenant/Owner) via email or phone",
+    description="Login with email+password or phone+password. Works for all registered mobile app users.",
     tags=['Authentication'],
-    request_body=TenantLoginSerializer,
+    request=TenantLoginSerializer,
     responses={
-        200: "Login successful - returns user data and JWT tokens",
-        400: "Login failed - invalid credentials"
+        200: {'description': 'Login successful - returns user data and JWT tokens'},
+        400: {'description': 'Login failed - invalid credentials'}
     }
 )
 @csrf_exempt
@@ -320,21 +458,25 @@ def tenant_login(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@swagger_auto_schema(
-    method='post',
-    operation_description="Request password reset. Sends a notification to administrators who will reset your password to the default (DefaultPass@12).",
-    operation_summary="Forgot Password Request",
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular
+@extend_schema(
+    summary="Forgot Password Request",
+    description="Request password reset. Sends a notification to administrators who will reset your password to the default (DefaultPass@12).",
     tags=['Authentication'],
-    request_body=openapi.Schema(
-        type=openapi.TYPE_OBJECT,
-        required=['email'],
-        properties={
-            'email': openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_EMAIL, description='User email address')
+    request={
+        'application/json': {
+            'schema': {
+                'type': 'object',
+                'required': ['email'],
+                'properties': {
+                    'email': {'type': 'string', 'format': 'email', 'description': 'User email address'}
+                }
+            }
         }
-    ),
+    },
     responses={
-        200: "Password reset request submitted successfully",
-        400: "Validation failed - email required"
+        200: {'description': 'Password reset request submitted successfully'},
+        400: {'description': 'Validation failed - email required'}
     }
 )
 @csrf_exempt
@@ -411,23 +553,26 @@ def forgot_password(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@swagger_auto_schema(
-    method='post',
-    operation_description="Logout user and blacklist refresh token",
-    operation_summary="User Logout",
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular
+@extend_schema(
+    summary="User Logout",
+    description="Logout user and blacklist refresh token",
     tags=['Authentication'],
-    request_body=openapi.Schema(
-        type=openapi.TYPE_OBJECT,
-        properties={
-            'refresh': openapi.Schema(type=openapi.TYPE_STRING, description='Refresh token to blacklist')
+    request={
+        'application/json': {
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'refresh': {'type': 'string', 'description': 'Refresh token to blacklist'}
+                }
+            }
         }
-    ),
-    responses={
-        200: "Logout successful",
-        400: "Logout failed",
-        401: "Authentication required"
     },
-    security=[{'Bearer': []}]
+    responses={
+        200: {'description': 'Logout successful'},
+        400: {'description': 'Logout failed'},
+        401: {'description': 'Authentication required'}
+    }
 )
 @csrf_exempt
 @api_view(['POST'])
@@ -455,17 +600,16 @@ def tenant_logout(request):
         }, status=status.HTTP_400_BAD_REQUEST)
 
 
-@swagger_auto_schema(
-    method='get',
-    operation_description="Get current authenticated user's profile information",
-    operation_summary="Get User Profile",
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular
+@extend_schema(
+    summary="Get User Profile",
+    description="Get current authenticated user's profile information",
     tags=['Profile'],
     responses={
         200: UserProfileSerializer,
-        401: "Authentication required",
-        500: "Internal server error"
-    },
-    security=[{'Bearer': []}]
+        401: {'description': 'Authentication required'},
+        500: {'description': 'Internal server error'}
+    }
 )
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -490,39 +634,32 @@ def tenant_profile(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@swagger_auto_schema(
-    method='put',
-    operation_description="Update user profile information. All fields are optional - only provided fields will be updated.",
-    operation_summary="Update User Profile",
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular
+@extend_schema(
+    summary="Update User Profile",
+    description="Update user profile information. All fields are optional - only provided fields will be updated.",
     tags=['Profile'],
-    request_body=ProfileUpdateSerializer,
+    request=ProfileUpdateSerializer,
     responses={
-        200: openapi.Response(
-            description="Profile updated successfully",
-            schema=openapi.Schema(
-                type=openapi.TYPE_OBJECT,
-                properties={
-                    'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
-                    'message': openapi.Schema(type=openapi.TYPE_STRING),
-                    'user': openapi.Schema(type=openapi.TYPE_OBJECT)
+        200: {
+            'description': 'Profile updated successfully',
+            'content': {
+                'application/json': {
+                    'schema': {
+                        'type': 'object',
+                        'properties': {
+                            'success': {'type': 'boolean'},
+                            'message': {'type': 'string'},
+                            'user': {'type': 'object'}
+                        }
+                    }
                 }
-            )
-        ),
-        400: openapi.Response(
-            description="Validation failed",
-            schema=openapi.Schema(
-                type=openapi.TYPE_OBJECT,
-                properties={
-                    'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
-                    'message': openapi.Schema(type=openapi.TYPE_STRING),
-                    'errors': openapi.Schema(type=openapi.TYPE_OBJECT)
-                }
-            )
-        ),
-        401: "Authentication required",
-        500: "Internal server error"
-    },
-    security=[{'Bearer': []}]
+            }
+        },
+        400: {'description': 'Validation failed'},
+        401: {'description': 'Authentication required'},
+        500: {'description': 'Internal server error'}
+    }
 )
 @csrf_exempt
 @api_view(['PUT'])
@@ -558,38 +695,18 @@ def update_tenant_profile(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@swagger_auto_schema(
-    method='post',
-    operation_description="Change user password. Requires current password, new password, and password confirmation.",
-    operation_summary="Change User Password",
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular
+@extend_schema(
+    summary="Change User Password",
+    description="Change user password. Requires current password, new password, and password confirmation.",
     tags=['Authentication'],
-    request_body=ChangePasswordSerializer,
+    request=ChangePasswordSerializer,
     responses={
-        200: openapi.Response(
-            description="Password changed successfully",
-            schema=openapi.Schema(
-                type=openapi.TYPE_OBJECT,
-                properties={
-                    'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
-                    'message': openapi.Schema(type=openapi.TYPE_STRING)
-                }
-            )
-        ),
-        400: openapi.Response(
-            description="Validation failed",
-            schema=openapi.Schema(
-                type=openapi.TYPE_OBJECT,
-                properties={
-                    'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
-                    'message': openapi.Schema(type=openapi.TYPE_STRING),
-                    'errors': openapi.Schema(type=openapi.TYPE_OBJECT)
-                }
-            )
-        ),
-        401: "Authentication required",
-        500: "Internal server error"
-    },
-    security=[{'Bearer': []}]
+        200: {'description': 'Password changed successfully'},
+        400: {'description': 'Validation failed'},
+        401: {'description': 'Authentication required'},
+        500: {'description': 'Internal server error'}
+    }
 )
 @csrf_exempt
 @api_view(['POST'])
@@ -623,32 +740,25 @@ def change_password(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@swagger_auto_schema(
-    method='post',
-    operation_description="Refresh JWT access token using refresh token. Old refresh token will be blacklisted and new tokens issued.",
-    operation_summary="Refresh Token",
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular
+@extend_schema(
+    summary="Refresh Token",
+    description="Refresh JWT access token using refresh token. Old refresh token will be blacklisted and new tokens issued.",
     tags=['Authentication'],
-    request_body=openapi.Schema(
-        type=openapi.TYPE_OBJECT,
-        required=['refresh'],
-        properties={
-            'refresh': openapi.Schema(type=openapi.TYPE_STRING, description='Refresh token')
-        }
-    ),
-    responses={
-        200: openapi.Response(
-            description="Token refreshed successfully",
-            schema=openapi.Schema(
-                type=openapi.TYPE_OBJECT,
-                properties={
-                    'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
-                    'message': openapi.Schema(type=openapi.TYPE_STRING),
-                    'access': openapi.Schema(type=openapi.TYPE_STRING),
-                    'refresh': openapi.Schema(type=openapi.TYPE_STRING)
+    request={
+        'application/json': {
+            'schema': {
+                'type': 'object',
+                'required': ['refresh'],
+                'properties': {
+                    'refresh': {'type': 'string', 'description': 'Refresh token'}
                 }
-            )
-        ),
-        400: "Token refresh failed"
+            }
+        }
+    },
+    responses={
+        200: {'description': 'Token refreshed successfully'},
+        400: {'description': 'Token refresh failed'}
     }
 )
 @csrf_exempt
@@ -715,28 +825,31 @@ def refresh_token(request):
         }, status=status.HTTP_400_BAD_REQUEST)
 
 
-@swagger_auto_schema(
-    method='post',
-    operation_description="Verify JWT token validity",
-    operation_summary="Verify Token",
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular
+@extend_schema(
+    summary="Verify Token",
+    description="Verify JWT token validity",
     tags=['Authentication'],
     responses={
-        200: openapi.Response(
-            description="Token is valid",
-            schema=openapi.Schema(
-                type=openapi.TYPE_OBJECT,
-                properties={
-                    'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
-                    'message': openapi.Schema(type=openapi.TYPE_STRING),
-                    'user_id': openapi.Schema(type=openapi.TYPE_INTEGER),
-                    'username': openapi.Schema(type=openapi.TYPE_STRING)
+        200: {
+            'description': 'Token is valid',
+            'content': {
+                'application/json': {
+                    'schema': {
+                        'type': 'object',
+                        'properties': {
+                            'success': {'type': 'boolean'},
+                            'message': {'type': 'string'},
+                            'user_id': {'type': 'integer'},
+                            'username': {'type': 'string'}
+                        }
+                    }
                 }
-            )
-        ),
-        400: "Token verification failed",
-        401: "Authentication required"
-    },
-    security=[{'Bearer': []}]
+            }
+        },
+        400: {'description': 'Token verification failed'},
+        401: {'description': 'Authentication required'}
+    }
 )
 @csrf_exempt
 @api_view(['POST'])
@@ -762,23 +875,14 @@ def verify_token(request):
         }, status=status.HTTP_400_BAD_REQUEST)
 
 
-@swagger_auto_schema(
-    method='get',
-    operation_description="Get all users waiting for admin approval. Admin access required.",
-    operation_summary="Get Pending Users",
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular
+@extend_schema(
+    summary="Get Pending Users",
+    description="Get all users waiting for admin approval. Admin access required.",
     tags=['Admin'],
-    manual_parameters=[
-        openapi.Parameter(
-            'Authorization',
-            openapi.IN_HEADER,
-            description="Bearer <admin_access_token>",
-            type=openapi.TYPE_STRING,
-            required=True
-        )
-    ],
     responses={
-        200: "List of pending users retrieved successfully",
-        403: "Admin access required"
+        200: {'description': 'List of pending users retrieved successfully'},
+        403: {'description': 'Admin access required'}
     }
 )
 @api_view(['GET'])
@@ -816,28 +920,31 @@ def pending_users(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@csrf_exempt
-@swagger_auto_schema(
-    method='post',
-    operation_description="Approve or reject a pending user. Admin access required.",
-    operation_summary="Approve/Reject User",
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular
+@extend_schema(
+    summary="Approve/Reject User",
+    description="Approve or reject a pending user. Admin access required.",
     tags=['Admin'],
-    request_body=openapi.Schema(
-        type=openapi.TYPE_OBJECT,
-        required=['user_id', 'action'],
-        properties={
-            'user_id': openapi.Schema(type=openapi.TYPE_INTEGER, description='ID of user to approve/reject'),
-            'action': openapi.Schema(type=openapi.TYPE_STRING, enum=['approve', 'reject'], description='Action to take')
+    request={
+        'application/json': {
+            'schema': {
+                'type': 'object',
+                'required': ['user_id', 'action'],
+                'properties': {
+                    'user_id': {'type': 'integer', 'description': 'ID of user to approve/reject'},
+                    'action': {'type': 'string', 'enum': ['approve', 'reject'], 'description': 'Action to take'}
+                }
+            }
         }
-    ),
-    responses={
-        200: "User action completed successfully",
-        400: "Invalid request",
-        403: "Admin access required",
-        404: "User not found"
     },
-    security=[{'Bearer': []}]
+    responses={
+        200: {'description': 'User action completed successfully'},
+        400: {'description': 'Invalid request'},
+        403: {'description': 'Admin access required'},
+        404: {'description': 'User not found'}
+    }
 )
+@csrf_exempt
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def approve_user(request):
@@ -916,27 +1023,31 @@ def approve_user(request):
 
 # ==================== MULTI-TENANCY: Admin Owner Management Endpoints ====================
 
-@swagger_auto_schema(
-    method='post',
-    operation_description="Admin/Manager endpoint to register/create a new property owner account. Admin or Manager access required.",
-    operation_summary="Register New Owner (Admin/Manager)",
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular
+@extend_schema(
+    summary="Register New Owner (Admin/Manager)",
+    description="Admin/Manager endpoint to register/create a new property owner account. Admin or Manager access required.",
     tags=['Admin', 'Multi-Tenancy'],
-    request_body=openapi.Schema(
-        type=openapi.TYPE_OBJECT,
-        required=['username', 'email', 'password', 'first_name', 'last_name'],
-        properties={
-            'username': openapi.Schema(type=openapi.TYPE_STRING, description='Username for the owner'),
-            'email': openapi.Schema(type=openapi.TYPE_STRING, description='Email address'),
-            'password': openapi.Schema(type=openapi.TYPE_STRING, description='Password (min 8 characters)'),
-            'first_name': openapi.Schema(type=openapi.TYPE_STRING, description='First name'),
-            'last_name': openapi.Schema(type=openapi.TYPE_STRING, description='Last name'),
-            'phone': openapi.Schema(type=openapi.TYPE_STRING, description='Phone number (optional)'),
+    request={
+        'application/json': {
+            'schema': {
+                'type': 'object',
+                'required': ['username', 'email', 'password', 'first_name', 'last_name'],
+                'properties': {
+                    'username': {'type': 'string', 'description': 'Username for the owner'},
+                    'email': {'type': 'string', 'description': 'Email address'},
+                    'password': {'type': 'string', 'description': 'Password (min 8 characters)'},
+                    'first_name': {'type': 'string', 'description': 'First name'},
+                    'last_name': {'type': 'string', 'description': 'Last name'},
+                    'phone': {'type': 'string', 'description': 'Phone number (optional)'}
+                }
+            }
         }
-    ),
+    },
     responses={
-        201: "Owner account created successfully",
-        400: "Validation failed",
-        403: "Admin or Manager access required"
+        201: {'description': 'Owner account created successfully'},
+        400: {'description': 'Validation failed'},
+        403: {'description': 'Admin or Manager access required'}
     }
 )
 @csrf_exempt
@@ -1078,14 +1189,14 @@ def admin_register_owner(request):
         return Response(error_response, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@swagger_auto_schema(
-    method='get',
-    operation_description="Get all property owners. Admin sees all owners, Manager sees only owners they registered.",
-    operation_summary="List All Owners (Admin/Manager)",
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular
+@extend_schema(
+    summary="List All Owners (Admin/Manager)",
+    description="Get all property owners. Admin sees all owners, Manager sees only owners they registered.",
     tags=['Admin', 'Multi-Tenancy'],
     responses={
-        200: "List of owners retrieved successfully",
-        403: "Admin or Manager access required"
+        200: {'description': 'List of owners retrieved successfully'},
+        403: {'description': 'Admin or Manager access required'}
     }
 )
 @api_view(['GET'])
@@ -1170,25 +1281,29 @@ def admin_list_owners(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@swagger_auto_schema(
-    method='post',
-    operation_description="Admin endpoint to activate or deactivate a property owner. Admin access required.",
-    operation_summary="Activate/Deactivate Owner (Admin Only)",
+# CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular
+@extend_schema(
+    summary="Activate/Deactivate Owner (Admin Only)",
+    description="Admin endpoint to activate or deactivate a property owner. Admin access required.",
     tags=['Admin', 'Multi-Tenancy'],
-    request_body=openapi.Schema(
-        type=openapi.TYPE_OBJECT,
-        required=['user_id', 'action'],
-        properties={
-            'user_id': openapi.Schema(type=openapi.TYPE_INTEGER, description='Owner user ID'),
-            'action': openapi.Schema(type=openapi.TYPE_STRING, enum=['activate', 'deactivate'], description='Action to perform'),
-            'reason': openapi.Schema(type=openapi.TYPE_STRING, description='Reason for deactivation (required if action is deactivate)'),
+    request={
+        'application/json': {
+            'schema': {
+                'type': 'object',
+                'required': ['user_id', 'action'],
+                'properties': {
+                    'user_id': {'type': 'integer', 'description': 'Owner user ID'},
+                    'action': {'type': 'string', 'enum': ['activate', 'deactivate'], 'description': 'Action to perform'},
+                    'reason': {'type': 'string', 'description': 'Reason for deactivation (required if action is deactivate)'}
+                }
+            }
         }
-    ),
+    },
     responses={
-        200: "Owner status updated successfully",
-        400: "Invalid data",
-        403: "Admin access required",
-        404: "Owner not found"
+        200: {'description': 'Owner status updated successfully'},
+        400: {'description': 'Invalid data'},
+        403: {'description': 'Admin access required'},
+        404: {'description': 'Owner not found'}
     }
 )
 @csrf_exempt

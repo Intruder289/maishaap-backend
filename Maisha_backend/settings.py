@@ -71,7 +71,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',  # Token blacklist for strict token revocation
     'corsheaders',
-    'drf_yasg',  # Swagger API documentation
+    'drf_spectacular',  # Swagger/OpenAPI documentation (modern replacement for drf-yasg)
     'django_filters',  # For API filtering
 ]
 
@@ -119,11 +119,11 @@ WSGI_APPLICATION = 'Maisha_backend.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('DATABASE_NAME', default='maisha'),
-        'USER': config('DATABASE_USER', default='postgres'),
-        'PASSWORD': config('DATABASE_PASSWORD', default='alfred'),
-        'HOST': config('DATABASE_HOST', default='localhost'),
-        'PORT': config('DATABASE_PORT', default='5432'),
+        'NAME': config('DATABASE_NAME'),
+        'USER': config('DATABASE_USER'),
+        'PASSWORD': config('DATABASE_PASSWORD'),
+        'HOST': config('DATABASE_HOST'),
+        'PORT': config('DATABASE_PORT'),
         'OPTIONS': {
             'connect_timeout': 10,
         },
@@ -218,7 +218,9 @@ REST_FRAMEWORK = {
         'user': '1000/hour',  # Authenticated users: 1000 requests per hour
         'auth': '10/minute',  # Authentication endpoints: 10 requests per minute
         'search': '30/minute',  # Search endpoints: 30 requests per minute
-    }
+    },
+    # Use drf-spectacular for OpenAPI schema generation
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 # JWT Configuration
@@ -243,61 +245,111 @@ SIMPLE_JWT = {
     'TOKEN_TYPE_CLAIM': 'token_type',
 }
 
-# Swagger Configuration
-SWAGGER_SETTINGS = {
-    'SECURITY_DEFINITIONS': {
-        'Bearer': {
-            'type': 'apiKey',
-            'name': 'Authorization',
-            'in': 'header'
+# drf-spectacular Configuration (OpenAPI 3.0)
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Maisha Backend API',
+    'DESCRIPTION': '''
+    API for Flutter mobile application with role-based authentication (Tenant/Owner) and admin approval workflow.
+    
+    **Architecture:**
+    - **API Layer (DRF-only)**: `/api/v1/` - These endpoints are documented in Swagger
+    - **AJAX Endpoints**: `/api/` - Web interface AJAX calls (excluded from Swagger)
+    - **Web Views**: HTML/templates - Django views (excluded from Swagger)
+    
+    **Note:** Swagger only documents the DRF API layer (`/api/v1/`). AJAX endpoints and web views are separate.
+    ''',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+    # Only document endpoints under /api/v1/ (DRF API layer)
+    # AJAX endpoints (/api/) and web views are excluded via patterns parameter in urls.py
+    'SCHEMA_PATH_PREFIX': '/api/v1/',
+    'TAGS': [
+        {'name': 'Properties', 'description': 'Property management endpoints'},
+        {'name': 'Accounts', 'description': 'User authentication and account management'},
+        {'name': 'Payments', 'description': 'Payment processing and tracking'},
+        {'name': 'Bookings', 'description': 'Booking management for hotels, lodges, and venues'},
+        {'name': 'Documents', 'description': 'Document management'},
+        {'name': 'Rent', 'description': 'Rent management'},
+        {'name': 'Maintenance', 'description': 'Maintenance requests'},
+        {'name': 'Reports', 'description': 'Reporting and analytics'},
+        {'name': 'Complaints', 'description': 'Complaints and feedback'},
+    ],
+    'SECURITY': [
+        {
+            'Bearer': {
+                'type': 'http',
+                'scheme': 'bearer',
+                'bearerFormat': 'JWT',
+            }
+        }
+    ],
+    # Error handling - prevent schema generation from failing completely
+    'APPEND_COMPONENTS': {
+        'securitySchemes': {
+            'Bearer': {
+                'type': 'http',
+                'scheme': 'bearer',
+                'bearerFormat': 'JWT',
+            }
         }
     },
-    'USE_SESSION_AUTH': False,
-    'JSON_EDITOR': True,
-    'SUPPORTED_SUBMIT_METHODS': [
-        'get',
-        'post',
-        'put',
-        'delete',
-        'patch'
-    ],
-    'OPERATIONS_SORTER': 'alpha',
-    'TAGS_SORTER': 'alpha',
-    'DOC_EXPANSION': 'none',
-    'DEEP_LINKING': True,
-    'SHOW_EXTENSIONS': True,
-    'DEFAULT_MODEL_RENDERING': 'model',
+    # Prevent errors from crashing schema generation
+    'DISABLE_ERRORS_AND_WARNINGS': False,  # Set to True to hide warnings, but False to see them
+    'SERVE_PERMISSIONS': [],
+    'SERVE_AUTHENTICATION': [],
+    'SWAGGER_UI_SETTINGS': {
+        'deepLinking': True,
+        'displayOperationId': False,
+        'defaultModelsExpandDepth': 1,
+        'defaultModelExpandDepth': 1,
+        'displayRequestDuration': True,
+        'docExpansion': 'list',
+        'filter': True,
+        'showExtensions': True,
+        'showCommonExtensions': True,
+        'tryItOutEnabled': True,
+    },
+    # Suppress enum naming warnings (non-critical - schema still works correctly)
+    # The enum collisions are automatically resolved by drf-spectacular
+    # If you want custom enum names, use COMPONENT_NAME_OVERRIDES instead
 }
 
 # CORS Configuration for Flutter app - Environment-based
-# Get environment (defaults to development for backward compatibility)
-ENVIRONMENT = os.environ.get('ENVIRONMENT', 'development')
+# Get environment from .env file (defaults to development for backward compatibility)
+ENVIRONMENT = config('ENVIRONMENT', default='development')
 
 if ENVIRONMENT == 'production':
-    # Production: Only allow specific origins
+    # Production: Only allow specific origins from .env file
     CORS_ALLOW_ALL_ORIGINS = False
-    CORS_ALLOWED_ORIGINS = [
-        # Add your production mobile app origins here
-        # Example: "https://your-mobile-app-domain.com",
-        # Example: "https://api.your-domain.com",
-    ]
-    # If no origins specified, allow common production patterns
-    if not CORS_ALLOWED_ORIGINS:
+    # Read CORS origins from .env file (comma-separated list)
+    cors_origins_env = config('CORS_ALLOWED_ORIGINS', default='', cast=Csv())
+    if cors_origins_env:
+        CORS_ALLOWED_ORIGINS = cors_origins_env
+    else:
+        # Fallback: Use default production origins if not specified in .env
+        # This should be configured in .env for production!
         CORS_ALLOWED_ORIGINS = [
-            "https://api.maisha.local",
-            "https://app.maisha.local",
+            "https://portal.maishaapp.co.tz",
+            "https://app.maishaapp.co.tz",
         ]
 else:
-    # Development: Allow all origins for testing
-    CORS_ALLOW_ALL_ORIGINS = True
-    CORS_ALLOWED_ORIGINS = [
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:8080",
-        "http://127.0.0.1:8080",
-        "http://localhost:8000",
-        "http://127.0.0.1:8000",
-    ]
+    # Development: Allow all origins for testing, or use .env if specified
+    cors_origins_dev = config('CORS_ALLOWED_ORIGINS', default='', cast=Csv())
+    if cors_origins_dev:
+        CORS_ALLOW_ALL_ORIGINS = False
+        CORS_ALLOWED_ORIGINS = cors_origins_dev
+    else:
+        # Default development: Allow all origins
+        CORS_ALLOW_ALL_ORIGINS = True
+        CORS_ALLOWED_ORIGINS = [
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://localhost:8080",
+            "http://127.0.0.1:8080",
+            "http://localhost:8000",
+            "http://127.0.0.1:8000",
+        ]
 
 CORS_ALLOW_CREDENTIALS = True
 
@@ -349,8 +401,28 @@ SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 # In production, set SESSION_COOKIE_SECURE = True to only send cookies over HTTPS
 if ENVIRONMENT == 'production':
     SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    
+    # Force HTTPS redirects
+    SECURE_SSL_REDIRECT = True
+    
+    # HSTS (HTTP Strict Transport Security) - Force browsers to use HTTPS
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    
+    # Prevent MIME type sniffing
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    
+    # Referrer policy
+    SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+    
+    # Cross-Origin Opener Policy
+    SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin'
 else:
     SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+    SECURE_SSL_REDIRECT = False
 
 # =============================================================================
 # Logging configuration - Enhanced for API monitoring
@@ -454,6 +526,9 @@ AZAM_PAY_APP_NAME = config('AZAM_PAY_APP_NAME', default='Maisha Property Managem
 AZAM_PAY_SANDBOX = config('AZAM_PAY_SANDBOX', default='True', cast=bool)
 AZAM_PAY_BASE_URL = config('AZAM_PAY_BASE_URL', default='https://sandbox.azampay.co.tz')
 AZAM_PAY_PRODUCTION_URL = config('AZAM_PAY_PRODUCTION_URL', default='https://api.azampay.co.tz')
+# Checkout endpoint uses a separate base URL in production
+AZAM_PAY_CHECKOUT_BASE_URL = config('AZAM_PAY_CHECKOUT_BASE_URL', default='https://checkout.azampay.co.tz')
+AZAM_PAY_AUTHENTICATOR_BASE_URL = config('AZAM_PAY_AUTHENTICATOR_BASE_URL', default='https://authenticator.azampay.co.tz')
 AZAM_PAY_WEBHOOK_SECRET = config('AZAM_PAY_WEBHOOK_SECRET', default='')
 AZAM_PAY_VENDOR_ID = config('AZAM_PAY_VENDOR_ID', default='')
 AZAM_PAY_MERCHANT_ACCOUNT = config('AZAM_PAY_MERCHANT_ACCOUNT', default='')

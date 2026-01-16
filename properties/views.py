@@ -58,6 +58,9 @@ class DocumentBookingWrapper:
         self.confirmed_at = None
         self.checked_in_at = None
         self.checked_out_at = None
+        self.is_deleted = False  # DocumentBooking doesn't support soft delete
+        self.deleted_at = None
+        self.deleted_by = None
         
         # Create a customer-like object from the tenant user
         # Get phone from profile if available
@@ -147,6 +150,9 @@ class LeaseWrapper:
         self.confirmed_at = None
         self.checked_in_at = None
         self.checked_out_at = None
+        self.is_deleted = False  # Lease doesn't support soft delete
+        self.deleted_at = None
+        self.deleted_by = None
         
         # Create a customer-like object from the tenant user
         phone = ''
@@ -503,11 +509,13 @@ def property_detail(request, pk):
     has_visit_access = False
     if request.user.is_authenticated and property_obj.property_type.name.lower() == 'house':
         from .models import PropertyVisitPayment
-        has_visit_access = PropertyVisitPayment.objects.filter(
+        visit_payment = PropertyVisitPayment.objects.filter(
             property=property_obj,
             user=request.user,
             status='completed'
-        ).exists()
+        ).first()
+        # Check if payment exists and is still active (not expired)
+        has_visit_access = visit_payment is not None and visit_payment.is_active()
     
     # Check if user can see owner contact (admin, owner, or has paid for visit)
     can_see_owner_contact = False
@@ -1068,41 +1076,126 @@ def manage_amenities(request):
     return render(request, 'properties/manage_amenities.html', context)
 
 
+@login_required
 def property_dashboard(request):
-    """Dashboard view with property statistics"""
-    # Overall statistics
-    total_properties = Property.objects.count()
-    available_properties = Property.objects.filter(status='available').count()
-    rented_properties = Property.objects.filter(status='rented').count()
+    """Dashboard view with property statistics - all data from database, no hardcoded values"""
+    from django.utils import timezone
+    from datetime import timedelta
+    from django.db.models import Sum
     
-    # Property statistics by type
-    property_types_stats = PropertyType.objects.annotate(
-        property_count=Count('properties')
-    ).order_by('-property_count')
+    # MULTI-TENANCY: Filter by owner for data isolation
+    if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
+        # Property owner: only see own properties (excluding unavailable)
+        properties_queryset = Property.objects.filter(owner=request.user).exclude(status='unavailable')
+        bookings_queryset = Booking.objects.filter(property_obj__owner=request.user).exclude(booking_status='cancelled')
+        payments_queryset = Payment.objects.filter(booking__property_obj__owner=request.user).exclude(booking__booking_status='cancelled')
+    else:
+        # Admin/staff: see all properties (excluding unavailable)
+        properties_queryset = Property.objects.exclude(status='unavailable')
+        bookings_queryset = Booking.objects.exclude(booking_status='cancelled')
+        payments_queryset = Payment.objects.exclude(booking__booking_status='cancelled')
     
-    # Property statistics by region
-    regions_stats = Region.objects.annotate(
-        property_count=Count('properties')
-    ).order_by('-property_count')
+    # Overall statistics - all from database
+    total_properties = properties_queryset.count()
+    available_properties = properties_queryset.filter(status='available').count()
+    rented_properties = properties_queryset.filter(status='rented').count()
+    maintenance_properties = properties_queryset.filter(status='under_maintenance').count()
     
-    # Average rent
-    average_rent = Property.objects.aggregate(
+    # Booking statistics - exclude cancelled bookings
+    total_bookings = bookings_queryset.count()
+    active_bookings = bookings_queryset.filter(booking_status__in=['confirmed', 'checked_in']).count()
+    completed_bookings = bookings_queryset.filter(booking_status='checked_out').count()
+    pending_bookings = bookings_queryset.filter(booking_status='pending').count()
+    
+    # Revenue statistics - from actual payments, exclude cancelled bookings
+    total_revenue = payments_queryset.aggregate(total=Sum('amount'))['total'] or 0
+    paid_bookings = bookings_queryset.filter(payment_status='paid')
+    revenue_from_bookings = sum(booking.total_amount for booking in paid_bookings)
+    
+    # Current month revenue
+    current_month_start = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    monthly_revenue = payments_queryset.filter(
+        payment_date__gte=current_month_start
+    ).aggregate(total=Sum('amount'))['total'] or 0
+    
+    # Property statistics by type - respect multi-tenancy
+    if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
+        property_types_stats = PropertyType.objects.filter(
+            properties__owner=request.user
+        ).annotate(
+            property_count=Count('properties', filter=Q(properties__owner=request.user) & ~Q(properties__status='unavailable'))
+        ).distinct().order_by('-property_count')
+    else:
+        property_types_stats = PropertyType.objects.annotate(
+            property_count=Count('properties', filter=~Q(properties__status='unavailable'))
+        ).order_by('-property_count')
+    
+    # Property statistics by region - respect multi-tenancy
+    if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
+        regions_stats = Region.objects.filter(
+            properties__owner=request.user
+        ).annotate(
+            property_count=Count('properties', filter=Q(properties__owner=request.user) & ~Q(properties__status='unavailable'))
+        ).distinct().order_by('-property_count')
+    else:
+        regions_stats = Region.objects.annotate(
+            property_count=Count('properties', filter=~Q(properties__status='unavailable'))
+        ).order_by('-property_count')
+    
+    # Average rent - from actual property data
+    average_rent = properties_queryset.aggregate(
         avg_rent=Avg('rent_amount')
     )['avg_rent'] or 0
     
-    # Recent properties
-    recent_properties = Property.objects.select_related(
+    # Recent properties - respect multi-tenancy
+    recent_properties = properties_queryset.select_related(
         'property_type', 'region', 'owner'
-    ).prefetch_related('images')[:5]
+    ).prefetch_related('images').order_by('-created_at')[:5]
+    
+    # Recent bookings - exclude cancelled
+    recent_bookings = bookings_queryset.select_related(
+        'property_obj', 'customer', 'property_obj__property_type'
+    ).order_by('-created_at')[:5]
+    
+    # Today's check-ins and check-outs - exclude cancelled
+    today = timezone.now().date()
+    todays_checkins = bookings_queryset.filter(
+        check_in_date=today,
+        booking_status__in=['confirmed', 'checked_in']
+    ).select_related('property_obj', 'customer').count()
+    
+    todays_checkouts = bookings_queryset.filter(
+        check_out_date=today,
+        booking_status__in=['confirmed', 'checked_in']
+    ).select_related('property_obj', 'customer').count()
+    
+    # Upcoming bookings (next 7 days) - exclude cancelled
+    week_from_now = today + timedelta(days=7)
+    upcoming_bookings = bookings_queryset.filter(
+        check_in_date__range=[today + timedelta(days=1), week_from_now],
+        booking_status__in=['confirmed', 'pending']
+    ).select_related('property_obj', 'customer').count()
     
     context = {
         'total_properties': total_properties,
         'available_properties': available_properties,
         'rented_properties': rented_properties,
+        'maintenance_properties': maintenance_properties,
+        'total_bookings': total_bookings,
+        'active_bookings': active_bookings,
+        'completed_bookings': completed_bookings,
+        'pending_bookings': pending_bookings,
+        'total_revenue': total_revenue,
+        'revenue_from_bookings': revenue_from_bookings,
+        'monthly_revenue': monthly_revenue,
         'property_types_stats': property_types_stats,
         'regions_stats': regions_stats,
         'average_rent': average_rent,
         'recent_properties': recent_properties,
+        'recent_bookings': recent_bookings,
+        'todays_checkins': todays_checkins,
+        'todays_checkouts': todays_checkouts,
+        'upcoming_bookings': upcoming_bookings,
     }
     
     return render(request, 'properties/dashboard.html', context)
@@ -1169,28 +1262,32 @@ def hotel_dashboard(request):
                 request.session['selected_hotel_property_id'] = selected_property_id
                 request.session.modified = True
             
-            # Get stats for selected property
-            bookings = Booking.objects.filter(property_obj=selected_property)
+            # Get stats for selected property - exclude cancelled bookings
+            bookings = Booking.objects.filter(property_obj=selected_property).exclude(booking_status='cancelled')
             total_bookings = bookings.count()
             active_bookings = bookings.filter(booking_status__in=['confirmed', 'checked_in']).count()
             revenue = sum(booking.total_amount for booking in bookings.filter(payment_status='paid'))
             
-            # Get today's check-ins and check-outs for selected property
+            # Get today's check-ins and check-outs for selected property - exclude cancelled
             today = date.today()
-            todays_checkins = bookings.filter(check_in_date=today).select_related('customer')
-            todays_checkouts = bookings.filter(check_out_date=today).select_related('customer')
+            todays_checkins = bookings.filter(check_in_date=today).exclude(booking_status='cancelled').select_related('customer')
+            todays_checkouts = bookings.filter(check_out_date=today).exclude(booking_status='cancelled').select_related('customer')
             
             # Get room status for selected property - count actual Room objects, not property.total_rooms field
+            # Sync room status before counting to ensure accuracy
             rooms = Room.objects.filter(property_obj=selected_property)
+            # Sync room status from bookings to ensure accuracy
+            for room in rooms:
+                room.sync_status_from_bookings()
             total_rooms = rooms.count()  # Use actual count of Room objects
             available_rooms = rooms.filter(status='available').count()
             occupied_rooms = rooms.filter(status='occupied').count()
             maintenance_rooms = rooms.filter(status='maintenance').count()
             
-            # Get recent payments for selected property
+            # Get recent payments for selected property - exclude cancelled bookings
             recent_payments = Payment.objects.filter(
                 booking__property_obj=selected_property
-            ).select_related('booking__customer').order_by('-payment_date')[:5]
+            ).exclude(booking__booking_status='cancelled').select_related('booking__customer').order_by('-payment_date')[:5]
             
         except Property.DoesNotExist:
             # Property not found - clear invalid session value
@@ -1217,37 +1314,41 @@ def hotel_dashboard(request):
         else:
             total_rooms = Room.objects.filter(property_obj__property_type__name__iexact='hotel').count()
         if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
-            bookings = Booking.objects.filter(property_obj__property_type__name__iexact='hotel', property_obj__owner=request.user)
+            bookings = Booking.objects.filter(property_obj__property_type__name__iexact='hotel', property_obj__owner=request.user).exclude(booking_status='cancelled')
         else:
-            bookings = Booking.objects.filter(property_obj__property_type__name__iexact='hotel')
+            bookings = Booking.objects.filter(property_obj__property_type__name__iexact='hotel').exclude(booking_status='cancelled')
         total_bookings = bookings.count()
         active_bookings = bookings.filter(booking_status__in=['confirmed', 'checked_in']).count()
         revenue = sum(booking.total_amount for booking in bookings.filter(payment_status='paid'))
         
-        # Get today's check-ins and check-outs for all hotels
+        # Get today's check-ins and check-outs for all hotels - exclude cancelled
         today = date.today()
-        todays_checkins = bookings.filter(check_in_date=today).select_related('customer')
-        todays_checkouts = bookings.filter(check_out_date=today).select_related('customer')
+        todays_checkins = bookings.filter(check_in_date=today).exclude(booking_status='cancelled').select_related('customer')
+        todays_checkouts = bookings.filter(check_out_date=today).exclude(booking_status='cancelled').select_related('customer')
         
         # Get room status for all hotels (filtered by owner if not admin)
+        # Sync room status before counting to ensure accuracy
         if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
             rooms = Room.objects.filter(property_obj__property_type__name__iexact='hotel', property_obj__owner=request.user)
         else:
             rooms = Room.objects.filter(property_obj__property_type__name__iexact='hotel')
+        # Sync room status from bookings to ensure accuracy
+        for room in rooms:
+            room.sync_status_from_bookings()
         available_rooms = rooms.filter(status='available').count()
         occupied_rooms = rooms.filter(status='occupied').count()
         maintenance_rooms = rooms.filter(status='maintenance').count()
         
-        # Get recent payments for all hotels (filtered by owner if not admin)
+        # Get recent payments for all hotels (filtered by owner if not admin) - exclude cancelled bookings
         if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
             recent_payments = Payment.objects.filter(
                 booking__property_obj__property_type__name__iexact='hotel',
                 booking__property_obj__owner=request.user
-            ).select_related('booking__customer').order_by('-payment_date')[:5]
+            ).exclude(booking__booking_status='cancelled').select_related('booking__customer').order_by('-payment_date')[:5]
         else:
             recent_payments = Payment.objects.filter(
                 booking__property_obj__property_type__name__iexact='hotel'
-            ).select_related('booking__customer').order_by('-payment_date')[:5]
+            ).exclude(booking__booking_status='cancelled').select_related('booking__customer').order_by('-payment_date')[:5]
     
     context = {
         'hotel_properties': hotel_properties,
@@ -1288,18 +1389,26 @@ def hotel_bookings(request):
     else:
         hotel_properties = Property.objects.filter(property_type__name__iexact='hotel')
     
-    # Get bookings from properties.Booking (web admin bookings)
-    if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
-        bookings_query = Booking.objects.filter(property_obj__property_type__name__iexact='hotel', property_obj__owner=request.user).select_related('customer', 'property_obj').order_by('-created_at')
-        doc_bookings_query = DocumentBooking.objects.filter(property_ref__property_type__name__iexact='hotel', property_ref__owner=request.user).select_related('property_ref', 'tenant').order_by('-created_at')
-    else:
-        bookings_query = Booking.objects.filter(property_obj__property_type__name__iexact='hotel').select_related('customer', 'property_obj').order_by('-created_at')
-        doc_bookings_query = DocumentBooking.objects.filter(property_ref__property_type__name__iexact='hotel').select_related('property_ref', 'tenant').order_by('-created_at')
-    
     # Get search and filter parameters
     search_query = request.GET.get('search', '').strip()
     status_filter = request.GET.get('status', '')
     payment_filter = request.GET.get('payment_status', '')
+    show_deleted = request.GET.get('show_deleted', 'false').lower() == 'true'  # Filter for soft-deleted bookings
+    
+    # Get bookings from properties.Booking (web admin bookings)
+    # By default, exclude soft-deleted bookings unless show_deleted is True
+    if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
+        bookings_query = Booking.objects.filter(property_obj__property_type__name__iexact='hotel', property_obj__owner=request.user)
+        doc_bookings_query = DocumentBooking.objects.filter(property_ref__property_type__name__iexact='hotel', property_ref__owner=request.user).select_related('property_ref', 'tenant').order_by('-created_at')
+    else:
+        bookings_query = Booking.objects.filter(property_obj__property_type__name__iexact='hotel')
+        doc_bookings_query = DocumentBooking.objects.filter(property_ref__property_type__name__iexact='hotel').select_related('property_ref', 'tenant').order_by('-created_at')
+    
+    # Filter soft-deleted bookings based on show_deleted parameter
+    if not show_deleted:
+        bookings_query = bookings_query.filter(is_deleted=False)
+    
+    bookings_query = bookings_query.select_related('customer', 'property_obj').order_by('-created_at')
     
     # Filter by selected property if specified
     selected_property = None
@@ -1329,6 +1438,28 @@ def hotel_bookings(request):
         user=request.user
     )
     
+    # Sync total_amount with calculated_total_amount for consistency
+    # This ensures bookings show the correct amount based on room's base_rate
+    # NOTE: Venues are EXCLUDED - they use time-based calculation, not date-based
+    from decimal import Decimal
+    for booking in all_bookings:
+        # Only process properties.Booking instances (not DocumentBookingWrapper)
+        if hasattr(booking, 'calculated_total_amount') and hasattr(booking, 'total_amount'):
+            # Skip venues - they use manually entered total_amount from time-based calculation
+            # Hotel bookings view only processes hotel bookings, but add check for safety
+            is_venue = booking.property_obj and booking.property_obj.property_type.name.lower() == 'venue'
+            if is_venue:
+                continue  # Skip venue bookings - do not sync
+            
+            calculated_total = booking.calculated_total_amount if booking.calculated_total_amount and booking.calculated_total_amount > 0 else Decimal('0')
+            stored_total = booking.total_amount or Decimal('0')
+            
+            # Sync if there's a mismatch (calculated uses room.base_rate, stored might be outdated)
+            # This only applies to hotel bookings, NOT venues
+            if calculated_total > 0 and abs(stored_total - calculated_total) > Decimal('0.01'):
+                booking.total_amount = calculated_total
+                booking.save()
+    
     # Pagination
     from django.core.paginator import Paginator
     page_size = request.GET.get('page_size', '10')
@@ -1355,6 +1486,9 @@ def hotel_bookings(request):
         'search_query': search_query,
         'status_filter': status_filter,
         'payment_filter': payment_filter,
+        'show_deleted': show_deleted,
+        'status_filter': status_filter,
+        'payment_filter': payment_filter,
     }
     return render(request, 'properties/hotel_bookings.html', context)
 
@@ -1363,17 +1497,7 @@ def hotel_bookings(request):
 def hotel_rooms(request):
     """Hotel room status management"""
     from django.core.paginator import Paginator
-    
-    # Get selected property from request parameter or session
-    # Priority: URL parameter > Session
-    url_property_id = request.GET.get('property_id')
-    session_property_id = request.session.get('selected_hotel_property_id')
-    
-    # Use URL parameter if present, otherwise use session
-    selected_property_id = url_property_id or session_property_id
-    
-    # Validate selected_property_id - handle 'all' case
-    selected_property_id = validate_property_id(selected_property_id)
+    from django.shortcuts import redirect
     
     # Get hotel properties - MULTI-TENANCY: Filter by owner for data isolation
     if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
@@ -1381,15 +1505,35 @@ def hotel_rooms(request):
     else:
         hotel_properties = Property.objects.filter(property_type__name__iexact='hotel')
     
-    # Filter rooms based on selected property
-    if selected_property_id:
+    # For admins/staff: Must select a hotel first
+    if request.user.is_staff or request.user.is_superuser:
+        # Get selected property from request parameter or session
+        # Priority: URL parameter > Session
+        url_property_id = request.GET.get('property_id')
+        session_property_id = request.session.get('selected_hotel_property_id')
+        
+        # Use URL parameter if present, otherwise use session
+        selected_property_id = url_property_id or session_property_id
+        
+        # Validate selected_property_id - handle 'all' case
+        selected_property_id = validate_property_id(selected_property_id)
+        
+        # If no hotel selected, redirect to selection page
+        if not selected_property_id:
+            return redirect('properties:hotel_select_property')
+        
+        # Filter rooms based on selected property
         try:
-            # MULTI-TENANCY: Ensure owner can only access their own properties
-            if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
-                selected_property = Property.objects.get(id=selected_property_id, property_type__name__iexact='hotel', owner=request.user)
-            else:
-                selected_property = Property.objects.get(id=selected_property_id, property_type__name__iexact='hotel')
+            selected_property = Property.objects.get(id=selected_property_id, property_type__name__iexact='hotel')
             rooms_queryset = Room.objects.filter(property_obj=selected_property).select_related('property_obj', 'current_booking')
+            
+            # Sync room statuses from bookings to ensure accuracy
+            for room in rooms_queryset:
+                room.sync_status_from_bookings()
+            
+            # Refresh property status based on room availability
+            selected_property.refresh_status_from_activity()
+            
             # Store selected property in session only if it came from URL parameter (new selection)
             if url_property_id:
                 request.session['selected_hotel_property_id'] = selected_property_id
@@ -1398,12 +1542,28 @@ def hotel_rooms(request):
             selected_property = None
             rooms_queryset = Room.objects.none()
     else:
-        selected_property = None
-        # Show all hotel rooms if no specific property selected (filtered by owner if not admin)
-        if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
-            rooms_queryset = Room.objects.filter(property_obj__property_type__name__iexact='hotel', property_obj__owner=request.user).select_related('property_obj', 'current_booking')
+        # For individual users: Automatically show their hotel's rooms (they only have one)
+        selected_property = hotel_properties.first()  # Get their only hotel
+        
+        if selected_property:
+            selected_property_id = selected_property.id
+            # Store in session for consistency
+            request.session['selected_hotel_property_id'] = selected_property_id
+            
+            # Get rooms for their hotel
+            rooms_queryset = Room.objects.filter(property_obj=selected_property).select_related('property_obj', 'current_booking')
+            
+            # Sync room statuses from bookings to ensure accuracy
+            for room in rooms_queryset:
+                room.sync_status_from_bookings()
+            
+            # Refresh property status based on room availability
+            selected_property.refresh_status_from_activity()
         else:
-            rooms_queryset = Room.objects.filter(property_obj__property_type__name__iexact='hotel').select_related('property_obj', 'current_booking')
+            # No hotel found for this user
+            selected_property = None
+            selected_property_id = None
+            rooms_queryset = Room.objects.none()
     
     # Pagination - default 5 items per page
     paginator = Paginator(rooms_queryset, 5)
@@ -1415,6 +1575,7 @@ def hotel_rooms(request):
         'selected_property': selected_property,
         'rooms': rooms,
         'is_single_property_mode': bool(selected_property_id),
+        'user': request.user,  # Pass user to template for admin check
     }
     return render(request, 'properties/hotel_rooms.html', context)
 
@@ -1457,6 +1618,12 @@ def add_room(request):
             
             print(f"Room data: {room_number}, {room_type}, {floor_number}, {capacity}, {base_rate}")
             
+            # Validate that base_rate is set and greater than 0
+            # Each room MUST have its own price - no default/fallback pricing
+            if not base_rate or base_rate <= 0:
+                messages.error(request, f'Base Rate is required and must be greater than 0. Each room must have its own price set.')
+                return redirect('properties:hotel_rooms')
+            
             # Check if room number already exists for this hotel
             if Room.objects.filter(property_obj=hotel, room_number=room_number).exists():
                 messages.error(request, f'Room {room_number} already exists in {hotel.title}. Please choose a different room number.')
@@ -1469,7 +1636,7 @@ def add_room(request):
                 room_type=room_type,
                 floor_number=floor_number,
                 capacity=capacity,
-                base_rate=base_rate,
+                base_rate=base_rate,  # This is the ONLY source of pricing for this room
                 bed_type=bed_type,
                 amenities=amenities,
                 status='available'
@@ -1588,6 +1755,11 @@ def hotel_customers(request):
 @login_required
 def hotel_payments(request):
     """Hotel payment management"""
+    from django.db.models import Sum, Q
+    from django.core.paginator import Paginator
+    from collections import defaultdict
+    from decimal import Decimal
+    
     # Get selected property from request parameter or session
     # Priority: URL parameter > Session
     url_property_id = request.GET.get('property_id')
@@ -1605,7 +1777,7 @@ def hotel_payments(request):
     else:
         hotel_properties = Property.objects.filter(property_type__name__iexact='hotel')
     
-    # Filter payments based on selected property
+    # Get bookings for the Record Payment dropdown (filtered by owner if not admin)
     if selected_property_id:
         try:
             # MULTI-TENANCY: Ensure owner can only access their own properties
@@ -1613,57 +1785,131 @@ def hotel_payments(request):
                 selected_property = Property.objects.get(id=selected_property_id, property_type__name__iexact='hotel', owner=request.user)
             else:
                 selected_property = Property.objects.get(id=selected_property_id, property_type__name__iexact='hotel')
-            payments = Payment.objects.filter(
-                booking__property_obj=selected_property,
-                status='active'  # Only show active payments (exclude refunded)
-            ).select_related('booking', 'booking__customer', 'recorded_by').order_by('-payment_date')
+            bookings = Booking.objects.filter(
+                property_obj=selected_property
+            ).exclude(booking_status='cancelled').select_related('customer', 'property_obj').order_by('-created_at')
             # Store selected property in session only if it came from URL parameter (new selection)
             if url_property_id:
                 request.session['selected_hotel_property_id'] = selected_property_id
                 request.session.modified = True
         except Property.DoesNotExist:
             selected_property = None
-            payments = Payment.objects.none()
+            bookings = Booking.objects.none()
     else:
         selected_property = None
-        # Show all active payments for hotel bookings (exclude refunded, filtered by owner if not admin)
-        if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
-            payments = Payment.objects.filter(
-                booking__property_obj__property_type__name__iexact='hotel',
-                booking__property_obj__owner=request.user,
-                status='active'  # Only show active payments (exclude refunded)
-            ).select_related('booking', 'booking__customer', 'recorded_by').order_by('-payment_date')
-        else:
-            payments = Payment.objects.filter(
-                booking__property_obj__property_type__name__iexact='hotel',
-                status='active'  # Only show active payments (exclude refunded)
-            ).select_related('booking', 'booking__customer', 'recorded_by').order_by('-payment_date')
-    
-    # Get bookings for the Record Payment modal (filtered by owner if not admin)
-    if selected_property_id:
-        bookings = Booking.objects.filter(
-            property_obj=selected_property
-        ).select_related('customer').order_by('-created_at')
-    else:
         if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
             bookings = Booking.objects.filter(
                 property_obj__property_type__name__iexact='hotel',
                 property_obj__owner=request.user
-            ).select_related('customer').order_by('-created_at')
+            ).exclude(booking_status='cancelled').select_related('customer', 'property_obj').order_by('-created_at')
         else:
             bookings = Booking.objects.filter(
                 property_obj__property_type__name__iexact='hotel'
-            ).select_related('customer').order_by('-created_at')
+            ).exclude(booking_status='cancelled').select_related('customer', 'property_obj').order_by('-created_at')
+    
+    # Get all hotel bookings (for grouping payments by booking) - exclude cancelled bookings
+    if selected_property_id and selected_property:
+        hotel_bookings = Booking.objects.filter(
+            property_obj=selected_property
+        ).exclude(booking_status='cancelled').select_related('customer', 'property_obj')
+    else:
+        if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
+            hotel_bookings = Booking.objects.filter(
+                property_obj__property_type__name__iexact='hotel',
+                property_obj__owner=request.user
+            ).exclude(booking_status='cancelled').select_related('customer', 'property_obj')
+        else:
+            hotel_bookings = Booking.objects.filter(
+                property_obj__property_type__name__iexact='hotel'
+            ).exclude(booking_status='cancelled').select_related('customer', 'property_obj')
+    
+    # Group payments by booking to show booking-level payment information
+    bookings_data = {}
+    for booking in hotel_bookings:
+        # Calculate actual totals from all payments for this booking
+        all_payments = Payment.objects.filter(booking=booking).exclude(payment_type='refund')
+        all_refunds = Payment.objects.filter(booking=booking, payment_type='refund')
+        total_paid = all_payments.aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        total_refunded = all_refunds.aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        net_paid = max(Decimal('0'), total_paid - total_refunded)
+        
+        # Get total amount using ONLY room's base_rate (no property rent_amount fallback)
+        # For hotel bookings, room assignment is mandatory, so base_rate comes from room only
+        # NOTE: Venues are handled separately - they use time-based calculation, not date-based
+        is_venue = booking.property_obj and booking.property_obj.property_type.name.lower() == 'venue'
+        stored_total = booking.total_amount or Decimal('0')
+        
+        if is_venue:
+            # For venues: ALWAYS use stored total_amount (manually entered from form)
+            # Venues calculate days from start_time/end_time, which is different from hotel/lodge
+            # DO NOT sync or calculate for venues - use what was entered
+            total_required = stored_total
+        else:
+            # For hotels/lodges: sync with calculated_total_amount if needed
+            calculated_total = booking.calculated_total_amount if booking.calculated_total_amount and booking.calculated_total_amount > 0 else Decimal('0')
+            
+            # Sync total_amount with calculated_total_amount if there's a mismatch
+            # This ensures consistency between bookings and payments views
+            # calculated_total_amount uses booking.base_rate which now ONLY uses room.base_rate
+            if calculated_total > 0 and abs(stored_total - calculated_total) > Decimal('0.01'):
+                booking.total_amount = calculated_total
+                booking.save()
+            
+            # Use calculated_total_amount if available, otherwise use stored total_amount
+            # Both should now be based on room.base_rate only (no property rent_amount)
+            total_required = calculated_total if calculated_total > 0 else stored_total
+        
+        remaining = max(Decimal('0'), total_required - net_paid)
+        
+        # Update booking's paid_amount if inconsistent
+        if abs(booking.paid_amount - net_paid) > Decimal('0.01'):
+            booking.paid_amount = net_paid
+            booking.update_payment_status()
+            booking.save()
+        
+        # Get payment count and last payment date
+        payment_count = all_payments.count()
+        last_payment = all_payments.order_by('-payment_date').first()
+        
+        bookings_data[booking.id] = {
+            'booking': booking,
+            'total_required': total_required,
+            'paid_so_far': net_paid,
+            'remaining': remaining,
+            'payment_count': payment_count,
+            'last_payment_date': last_payment.payment_date if last_payment else None,
+            'last_payment_method': last_payment.payment_method if last_payment else None,
+        }
+    
+    # Convert to list for display
+    all_payments_data = list(bookings_data.values())
+    
+    # Sort by last payment date or booking creation date
+    all_payments_data.sort(key=lambda x: x['last_payment_date'] or x['booking'].created_at, reverse=True)
+    
+    # Pagination
+    page_size = request.GET.get('page_size', '5')  # Default to 5
+    try:
+        page_size = int(page_size)
+        if page_size not in [5, 10, 25, 50]:
+            page_size = 5
+    except (ValueError, TypeError):
+        page_size = 5
+    
+    paginator = Paginator(all_payments_data, page_size)
+    page_number = request.GET.get('page')
+    payments_page = paginator.get_page(page_number)
     
     # Calculate payment statistics
-    total_payments = payments.count()
-    total_amount = sum(payment.amount for payment in payments)
-    paid_bookings = payments.count()  # All payments are considered paid
+    total_payments = len(all_payments_data)
+    total_amount = sum(item['total_required'] for item in all_payments_data)
+    paid_bookings = sum(1 for item in all_payments_data if item['booking'].payment_status == 'paid')
     
     context = {
         'hotel_properties': hotel_properties,
         'selected_property': selected_property,
-        'payments': payments,
+        'payments': payments_page,  # Paginated payment data (booking-level)
+        'payments_all': all_payments_data,  # For stats
         'bookings': bookings,
         'total_payments': total_payments,
         'total_amount': total_amount,
@@ -1722,16 +1968,20 @@ def lodge_dashboard(request):
                 request.session['selected_lodge_property_id'] = selected_property_id
                 request.session.modified = True
             
-            # Get stats for selected property
+            # Get stats for selected property - exclude cancelled bookings
             total_rooms = selected_property.total_rooms or 0
-            bookings = Booking.objects.filter(property_obj=selected_property)
+            bookings = Booking.objects.filter(property_obj=selected_property).exclude(booking_status='cancelled')
             total_bookings = bookings.count()
             active_bookings = bookings.filter(booking_status__in=['confirmed', 'checked_in']).count()
             revenue = sum(booking.total_amount for booking in bookings.filter(payment_status='paid'))
             
             # Calculate room counts from Room model
+            # Sync room status before counting to ensure accuracy
             from .models import Room
             property_rooms = Room.objects.filter(property_obj=selected_property, is_active=True)
+            # Sync room status from bookings to ensure cancelled bookings don't show rooms as occupied
+            for room in property_rooms:
+                room.sync_status_from_bookings()
             available_rooms = property_rooms.filter(status='available').count()
             occupied_rooms = property_rooms.filter(status='occupied').count()
             maintenance_rooms = property_rooms.filter(status='maintenance').count()
@@ -1746,12 +1996,12 @@ def lodge_dashboard(request):
                 occupied_percentage = 0
                 maintenance_percentage = 0
             
-            # Get today's check-ins with pagination
+            # Get today's check-ins with pagination - exclude cancelled bookings
             from datetime import date
             today = date.today()
             todays_checkins_query = bookings.filter(
                 check_in_date=today
-            ).select_related('customer', 'property_obj').order_by('-created_at')
+            ).exclude(booking_status='cancelled').select_related('customer', 'property_obj').order_by('-created_at')
         except Property.DoesNotExist:
             selected_property = None
             total_rooms = 0
@@ -1770,19 +2020,23 @@ def lodge_dashboard(request):
         # Get stats for all lodges (filtered by owner if not admin)
         total_rooms = sum(prop.total_rooms or 0 for prop in lodge_properties)
         if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
-            bookings = Booking.objects.filter(property_obj__property_type__name__iexact='lodge', property_obj__owner=request.user)
+            bookings = Booking.objects.filter(property_obj__property_type__name__iexact='lodge', property_obj__owner=request.user).exclude(booking_status='cancelled')
         else:
-            bookings = Booking.objects.filter(property_obj__property_type__name__iexact='lodge')
+            bookings = Booking.objects.filter(property_obj__property_type__name__iexact='lodge').exclude(booking_status='cancelled')
         total_bookings = bookings.count()
         active_bookings = bookings.filter(booking_status__in=['confirmed', 'checked_in']).count()
         revenue = sum(booking.total_amount for booking in bookings.filter(payment_status='paid'))
         
         # Calculate room counts from Room model for all lodges
+        # Sync room status before counting to ensure accuracy
         from .models import Room
         if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
             property_rooms = Room.objects.filter(property_obj__property_type__name__iexact='lodge', property_obj__owner=request.user, is_active=True)
         else:
             property_rooms = Room.objects.filter(property_obj__property_type__name__iexact='lodge', is_active=True)
+        # Sync room status from bookings to ensure cancelled bookings don't show rooms as occupied
+        for room in property_rooms:
+            room.sync_status_from_bookings()
         available_rooms = property_rooms.filter(status='available').count()
         occupied_rooms = property_rooms.filter(status='occupied').count()
         maintenance_rooms = property_rooms.filter(status='maintenance').count()
@@ -1797,12 +2051,12 @@ def lodge_dashboard(request):
             occupied_percentage = 0
             maintenance_percentage = 0
         
-        # Get today's check-ins for all lodges with pagination
+        # Get today's check-ins for all lodges with pagination - exclude cancelled bookings
         from datetime import date
         today = date.today()
         todays_checkins_query = bookings.filter(
             check_in_date=today
-        ).select_related('customer', 'property_obj').order_by('-created_at')
+        ).exclude(booking_status='cancelled').select_related('customer', 'property_obj').order_by('-created_at')
     
     # Pagination for today's check-ins
     from django.core.paginator import Paginator
@@ -1856,18 +2110,26 @@ def lodge_bookings(request):
     else:
         lodge_properties = Property.objects.filter(property_type__name__iexact='lodge')
     
-    # Get bookings from properties.Booking (web admin bookings)
-    if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
-        bookings_query = Booking.objects.filter(property_obj__property_type__name__iexact='lodge', property_obj__owner=request.user).select_related('customer', 'property_obj').order_by('-created_at')
-        doc_bookings_query = DocumentBooking.objects.filter(property_ref__property_type__name__iexact='lodge', property_ref__owner=request.user).select_related('property_ref', 'tenant').order_by('-created_at')
-    else:
-        bookings_query = Booking.objects.filter(property_obj__property_type__name__iexact='lodge').select_related('customer', 'property_obj').order_by('-created_at')
-        doc_bookings_query = DocumentBooking.objects.filter(property_ref__property_type__name__iexact='lodge').select_related('property_ref', 'tenant').order_by('-created_at')
-    
     # Get search and filter parameters
     search_query = request.GET.get('search', '').strip()
     status_filter = request.GET.get('status', '')
     payment_filter = request.GET.get('payment_status', '')
+    show_deleted = request.GET.get('show_deleted', 'false').lower() == 'true'  # Filter for soft-deleted bookings
+    
+    # Get bookings from properties.Booking (web admin bookings)
+    # By default, exclude soft-deleted bookings unless show_deleted is True
+    if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
+        bookings_query = Booking.objects.filter(property_obj__property_type__name__iexact='lodge', property_obj__owner=request.user)
+        doc_bookings_query = DocumentBooking.objects.filter(property_ref__property_type__name__iexact='lodge', property_ref__owner=request.user).select_related('property_ref', 'tenant').order_by('-created_at')
+    else:
+        bookings_query = Booking.objects.filter(property_obj__property_type__name__iexact='lodge')
+        doc_bookings_query = DocumentBooking.objects.filter(property_ref__property_type__name__iexact='lodge').select_related('property_ref', 'tenant').order_by('-created_at')
+    
+    # Filter soft-deleted bookings based on show_deleted parameter
+    if not show_deleted:
+        bookings_query = bookings_query.filter(is_deleted=False)
+    
+    bookings_query = bookings_query.select_related('customer', 'property_obj').order_by('-created_at')
     
     # Filter by selected property if specified
     selected_property = None
@@ -1895,6 +2157,28 @@ def lodge_bookings(request):
         user=request.user
     )
     
+    # Sync total_amount with calculated_total_amount for consistency
+    # This ensures bookings show the correct amount based on room's base_rate
+    # NOTE: Venues are EXCLUDED - they use time-based calculation, not date-based
+    from decimal import Decimal
+    for booking in all_bookings:
+        # Only process properties.Booking instances (not DocumentBookingWrapper)
+        if hasattr(booking, 'calculated_total_amount') and hasattr(booking, 'total_amount'):
+            # Skip venues - they use manually entered total_amount from time-based calculation
+            # Lodge bookings view only processes lodge bookings, but add check for safety
+            is_venue = booking.property_obj and booking.property_obj.property_type.name.lower() == 'venue'
+            if is_venue:
+                continue  # Skip venue bookings - do not sync
+            
+            calculated_total = booking.calculated_total_amount if booking.calculated_total_amount and booking.calculated_total_amount > 0 else Decimal('0')
+            stored_total = booking.total_amount or Decimal('0')
+            
+            # Sync if there's a mismatch (calculated uses room.base_rate, stored might be outdated)
+            # This only applies to lodge bookings, NOT venues
+            if calculated_total > 0 and abs(stored_total - calculated_total) > Decimal('0.01'):
+                booking.total_amount = calculated_total
+                booking.save()
+    
     # Pagination
     from django.core.paginator import Paginator
     page_size = request.GET.get('page_size', '10')
@@ -1921,6 +2205,9 @@ def lodge_bookings(request):
         'search_query': search_query,
         'status_filter': status_filter,
         'payment_filter': payment_filter,
+        'show_deleted': show_deleted,
+        'status_filter': status_filter,
+        'payment_filter': payment_filter,
     }
     return render(request, 'properties/lodge_bookings.html', context)
 
@@ -1928,11 +2215,8 @@ def lodge_bookings(request):
 @login_required
 def lodge_rooms(request):
     """Lodge room status management"""
-    # Get selected property from session or request
-    selected_property_id = request.session.get('selected_lodge_property_id') or request.GET.get('property_id')
-    
-    # Validate selected_property_id - handle 'all' case
-    selected_property_id = validate_property_id(selected_property_id)
+    from django.shortcuts import redirect
+    from django.urls import reverse
     
     # Get lodge properties - MULTI-TENANCY: Filter by owner for data isolation
     if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
@@ -1940,14 +2224,21 @@ def lodge_rooms(request):
     else:
         lodge_properties = Property.objects.filter(property_type__name__iexact='lodge')
     
-    # Filter rooms based on selected property
-    if selected_property_id:
+    # For admins/staff: Must select a lodge first
+    if request.user.is_staff or request.user.is_superuser:
+        # Get selected property from session or request
+        selected_property_id = request.session.get('selected_lodge_property_id') or request.GET.get('property_id')
+        
+        # Validate selected_property_id - handle 'all' case
+        selected_property_id = validate_property_id(selected_property_id)
+        
+        # If no lodge selected, redirect to selection page
+        if not selected_property_id:
+            return redirect('properties:lodge_select_property')
+        
+        # Filter rooms based on selected property
         try:
-            # MULTI-TENANCY: Ensure owner can only access their own properties
-            if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
-                selected_property = Property.objects.get(id=selected_property_id, property_type__name__iexact='lodge', owner=request.user)
-            else:
-                selected_property = Property.objects.get(id=selected_property_id, property_type__name__iexact='lodge')
+            selected_property = Property.objects.get(id=selected_property_id, property_type__name__iexact='lodge')
             # Store selected property in session
             request.session['selected_lodge_property_id'] = selected_property_id
             
@@ -1957,12 +2248,21 @@ def lodge_rooms(request):
             selected_property = None
             rooms = Room.objects.none()
     else:
-        selected_property = None
-        # Show all lodge rooms if no specific property selected (filtered by owner if not admin)
-        if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
-            rooms = Room.objects.filter(property_obj__property_type__name__iexact='lodge', property_obj__owner=request.user).select_related('current_booking', 'current_booking__customer')
+        # For individual users: Automatically show their lodge's rooms (they only have one)
+        selected_property = lodge_properties.first()  # Get their only lodge
+        
+        if selected_property:
+            selected_property_id = selected_property.id
+            # Store in session for consistency
+            request.session['selected_lodge_property_id'] = selected_property_id
+            
+            # Get rooms for their lodge
+            rooms = Room.objects.filter(property_obj=selected_property).select_related('current_booking', 'current_booking__customer')
         else:
-            rooms = Room.objects.filter(property_obj__property_type__name__iexact='lodge').select_related('current_booking', 'current_booking__customer')
+            # No lodge found for this user
+            selected_property = None
+            selected_property_id = None
+            rooms = Room.objects.none()
     
     # Calculate room statistics
     total_rooms = rooms.count()
@@ -1971,11 +2271,14 @@ def lodge_rooms(request):
     maintenance_rooms = rooms.filter(status='maintenance').count()
     out_of_order_rooms = rooms.filter(status='out_of_order').count()
     
-    # Get current bookings for occupied rooms
-    current_bookings = Booking.objects.filter(
-        property_obj__in=lodge_properties,
-        booking_status__in=['confirmed', 'checked_in']
-    ).select_related('customer', 'property_obj')
+    # Get current bookings for occupied rooms (only for selected property if available)
+    if selected_property:
+        current_bookings = Booking.objects.filter(
+            property_obj=selected_property,
+            booking_status__in=['confirmed', 'checked_in']
+        ).select_related('customer', 'property_obj')
+    else:
+        current_bookings = Booking.objects.none()
     
     # Group rooms by area/type for better organization
     rooms_by_type = {}
@@ -1997,6 +2300,7 @@ def lodge_rooms(request):
         'out_of_order_rooms': out_of_order_rooms,
         'current_bookings': current_bookings,
         'is_single_property_mode': bool(selected_property_id),
+        'user': request.user,  # Pass user to template for admin check
     }
     return render(request, 'properties/lodge_rooms.html', context)
 
@@ -2098,9 +2402,19 @@ def lodge_customers(request):
 
 @login_required
 def lodge_payments(request):
-    """Lodge payment management"""
-    # Get selected property from session or request
-    selected_property_id = request.session.get('selected_lodge_property_id') or request.GET.get('property_id')
+    """Lodge payment management - similar to hotel_payments"""
+    from django.db.models import Sum, Q
+    from django.core.paginator import Paginator
+    from collections import defaultdict
+    from decimal import Decimal
+    
+    # Get selected property from request parameter or session
+    # Priority: URL parameter > Session
+    url_property_id = request.GET.get('property_id')
+    session_property_id = request.session.get('selected_lodge_property_id')
+    
+    # Use URL parameter if present, otherwise use session
+    selected_property_id = url_property_id or session_property_id
     
     # Validate selected_property_id - handle 'all' case
     selected_property_id = validate_property_id(selected_property_id)
@@ -2111,7 +2425,7 @@ def lodge_payments(request):
     else:
         lodge_properties = Property.objects.filter(property_type__name__iexact='lodge')
     
-    # Filter payments based on selected property
+    # Get bookings for the Record Payment dropdown (filtered by owner if not admin)
     if selected_property_id:
         try:
             # MULTI-TENANCY: Ensure owner can only access their own properties
@@ -2119,73 +2433,131 @@ def lodge_payments(request):
                 selected_property = Property.objects.get(id=selected_property_id, property_type__name__iexact='lodge', owner=request.user)
             else:
                 selected_property = Property.objects.get(id=selected_property_id, property_type__name__iexact='lodge')
-            payments = Payment.objects.filter(
-                booking__property_obj=selected_property,
-                status='active'  # Only show active payments (exclude refunded)
-            ).select_related('booking', 'booking__customer', 'recorded_by').order_by('-payment_date')
-            # Store selected property in session
-            request.session['selected_lodge_property_id'] = selected_property_id
+            bookings = Booking.objects.filter(
+                property_obj=selected_property
+            ).exclude(booking_status='cancelled').select_related('customer', 'property_obj').order_by('-created_at')
+            # Store selected property in session only if it came from URL parameter (new selection)
+            if url_property_id:
+                request.session['selected_lodge_property_id'] = selected_property_id
+                request.session.modified = True
         except Property.DoesNotExist:
             selected_property = None
-            payments = Payment.objects.none()
+            bookings = Booking.objects.none()
     else:
         selected_property = None
-        # Show all active payments for lodge bookings (exclude refunded, filtered by owner if not admin)
-        if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
-            payments = Payment.objects.filter(
-                booking__property_obj__property_type__name__iexact='lodge',
-                booking__property_obj__owner=request.user,
-                status='active'  # Only show active payments (exclude refunded)
-            ).select_related('booking', 'booking__customer', 'recorded_by').order_by('-payment_date')
-        else:
-            payments = Payment.objects.filter(
-                booking__property_obj__property_type__name__iexact='lodge',
-                status='active'  # Only show active payments (exclude refunded)
-            ).select_related('booking', 'booking__customer', 'recorded_by').order_by('-payment_date')
-    
-    # Get bookings for the Record Payment modal (filtered by owner if not admin)
-    if selected_property_id:
-        bookings = Booking.objects.filter(
-            property_obj__id=selected_property_id
-        ).select_related('customer').order_by('-created_at')
-    else:
         if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
             bookings = Booking.objects.filter(
                 property_obj__property_type__name__iexact='lodge',
                 property_obj__owner=request.user
-            ).select_related('customer').order_by('-created_at')
+            ).exclude(booking_status='cancelled').select_related('customer', 'property_obj').order_by('-created_at')
         else:
             bookings = Booking.objects.filter(
                 property_obj__property_type__name__iexact='lodge'
-            ).select_related('customer').order_by('-created_at')
+            ).exclude(booking_status='cancelled').select_related('customer', 'property_obj').order_by('-created_at')
+    
+    # Get all lodge bookings (for grouping payments by booking) - exclude cancelled bookings
+    if selected_property_id and selected_property:
+        lodge_bookings = Booking.objects.filter(
+            property_obj=selected_property
+        ).exclude(booking_status='cancelled').select_related('customer', 'property_obj')
+    else:
+        if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
+            lodge_bookings = Booking.objects.filter(
+                property_obj__property_type__name__iexact='lodge',
+                property_obj__owner=request.user
+            ).exclude(booking_status='cancelled').select_related('customer', 'property_obj')
+        else:
+            lodge_bookings = Booking.objects.filter(
+                property_obj__property_type__name__iexact='lodge'
+            ).exclude(booking_status='cancelled').select_related('customer', 'property_obj')
+    
+    # Group payments by booking to show booking-level payment information
+    bookings_data = {}
+    for booking in lodge_bookings:
+        # Calculate actual totals from all payments for this booking
+        all_payments = Payment.objects.filter(booking=booking).exclude(payment_type='refund')
+        all_refunds = Payment.objects.filter(booking=booking, payment_type='refund')
+        total_paid = all_payments.aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        total_refunded = all_refunds.aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        net_paid = max(Decimal('0'), total_paid - total_refunded)
+        
+        # Get total amount using ONLY room's base_rate (no property rent_amount fallback)
+        # For lodge bookings, room assignment is mandatory, so base_rate comes from room only
+        # NOTE: Venues are handled separately - they use time-based calculation, not date-based
+        is_venue = booking.property_obj and booking.property_obj.property_type.name.lower() == 'venue'
+        stored_total = booking.total_amount or Decimal('0')
+        
+        if is_venue:
+            # For venues: ALWAYS use stored total_amount (manually entered from form)
+            # Venues calculate days from start_time/end_time, which is different from lodge
+            # DO NOT sync or calculate for venues - use what was entered
+            total_required = stored_total
+        else:
+            # For lodges: sync with calculated_total_amount if needed
+            calculated_total = booking.calculated_total_amount if booking.calculated_total_amount and booking.calculated_total_amount > 0 else Decimal('0')
+            
+            # Sync total_amount with calculated_total_amount if there's a mismatch
+            # This ensures consistency between bookings and payments views
+            # calculated_total_amount uses booking.base_rate which now ONLY uses room.base_rate
+            if calculated_total > 0 and abs(stored_total - calculated_total) > Decimal('0.01'):
+                booking.total_amount = calculated_total
+                booking.save()
+            
+            # Use calculated_total_amount if available, otherwise use stored total_amount
+            # Both should now be based on room.base_rate only (no property rent_amount)
+            total_required = calculated_total if calculated_total > 0 else stored_total
+        
+        remaining = max(Decimal('0'), total_required - net_paid)
+        
+        # Update booking's paid_amount if inconsistent
+        if abs(booking.paid_amount - net_paid) > Decimal('0.01'):
+            booking.paid_amount = net_paid
+            booking.update_payment_status()
+            booking.save()
+        
+        # Get payment count and last payment date
+        payment_count = all_payments.count()
+        last_payment = all_payments.order_by('-payment_date').first()
+        
+        bookings_data[booking.id] = {
+            'booking': booking,
+            'total_required': total_required,
+            'paid_so_far': net_paid,
+            'remaining': remaining,
+            'payment_count': payment_count,
+            'last_payment_date': last_payment.payment_date if last_payment else None,
+            'last_payment_method': last_payment.payment_method if last_payment else None,
+        }
+    
+    # Convert to list for display
+    all_payments_data = list(bookings_data.values())
+    
+    # Sort by last payment date or booking creation date
+    all_payments_data.sort(key=lambda x: x['last_payment_date'] or x['booking'].created_at, reverse=True)
     
     # Pagination
-    from django.core.paginator import Paginator
-    page_size = request.GET.get('page_size', '10')
+    page_size = request.GET.get('page_size', '5')  # Default to 5
     try:
         page_size = int(page_size)
         if page_size not in [5, 10, 25, 50]:
-            page_size = 10
+            page_size = 5
     except (ValueError, TypeError):
-        page_size = 10
+        page_size = 5
     
-    paginator = Paginator(payments, page_size)
+    paginator = Paginator(all_payments_data, page_size)
     page_number = request.GET.get('page')
-    
-    try:
-        payments_page = paginator.get_page(page_number)
-    except:
-        payments_page = paginator.get_page(1)
+    payments_page = paginator.get_page(page_number)
     
     # Calculate payment statistics
-    total_payments = paginator.count
-    total_amount = sum(payment.amount for payment in payments)
-    paid_bookings = payments.count()  # All payments are considered paid
+    total_payments = len(all_payments_data)
+    total_amount = sum(item['total_required'] for item in all_payments_data)
+    paid_bookings = sum(1 for item in all_payments_data if item['booking'].payment_status == 'paid')
     
     context = {
         'lodge_properties': lodge_properties,
         'selected_property': selected_property,
-        'payments': payments_page,
+        'payments': payments_page,  # Paginated payment data (booking-level)
+        'payments_all': all_payments_data,  # For stats
         'bookings': bookings,
         'total_payments': total_payments,
         'total_amount': total_amount,
@@ -2548,16 +2920,16 @@ def venue_dashboard(request):
             # Store selected property in session
             request.session['selected_venue_property_id'] = selected_property_id
             
-            # Get stats for selected property
+            # Get stats for selected property - exclude cancelled bookings
             capacity = selected_property.capacity or 0
-            bookings = Booking.objects.filter(property_obj=selected_property)
+            bookings = Booking.objects.filter(property_obj=selected_property).exclude(booking_status='cancelled')
             total_bookings = bookings.count()
             active_bookings = bookings.filter(booking_status__in=['confirmed', 'checked_in']).count()
             revenue = sum(booking.total_amount for booking in bookings.filter(payment_status='paid'))
             
-            # Get today's events
+            # Get today's events - exclude cancelled bookings
             today = timezone.now().date()
-            todays_events = bookings.filter(check_in_date=today).select_related('customer')
+            todays_events = bookings.filter(check_in_date=today).exclude(booking_status='cancelled').select_related('customer')
             
             # Add pagination for today's events
             from django.core.paginator import Paginator
@@ -2565,11 +2937,11 @@ def venue_dashboard(request):
             todays_events_page = request.GET.get('todays_page')
             todays_events = todays_events_paginator.get_page(todays_events_page)
             
-            # Get upcoming events (next 7 days)
+            # Get upcoming events (next 7 days) - exclude cancelled bookings
             week_from_now = today + timedelta(days=7)
             upcoming_events = bookings.filter(
                 check_in_date__range=[today + timedelta(days=1), week_from_now]
-            ).select_related('customer').order_by('check_in_date')[:5]
+            ).exclude(booking_status='cancelled').select_related('customer').order_by('check_in_date')[:5]
             
         except Property.DoesNotExist:
             selected_property = None
@@ -2584,16 +2956,16 @@ def venue_dashboard(request):
         # Get stats for all venues (filtered by owner if not admin)
         capacity = sum(prop.capacity or 0 for prop in venue_properties)
         if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
-            bookings = Booking.objects.filter(property_obj__property_type__name__iexact='venue', property_obj__owner=request.user)
+            bookings = Booking.objects.filter(property_obj__property_type__name__iexact='venue', property_obj__owner=request.user).exclude(booking_status='cancelled')
         else:
-            bookings = Booking.objects.filter(property_obj__property_type__name__iexact='venue')
+            bookings = Booking.objects.filter(property_obj__property_type__name__iexact='venue').exclude(booking_status='cancelled')
         total_bookings = bookings.count()
         active_bookings = bookings.filter(booking_status__in=['confirmed', 'checked_in']).count()
         revenue = sum(booking.total_amount for booking in bookings.filter(payment_status='paid'))
         
-        # Get today's events for all venues
+        # Get today's events for all venues - exclude cancelled bookings
         today = timezone.now().date()
-        todays_events = bookings.filter(check_in_date=today).select_related('customer', 'property_obj')
+        todays_events = bookings.filter(check_in_date=today).exclude(booking_status='cancelled').select_related('customer', 'property_obj')
         
         # Add pagination for today's events
         from django.core.paginator import Paginator
@@ -2601,16 +2973,16 @@ def venue_dashboard(request):
         todays_events_page = request.GET.get('todays_page')
         todays_events = todays_events_paginator.get_page(todays_events_page)
         
-        # Get upcoming events (next 7 days)
+        # Get upcoming events (next 7 days) - exclude cancelled bookings
         week_from_now = today + timedelta(days=7)
         upcoming_events = bookings.filter(
             check_in_date__range=[today + timedelta(days=1), week_from_now]
-        ).select_related('customer', 'property_obj').order_by('check_in_date')[:5]
+        ).exclude(booking_status='cancelled').select_related('customer', 'property_obj').order_by('check_in_date')[:5]
     
-    # Calculate additional metrics
+    # Calculate additional metrics - exclude cancelled bookings from occupancy calculation
     occupancy_rate = 0
     if capacity > 0:
-        total_guests = sum(booking.number_of_guests or 0 for booking in bookings.filter(booking_status__in=['confirmed', 'checked_in']))
+        total_guests = sum(booking.number_of_guests or 0 for booking in bookings.filter(booking_status__in=['confirmed', 'checked_in']).exclude(booking_status='cancelled'))
         occupancy_rate = min(100, (total_guests / capacity) * 100)
     
     context = {
@@ -2644,18 +3016,26 @@ def venue_bookings(request):
     else:
         venue_properties = Property.objects.filter(property_type__name__iexact='venue')
     
-    # Get bookings from properties.Booking (web admin bookings)
-    if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
-        bookings_query = Booking.objects.filter(property_obj__property_type__name__iexact='venue', property_obj__owner=request.user).select_related('customer', 'property_obj').order_by('-created_at')
-        doc_bookings_query = DocumentBooking.objects.filter(property_ref__property_type__name__iexact='venue', property_ref__owner=request.user).select_related('property_ref', 'tenant').order_by('-created_at')
-    else:
-        bookings_query = Booking.objects.filter(property_obj__property_type__name__iexact='venue').select_related('customer', 'property_obj').order_by('-created_at')
-        doc_bookings_query = DocumentBooking.objects.filter(property_ref__property_type__name__iexact='venue').select_related('property_ref', 'tenant').order_by('-created_at')
-    
     # Get search and filter parameters
     search_query = request.GET.get('search', '').strip()
     status_filter = request.GET.get('status', '')
     payment_filter = request.GET.get('payment_status', '')
+    show_deleted = request.GET.get('show_deleted', 'false').lower() == 'true'  # Filter for soft-deleted bookings
+    
+    # Get bookings from properties.Booking (web admin bookings)
+    # By default, exclude soft-deleted bookings unless show_deleted is True
+    if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
+        bookings_query = Booking.objects.filter(property_obj__property_type__name__iexact='venue', property_obj__owner=request.user)
+        doc_bookings_query = DocumentBooking.objects.filter(property_ref__property_type__name__iexact='venue', property_ref__owner=request.user).select_related('property_ref', 'tenant').order_by('-created_at')
+    else:
+        bookings_query = Booking.objects.filter(property_obj__property_type__name__iexact='venue')
+        doc_bookings_query = DocumentBooking.objects.filter(property_ref__property_type__name__iexact='venue').select_related('property_ref', 'tenant').order_by('-created_at')
+    
+    # Filter soft-deleted bookings based on show_deleted parameter
+    if not show_deleted:
+        bookings_query = bookings_query.filter(is_deleted=False)
+    
+    bookings_query = bookings_query.select_related('customer', 'property_obj').order_by('-created_at')
     
     # Filter by selected property if specified
     selected_property = None
@@ -2691,6 +3071,7 @@ def venue_bookings(request):
         'search_query': search_query,
         'status_filter': status_filter,
         'payment_filter': payment_filter,
+        'show_deleted': show_deleted,
     }
     return render(request, 'properties/venue_bookings.html', context)
 
@@ -2832,11 +3213,21 @@ def venue_customers(request):
 
 @login_required
 def venue_payments(request):
-    """Venue payment management"""
+    """Venue payment management - matches hotel/lodge pattern"""
+    from django.db.models import Sum, Q
     from django.core.paginator import Paginator
+    from collections import defaultdict
+    from decimal import Decimal
     
-    # Get selected property from session or request
-    selected_property_id = request.session.get('selected_venue_property_id') or request.GET.get('property_id')
+    # Get selected property from request parameter or session
+    url_property_id = request.GET.get('property_id')
+    session_property_id = request.session.get('selected_venue_property_id')
+    
+    # Use URL parameter if present, otherwise use session
+    selected_property_id = url_property_id or session_property_id
+    
+    # Validate selected_property_id - handle 'all' case
+    selected_property_id = validate_property_id(selected_property_id)
     
     # Get venue properties - MULTI-TENANCY: Filter by owner for data isolation
     if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
@@ -2844,7 +3235,7 @@ def venue_payments(request):
     else:
         venue_properties = Property.objects.filter(property_type__name__iexact='venue')
     
-    # Filter payments based on selected property
+    # Get bookings for the Record Payment dropdown (filtered by owner if not admin)
     if selected_property_id:
         try:
             # MULTI-TENANCY: Ensure owner can only access their own properties
@@ -2852,45 +3243,134 @@ def venue_payments(request):
                 selected_property = Property.objects.get(id=selected_property_id, property_type__name__iexact='venue', owner=request.user)
             else:
                 selected_property = Property.objects.get(id=selected_property_id, property_type__name__iexact='venue')
-            payments = Payment.objects.filter(
-                booking__property_obj=selected_property
-            ).select_related('booking', 'booking__customer', 'recorded_by').order_by('-payment_date')
-            bookings = Booking.objects.filter(property_obj=selected_property)
-            # Store selected property in session
-            request.session['selected_venue_property_id'] = selected_property_id
+            bookings = Booking.objects.filter(
+                property_obj=selected_property
+            ).exclude(booking_status='cancelled').select_related('customer', 'property_obj').order_by('-created_at')
+            # Store selected property in session only if it came from URL parameter (new selection)
+            if url_property_id:
+                request.session['selected_venue_property_id'] = selected_property_id
+                request.session.modified = True
         except Property.DoesNotExist:
             selected_property = None
-            payments = Payment.objects.none()
             bookings = Booking.objects.none()
     else:
         selected_property = None
-        # Show all payments for venue bookings (filtered by owner if not admin)
         if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
-            payments = Payment.objects.filter(
-                booking__property_obj__property_type__name__iexact='venue',
-                booking__property_obj__owner=request.user
-            ).select_related('booking', 'booking__customer', 'recorded_by').order_by('-payment_date')
-            bookings = Booking.objects.filter(property_obj__property_type__name__iexact='venue', property_obj__owner=request.user)
+            bookings = Booking.objects.filter(
+                property_obj__property_type__name__iexact='venue',
+                property_obj__owner=request.user
+            ).exclude(booking_status='cancelled').select_related('customer', 'property_obj').order_by('-created_at')
         else:
-            payments = Payment.objects.filter(
-                booking__property_obj__property_type__name__iexact='venue'
-            ).select_related('booking', 'booking__customer', 'recorded_by').order_by('-payment_date')
-            bookings = Booking.objects.filter(property_obj__property_type__name__iexact='venue')
+            bookings = Booking.objects.filter(
+                property_obj__property_type__name__iexact='venue'
+            ).exclude(booking_status='cancelled').select_related('customer', 'property_obj').order_by('-created_at')
     
-    # Add pagination
-    paginator = Paginator(payments, 10)  # Show 10 payments per page
+    # Get all venue bookings (for grouping payments by booking) - exclude cancelled bookings
+    if selected_property_id and selected_property:
+        venue_bookings = Booking.objects.filter(
+            property_obj=selected_property
+        ).exclude(booking_status='cancelled').select_related('customer', 'property_obj')
+    else:
+        if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
+            venue_bookings = Booking.objects.filter(
+                property_obj__property_type__name__iexact='venue',
+                property_obj__owner=request.user
+            ).exclude(booking_status='cancelled').select_related('customer', 'property_obj')
+        else:
+            venue_bookings = Booking.objects.filter(
+                property_obj__property_type__name__iexact='venue'
+            ).exclude(booking_status='cancelled').select_related('customer', 'property_obj')
+    
+    # Group payments by booking to show booking-level payment information
+    bookings_data = {}
+    for booking in venue_bookings:
+        # Calculate actual totals from all payments for this booking
+        all_payments = Payment.objects.filter(booking=booking).exclude(payment_type='refund')
+        all_refunds = Payment.objects.filter(booking=booking, payment_type='refund')
+        total_paid = all_payments.aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        total_refunded = all_refunds.aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        net_paid = max(Decimal('0'), total_paid - total_refunded)
+        
+        # Get total amount - handle venues separately (venues use time-based calculation, not date-based)
+        is_venue = booking.property_obj and booking.property_obj.property_type.name.lower() == 'venue'
+        stored_total = booking.total_amount or Decimal('0')
+        
+        if is_venue:
+            # For venues: ALWAYS use stored total_amount (manually entered from form)
+            # Venues calculate days from start_time/end_time, which is different from hotel/lodge
+            # DO NOT sync or calculate for venues - use what was entered
+            total_required = stored_total
+        else:
+            # For hotel/lodge: sync with calculated_total_amount if needed
+            calculated_total = booking.calculated_total_amount if booking.calculated_total_amount and booking.calculated_total_amount > 0 else Decimal('0')
+            
+            # Sync total_amount with calculated_total_amount if there's a mismatch
+            # Only sync if calculated_total is valid (> 0) and stored_total is 0 or significantly different
+            if calculated_total > 0:
+                # If stored_total is 0 or empty, use calculated_total
+                if stored_total == 0:
+                    booking.total_amount = calculated_total
+                    booking.save()
+                # If there's a significant mismatch (more than 1% difference), sync
+                elif abs(stored_total - calculated_total) > Decimal('0.01') and abs(stored_total - calculated_total) / max(stored_total, calculated_total) > Decimal('0.01'):
+                    # Only sync if calculated is reasonable (not zero and not way off)
+                    booking.total_amount = calculated_total
+                    booking.save()
+            
+            # Use calculated_total_amount if available, otherwise use stored total_amount
+            total_required = calculated_total if calculated_total > 0 else stored_total
+        
+        remaining = max(Decimal('0'), total_required - net_paid)
+        
+        # Update booking's paid_amount if inconsistent
+        if abs(booking.paid_amount - net_paid) > Decimal('0.01'):
+            booking.paid_amount = net_paid
+            booking.update_payment_status()
+            booking.save()
+        
+        # Get payment count and last payment date
+        payment_count = all_payments.count()
+        last_payment = all_payments.order_by('-payment_date').first()
+        
+        bookings_data[booking.id] = {
+            'booking': booking,
+            'total_required': total_required,
+            'paid_so_far': net_paid,
+            'remaining': remaining,
+            'payment_count': payment_count,
+            'last_payment_date': last_payment.payment_date if last_payment else None,
+            'last_payment_method': last_payment.payment_method if last_payment else None,
+        }
+    
+    # Convert to list for display
+    all_payments_data = list(bookings_data.values())
+    
+    # Sort by last payment date or booking creation date
+    all_payments_data.sort(key=lambda x: x['last_payment_date'] or x['booking'].created_at, reverse=True)
+    
+    # Pagination
+    page_size = request.GET.get('page_size', '5')  # Default to 5
+    try:
+        page_size = int(page_size)
+        if page_size not in [5, 10, 25, 50]:
+            page_size = 5
+    except (ValueError, TypeError):
+        page_size = 5
+    
+    paginator = Paginator(all_payments_data, page_size)
     page_number = request.GET.get('page')
     payments_page = paginator.get_page(page_number)
     
     # Calculate payment statistics
-    total_payments = paginator.count
-    total_amount = sum(payment.amount for payment in payments)
-    paid_bookings = payments.count()  # All payments are considered paid
+    total_payments = len(all_payments_data)
+    total_amount = sum(item['total_required'] for item in all_payments_data)
+    paid_bookings = sum(1 for item in all_payments_data if item['booking'].payment_status == 'paid')
     
     context = {
         'venue_properties': venue_properties,
         'selected_property': selected_property,
-        'payments': payments_page,
+        'payments': payments_page,  # Paginated payment data (booking-level)
+        'payments_all': all_payments_data,  # For stats
         'bookings': bookings,
         'total_payments': total_payments,
         'total_amount': total_amount,
@@ -4924,16 +5404,27 @@ def add_hotel_room(request):
             messages.error(request, 'Selected hotel not found.')
             return redirect('properties:hotel_select_property')
         
+        # Validate base_rate is set and greater than 0
+        # Each room MUST have its own price - no default/fallback pricing
+        base_rate = float(request.POST.get('base_rate', 0))
+        if not base_rate or base_rate <= 0:
+            messages.error(request, 'Base Rate is required and must be greater than 0. Each room must have its own price set.')
+            return redirect('properties:hotel_rooms')
+        
+        # Handle floor_number - can be empty string, need to convert properly
+        floor_number_str = request.POST.get('floor_number', '').strip()
+        floor_number = int(floor_number_str) if floor_number_str and floor_number_str.isdigit() else None
+        
         # Create room
         room = Room.objects.create(
             property_obj=selected_property,
             room_number=request.POST.get('room_number'),
             room_type=request.POST.get('room_type'),
-            floor_number=int(request.POST.get('floor_number', 0)) or None,
+            floor_number=floor_number,
             capacity=int(request.POST.get('capacity', 1)),
             bed_type=request.POST.get('bed_type'),
             amenities=request.POST.get('amenities'),
-            base_rate=float(request.POST.get('base_rate', 0)),
+            base_rate=base_rate,  # This is the ONLY source of pricing for this room
         )
         
         messages.success(request, f'Room {room.room_number} added successfully!')
@@ -4974,16 +5465,27 @@ def add_lodge_room(request):
             messages.error(request, 'Selected lodge not found.')
             return redirect('properties:lodge_select_property')
         
+        # Validate base_rate is set and greater than 0
+        # Each room MUST have its own price - no default/fallback pricing
+        base_rate = float(request.POST.get('base_rate', 0))
+        if not base_rate or base_rate <= 0:
+            messages.error(request, 'Base Rate is required and must be greater than 0. Each room must have its own price set.')
+            return redirect('properties:lodge_rooms')
+        
+        # Handle floor_number - can be empty string, need to convert properly
+        floor_number_str = request.POST.get('floor_number', '').strip()
+        floor_number = int(floor_number_str) if floor_number_str and floor_number_str.isdigit() else None
+        
         # Create room
         room = Room.objects.create(
             property_obj=selected_property,
             room_number=request.POST.get('room_number'),
             room_type=request.POST.get('room_type'),
-            floor_number=int(request.POST.get('floor_number', 0)) or None,
+            floor_number=floor_number,
             capacity=int(request.POST.get('capacity', 1)),
             bed_type=request.POST.get('bed_type'),
             amenities=request.POST.get('amenities'),
-            base_rate=float(request.POST.get('base_rate', 0)),
+            base_rate=base_rate,  # This is the ONLY source of pricing for this room
         )
         
         messages.success(request, f'Room {room.room_number} added successfully!')
@@ -5798,15 +6300,13 @@ def create_payment(request, booking_id=None, payment_id=None):
     # Update payment status based on actual amounts
     booking.update_payment_status()
     
-    # Log if there's a data inconsistency for debugging
+    # Note: Overpayments are not allowed - validation prevents paid > total
+    # If this condition is true, it indicates a data inconsistency that should be investigated
+    overpayment = 0
     if net_paid_amount > total_amount and total_amount > 0:
         import logging
         logger = logging.getLogger(__name__)
-        logger.warning(f"Booking {booking.id} ({booking.booking_reference}): Paid ({net_paid_amount}) exceeds total ({total_amount}). Possible overpayment or refund issue.")
-    
-    # Calculate difference for display if there's an inconsistency
-    overpayment = 0
-    if net_paid_amount > total_amount and total_amount > 0:
+        logger.error(f"Booking {booking.id} ({booking.booking_reference}): Data inconsistency detected - Paid ({net_paid_amount}) exceeds total ({total_amount}). This should not happen with proper validation.")
         overpayment = float(net_paid_amount - total_amount)
     
     context = {
@@ -5905,35 +6405,145 @@ def api_payment_details(request, payment_id):
 
 @login_required
 def api_create_booking(request):
-    """API endpoint to create booking from modal form"""
+    """API endpoint to create booking from modal form - supports hotel, lodge, and venue"""
     if request.method == 'POST':
         try:
-            # Get selected property from session
-            selected_property_id = request.session.get('selected_hotel_property_id')
+            # CRITICAL: Determine property type from HTTP_REFERER or venue parameter
+            referer = request.META.get('HTTP_REFERER', '')
+            property_type = None
+            
+            # Check if venue is explicitly provided in POST data (for venue bookings)
+            venue_id = request.POST.get('venue', '').strip()
+            if venue_id:
+                property_type = 'venue'
+            # Check referer URL to determine if this is a hotel or lodge request
+            elif '/lodge/' in referer:
+                property_type = 'lodge'
+            elif '/hotel/' in referer:
+                property_type = 'hotel'
+            elif '/venue/' in referer:
+                property_type = 'venue'
+            
+            # If we cannot determine from referer or POST, return error
+            if not property_type:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Unable to determine property type. Please access this from a hotel, lodge, or venue bookings page.'
+                }, status=400)
+            
+            # Get the correct property ID based on property type
+            if property_type == 'lodge':
+                selected_property_id = request.session.get('selected_lodge_property_id')
+                if not selected_property_id:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'No lodge selected. Please select a lodge first.'
+                    }, status=400)
+            elif property_type == 'hotel':
+                selected_property_id = request.session.get('selected_hotel_property_id')
+                if not selected_property_id:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'No hotel selected. Please select a hotel first.'
+                    }, status=400)
+            elif property_type == 'venue':
+                # For venues, use the venue ID from POST data
+                selected_property_id = venue_id
+                if not selected_property_id:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'No venue selected. Please select a venue.'
+                    }, status=400)
+            
             selected_property_id = validate_property_id(selected_property_id)
             
             if not selected_property_id:
                 return JsonResponse({
                     'success': False,
-                    'error': 'Please select a hotel first.'
+                    'error': f'No {property_type} selected. Please select a {property_type} first.'
                 }, status=400)
             
+            # Validate property type
+            if property_type not in ['hotel', 'lodge', 'venue']:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'This endpoint only supports hotel, lodge, and venue properties.'
+                }, status=400)
+            
+            # CRITICAL: Validate that the selected property matches the property type
+            # This ensures lodge NEVER reads hotel data and vice versa
             try:
-                selected_property = Property.objects.get(id=selected_property_id, property_type__name__iexact='hotel')
+                selected_property = Property.objects.get(id=selected_property_id)
+                actual_property_type = selected_property.property_type.name.lower() if selected_property.property_type else None
+                
+                if actual_property_type != property_type:
+                    return JsonResponse({
+                        'success': False,
+                        'error': f'Property type mismatch. Expected {property_type}, but property is {actual_property_type}. Lodge and Hotel are completely separate.'
+                    }, status=400)
+                
+                # Double-check with explicit filter
+                selected_property = Property.objects.get(id=selected_property_id, property_type__name__iexact=property_type)
             except Property.DoesNotExist:
                 return JsonResponse({
                     'success': False,
-                    'error': 'Selected hotel not found.'
+                    'error': f'Selected {property_type} not found or type mismatch. Lodge and Hotel are completely separate.'
                 }, status=400)
             
-            # Get form data
+            # Get form data - different fields for venue vs hotel/lodge
             customer_name = request.POST.get('customer_name', '').strip()
             phone = request.POST.get('phone', '').strip()
             email = request.POST.get('email', '').strip()
-            room_type = request.POST.get('room_type', '').strip()
-            room_number = request.POST.get('room_number', '').strip()
-            check_in_date = request.POST.get('check_in_date', '').strip()
-            check_out_date = request.POST.get('check_out_date', '').strip()
+            
+            # For venue bookings, use different field names
+            if property_type == 'venue':
+                event_name = request.POST.get('event_name', '').strip()
+                event_type = request.POST.get('event_type', '').strip()
+                event_date = request.POST.get('event_date', '').strip()
+                check_in_date = event_date  # For venues, event_date is check_in_date
+                check_out_date = request.POST.get('check_out_date', '').strip() or event_date
+                number_of_guests = int(request.POST.get('expected_guests', request.POST.get('number_of_guests', 1)))
+                total_amount = float(request.POST.get('total_amount', 0))
+                special_requests = request.POST.get('special_requirements', request.POST.get('special_requests', '')).strip()
+                room_type = event_type  # Use event_type as room_type for venues
+                room_number = None  # Venues don't have rooms
+                
+                # Validate venue capacity
+                if selected_property.capacity and number_of_guests > selected_property.capacity:
+                    return JsonResponse({
+                        'success': False,
+                        'error': f'Expected guests ({number_of_guests}) exceeds venue capacity ({selected_property.capacity}).'
+                    }, status=400)
+                
+                # Validate required fields for venue
+                if not all([event_name, customer_name, phone, email, event_type, event_date]):
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Please fill in all required fields including event name, customer name, phone number, email, event type, and event date.'
+                    }, status=400)
+                
+                # Validate total_amount is provided and greater than 0
+                if not total_amount or total_amount <= 0:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Total amount must be greater than 0. Please ensure the amount is calculated correctly.'
+                    }, status=400)
+            else:
+                # Hotel/Lodge bookings
+                room_type = request.POST.get('room_type', '').strip()
+                room_number = request.POST.get('room_number', '').strip()
+                check_in_date = request.POST.get('check_in_date', '').strip()
+                check_out_date = request.POST.get('check_out_date', '').strip()
+                number_of_guests = int(request.POST.get('number_of_guests', 1))
+                total_amount = float(request.POST.get('total_amount', 0))
+                special_requests = request.POST.get('special_requests', '').strip()
+                
+                # Validate required fields for hotel/lodge
+                if not all([customer_name, phone, email, room_type, check_in_date, check_out_date, total_amount]):
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Please fill in all required fields including customer name, phone number, and email.'
+                    }, status=400)
             
             # Check property availability
             from datetime import datetime
@@ -5951,15 +6561,14 @@ def api_create_booking(request):
                     'success': False,
                     'error': 'Invalid date format.'
                 }, status=400)
-            number_of_guests = int(request.POST.get('number_of_guests', 1))
-            total_amount = float(request.POST.get('total_amount', 0))
-            special_requests = request.POST.get('special_requests', '').strip()
             
-            # Validate required fields
-            if not all([customer_name, phone, room_type, check_in_date, check_out_date, total_amount]):
+            # Validate email format
+            import re
+            email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+            if not re.match(email_pattern, email):
                 return JsonResponse({
                     'success': False,
-                    'error': 'Please fill in all required fields.'
+                    'error': 'Please provide a valid email address.'
                 }, status=400)
             
             # Parse customer name
@@ -5967,68 +6576,110 @@ def api_create_booking(request):
             first_name = name_parts[0]
             last_name = name_parts[1] if len(name_parts) > 1 else ''
             
-            # Create customer
-            customer, created = Customer.objects.get_or_create(
-                email=email if email else f"{phone}@temp.com",
-                defaults={
-                    'first_name': first_name,
-                    'last_name': last_name,
-                    'phone': phone,
-                }
-            )
+            # Create or get customer - email is UNIQUE, so use it as primary identifier
+            # Since email is unique, we can safely look up by email and update other fields
+            try:
+                customer, created = Customer.objects.get_or_create(
+                    email=email,
+                    defaults={
+                        'first_name': first_name,
+                        'last_name': last_name,
+                        'phone': phone,
+                    }
+                )
+                
+                # If customer already existed (not created), update name and phone if different
+                if not created:
+                    updated = False
+                    if customer.first_name != first_name or customer.last_name != last_name:
+                        customer.first_name = first_name
+                        customer.last_name = last_name
+                        updated = True
+                    if customer.phone != phone:
+                        customer.phone = phone
+                        updated = True
+                    if updated:
+                        customer.save()
+            except Exception as e:
+                # Handle any database errors (e.g., unique constraint violation)
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Error creating/updating customer: {str(e)}")
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Error saving customer information: {str(e)}. Please check that the email is unique.'
+                }, status=400)
+            
+            # Generate booking reference based on property type
+            if property_type == 'lodge':
+                booking_reference = f"LDG-{Booking.objects.count() + 1:06d}"
+            elif property_type == 'venue':
+                booking_reference = f"VEN-{Booking.objects.count() + 1:06d}"
+            else:
+                booking_reference = f"HTL-{Booking.objects.count() + 1:06d}"
+            
+            # For venue bookings, use event_name as special_requests if provided
+            if property_type == 'venue' and event_name:
+                special_requests = f"{event_name}" + (f" - {special_requests}" if special_requests else "")
+            
+            # Create booking - ensure total_amount is Decimal
+            from decimal import Decimal
+            total_amount_decimal = Decimal(str(total_amount)) if total_amount else Decimal('0')
             
             # Create booking
             booking = Booking.objects.create(
                 property_obj=selected_property,
                 customer=customer,
-                booking_reference=f"HTL-{Booking.objects.count() + 1:06d}",
+                booking_reference=booking_reference,
                 check_in_date=check_in_date,
                 check_out_date=check_out_date,
                 number_of_guests=number_of_guests,
                 room_type=room_type,
-                total_amount=total_amount,
+                total_amount=total_amount_decimal,
                 special_requests=special_requests,
                 created_by=request.user,
             )
             
-            # Handle room assignment - room selection is mandatory
+            # Handle room assignment - only for hotel/lodge, not venues
             room_assigned = False
             room_message = ""
             
-            if not room_number:
-                return JsonResponse({
-                    'success': False,
-                    'error': 'Please select a room number.'
-                }, status=400)
-            
-            # Validate and assign the selected room
-            try:
-                room = Room.objects.get(
-                    property_obj=selected_property, 
-                    room_number=room_number,
-                    room_type=room_type
-                )
-                
-                if room.status == 'available':
-                    # Assign the selected room
-                    booking.room_number = room_number
-                    room.current_booking = booking
-                    room.status = 'occupied'
-                    room.save()
-                    booking.save()
-                    room_assigned = True
-                    room_message = f"Room {room_number} assigned successfully"
-                else:
+            if property_type != 'venue':
+                # Room selection is mandatory for hotel/lodge
+                if not room_number:
                     return JsonResponse({
                         'success': False,
-                        'error': f'Room {room_number} is not available (Status: {room.status}). Please select an available room.'
+                        'error': 'Please select a room number.'
                     }, status=400)
+                
+                # Validate and assign the selected room
+                try:
+                    room = Room.objects.get(
+                        property_obj=selected_property, 
+                        room_number=room_number,
+                        room_type=room_type
+                    )
                     
-            except Room.DoesNotExist:
-                return JsonResponse({
-                    'success': False,
-                    'error': f'Room {room_number} not found. Please select a valid room.'
-                }, status=400)
+                    if room.status == 'available':
+                        # Assign the selected room
+                        booking.room_number = room_number
+                        room.current_booking = booking
+                        room.status = 'occupied'
+                        room.save()
+                        booking.save()
+                        room_assigned = True
+                        room_message = f"Room {room_number} assigned successfully"
+                    else:
+                        return JsonResponse({
+                            'success': False,
+                            'error': f'Room {room_number} is not available (Status: {room.status}). Please select an available room.'
+                        }, status=400)
+                        
+                except Room.DoesNotExist:
+                    return JsonResponse({
+                        'success': False,
+                        'error': f'Room {room_number} not found. Please select a valid room.'
+                    }, status=400)
             
             return JsonResponse({
                 'success': True,
@@ -6053,38 +6704,196 @@ def api_create_booking(request):
 
 @login_required
 def api_available_rooms(request):
-    """API endpoint to get available rooms for booking modal"""
+    """API endpoint to get available rooms for booking modal - STRICTLY separates hotel and lodge"""
     try:
-        # Get selected property from session
-        selected_property_id = request.session.get('selected_hotel_property_id')
+        # CRITICAL: Determine property type from HTTP_REFERER - this is REQUIRED
+        # Lodge and Hotel are COMPLETELY SEPARATE - never mix them
+        referer = request.META.get('HTTP_REFERER', '')
+        property_type = None
+        
+        # Check referer URL to determine if this is a hotel or lodge request
+        # This is the PRIMARY way to determine context - no fallbacks that mix
+        if '/lodge/' in referer:
+            property_type = 'lodge'
+        elif '/hotel/' in referer:
+            property_type = 'hotel'
+        
+        # If we cannot determine from referer, return error - DO NOT GUESS
+        if not property_type:
+            return JsonResponse({
+                'success': False,
+                'error': 'Unable to determine property type. Please access this from a hotel or lodge bookings page.'
+            }, status=400)
+        
+        # Get the correct property ID based on property type - STRICTLY SEPARATE
+        if property_type == 'lodge':
+            selected_property_id = request.session.get('selected_lodge_property_id')
+            # Validate that we're using lodge data, not hotel
+            if not selected_property_id:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'No lodge selected. Please select a lodge first.'
+                }, status=400)
+        elif property_type == 'hotel':
+            selected_property_id = request.session.get('selected_hotel_property_id')
+            # Validate that we're using hotel data, not lodge
+            if not selected_property_id:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'No hotel selected. Please select a hotel first.'
+                }, status=400)
+        
         selected_property_id = validate_property_id(selected_property_id)
         
-        # For now, always get rooms for all hotels to ensure data is available
-        rooms = Room.objects.filter(property_obj__property_type__name__iexact='hotel')
+        if not selected_property_id:
+            return JsonResponse({
+                'success': False,
+                'error': f'No {property_type} selected. Please select a {property_type} first.'
+            }, status=400)
         
-        # If a specific hotel is selected, filter by it
-        if selected_property_id:
-            rooms = rooms.filter(property_obj_id=selected_property_id)
+        # CRITICAL: Validate that the selected property matches the property type
+        # This ensures lodge NEVER reads hotel data and vice versa
+        try:
+            selected_property = Property.objects.get(id=selected_property_id)
+            actual_property_type = selected_property.property_type.name.lower() if selected_property.property_type else None
+            
+            if actual_property_type != property_type:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Property type mismatch. Expected {property_type}, but property is {actual_property_type}. Lodge and Hotel are completely separate.'
+                }, status=400)
+        except Property.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'error': f'{property_type.capitalize()} property not found.'
+            }, status=404)
+        
+        # Get rooms for hotel or lodge - STRICTLY filtered by property type
+        rooms = Room.objects.filter(
+            property_obj__property_type__name__iexact=property_type,
+            property_obj_id=selected_property_id
+        )
         
         rooms_data = []
         for room in rooms:
-            rooms_data.append({
-                'id': room.id,
-                'room_number': room.room_number,
-                'room_type': room.room_type,
-                'capacity': room.capacity,
-                'base_rate': float(room.base_rate),
-                'status': room.status,
-                'floor_number': room.floor_number,
-                'bed_type': room.bed_type,
-                'amenities': room.amenities,
-            })
+            # Only include rooms that have a valid base_rate set
+            # Each room MUST have its own price - no default/fallback pricing
+            if room.base_rate and room.base_rate > 0:
+                # Sync room status to ensure it's up-to-date with bookings
+                # This fixes cases where current_booking points to cancelled bookings
+                room.sync_status_from_bookings()
+                
+                rooms_data.append({
+                    'id': room.id,
+                    'room_number': room.room_number,
+                    'room_type': room.room_type,
+                    'capacity': room.capacity,
+                    'base_rate': float(room.base_rate),  # Use ONLY room's base_rate - no fallback
+                    'status': room.status,
+                    'floor_number': room.floor_number,
+                    'bed_type': room.bed_type,
+                    'amenities': room.amenities,
+                })
+            # Skip rooms without a valid base_rate (they shouldn't be bookable)
         
         return JsonResponse({
             'success': True,
-            'rooms': rooms_data
+            'rooms': rooms_data,
+            'property_type': property_type
         })
         
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@login_required
+def api_hotel_room_status_summary(request, property_id):
+    """API endpoint to get hotel room status summary for quick view"""
+    from django.http import JsonResponse
+    from properties.models import Room, Booking
+    from django.utils import timezone
+    
+    try:
+        property_obj = Property.objects.get(id=property_id, property_type__name__iexact='hotel')
+        
+        # Get all rooms for this hotel
+        rooms = Room.objects.filter(property_obj=property_obj, is_active=True).select_related('current_booking', 'current_booking__customer')
+        
+        # Sync room statuses
+        for room in rooms:
+            room.sync_status_from_bookings()
+        
+        # Categorize rooms
+        available_rooms = []
+        occupied_rooms = []
+        maintenance_rooms = []
+        out_of_order_rooms = []
+        
+        for room in rooms:
+            room_data = {
+                'id': room.id,
+                'room_number': room.room_number,
+                'room_type': room.room_type,
+                'floor_number': room.floor_number,
+                'status': room.status,
+            }
+            
+            if room.status == 'available':
+                available_rooms.append(room_data)
+            elif room.status == 'occupied':
+                # Get booking info if available
+                booking_info = None
+                if room.current_booking:
+                    booking_info = {
+                        'booking_id': room.current_booking.id,
+                        'customer_name': room.current_booking.customer.full_name if room.current_booking.customer else 'N/A',
+                        'check_in': room.current_booking.check_in_date.strftime('%b %d, %Y') if room.current_booking.check_in_date else 'N/A',
+                        'check_out': room.current_booking.check_out_date.strftime('%b %d, %Y') if room.current_booking.check_out_date else 'N/A',
+                    }
+                room_data['booking'] = booking_info
+                occupied_rooms.append(room_data)
+            elif room.status == 'maintenance':
+                maintenance_rooms.append(room_data)
+            elif room.status == 'out_of_order':
+                out_of_order_rooms.append(room_data)
+        
+        # Calculate statistics
+        total_rooms = rooms.count()
+        available_count = len(available_rooms)
+        occupied_count = len(occupied_rooms)
+        maintenance_count = len(maintenance_rooms)
+        out_of_order_count = len(out_of_order_rooms)
+        
+        return JsonResponse({
+            'success': True,
+            'property': {
+                'id': property_obj.id,
+                'title': property_obj.title,
+                'address': property_obj.address,
+            },
+            'summary': {
+                'total_rooms': total_rooms,
+                'available_count': available_count,
+                'occupied_count': occupied_count,
+                'maintenance_count': maintenance_count,
+                'out_of_order_count': out_of_order_count,
+            },
+            'rooms': {
+                'available': available_rooms,
+                'occupied': occupied_rooms,
+                'maintenance': maintenance_rooms,
+                'out_of_order': out_of_order_rooms,
+            }
+        })
+        
+    except Property.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Hotel property not found'
+        }, status=404)
     except Exception as e:
         return JsonResponse({
             'success': False,
@@ -6151,8 +6960,9 @@ def api_collect_payment(request):
                 'error': f'Booking {booking.booking_reference} is already fully paid (Tsh{booking.total_amount:,.0f}). Please start a new booking for additional payments.'
             }, status=400)
         
-        # Calculate remaining balance
-        remaining_balance = booking.total_amount - booking.paid_amount
+        # Calculate remaining balance (use calculated_total_amount if available)
+        calculated_total = booking.calculated_total_amount if booking.calculated_total_amount and booking.calculated_total_amount > 0 else (booking.total_amount or 0)
+        remaining_balance = max(Decimal('0'), Decimal(str(calculated_total)) - booking.paid_amount)
         
         # Validate payment amount doesn't exceed remaining balance
         if payment_amount > remaining_balance:
@@ -6172,6 +6982,34 @@ def api_collect_payment(request):
             return JsonResponse({'error': 'Invalid payment date format'}, status=400)
         
         # Create new payment
+        # Validate payment amount doesn't exceed remaining balance
+        from django.db.models import Sum
+        current_paid = Payment.objects.filter(
+            booking=booking
+        ).exclude(
+            payment_type='refund'
+        ).aggregate(
+            total=Sum('amount')
+        )['total'] or Decimal('0')
+        
+        total_refunded = Payment.objects.filter(
+            booking=booking,
+            payment_type='refund'
+        ).aggregate(
+            total=Sum('amount')
+        )['total'] or Decimal('0')
+        
+        current_net_paid = max(Decimal('0'), current_paid - total_refunded)
+        calculated_total = booking.calculated_total_amount if booking.calculated_total_amount and booking.calculated_total_amount > 0 else (booking.total_amount or 0)
+        remaining_balance = max(Decimal('0'), Decimal(str(calculated_total)) - current_net_paid)
+        
+        # Validate payment amount doesn't exceed remaining balance
+        if payment_amount > remaining_balance:
+            return JsonResponse({
+                'success': False,
+                'error': f'Payment amount (Tsh{payment_amount:,.2f}) exceeds remaining balance (Tsh{remaining_balance:,.2f}). Maximum allowed: Tsh{remaining_balance:,.2f}'
+            }, status=400)
+        
         payment = Payment.objects.create(
             booking=booking,
             amount=payment_amount,
@@ -6183,8 +7021,17 @@ def api_collect_payment(request):
             recorded_by=request.user
         )
         
-        # Update booking payment status
-        booking.paid_amount += payment.amount
+        # Recalculate booking payment status from all payments
+        actual_paid = Payment.objects.filter(
+            booking=booking
+        ).exclude(
+            payment_type='refund'
+        ).aggregate(
+            total=Sum('amount')
+        )['total'] or Decimal('0')
+        
+        net_paid_amount = max(Decimal('0'), actual_paid - total_refunded)
+        booking.paid_amount = net_paid_amount
         booking.update_payment_status()
         booking.save()
         
@@ -7008,6 +7855,20 @@ def api_booking_cancel(request, booking_id):
                 booking.special_requests = f"{booking.special_requests or ''}\n\nCancellation Reason: {cancellation_reason}"
                 booking.save()
                 
+                # If booking has a room assigned, sync room status
+                # This applies to both hotel and lodge bookings
+                if booking.room_number and booking.property_obj:
+                    try:
+                        room = Room.objects.get(
+                            property_obj=booking.property_obj,
+                            room_number=booking.room_number
+                        )
+                        # Use the sync method to properly update room status based on all bookings
+                        room.sync_status_from_bookings()
+                    except Room.DoesNotExist:
+                        # Room might not exist (e.g., for house bookings), that's okay
+                        pass
+                
                 return JsonResponse({'success': True, 'message': 'Booking cancelled successfully'})
             except Exception as save_error:
                 import logging
@@ -7029,6 +7890,115 @@ def api_booking_cancel(request, booking_id):
         logger.error(f"Error loading booking cancel for booking {booking_id}: {str(e)}")
         logger.error(traceback.format_exc())
         return JsonResponse({'error': f'Error cancelling booking: {str(e)}'}, status=500)
+
+
+@login_required
+def api_booking_soft_delete(request, booking_id):
+    """Soft delete a booking - only allowed for cancelled or completed bookings"""
+    try:
+        booking = Booking.objects.select_related('customer', 'property_obj', 'property_obj__property_type', 'created_by').get(id=booking_id)
+        
+        # Check if user has permission (must be admin/staff)
+        if not (request.user.is_staff or request.user.is_superuser):
+            return JsonResponse({'error': 'Permission denied. Only admins can soft delete bookings.'}, status=403)
+        
+        if request.method == 'POST':
+            try:
+                # Only allow soft delete for cancelled or completed (checked_out) bookings
+                if booking.booking_status not in ['cancelled', 'checked_out']:
+                    return JsonResponse({
+                        'error': f'Cannot soft delete booking with status "{booking.get_booking_status_display()}". Only cancelled or completed bookings can be soft deleted.'
+                    }, status=400)
+                
+                # Check if already soft deleted
+                if booking.is_deleted:
+                    return JsonResponse({
+                        'error': 'Booking is already soft deleted.'
+                    }, status=400)
+                
+                # Soft delete the booking
+                from django.utils import timezone
+                booking.is_deleted = True
+                booking.deleted_at = timezone.now()
+                booking.deleted_by = request.user
+                booking.save()
+                
+                return JsonResponse({
+                    'success': True,
+                    'message': f'Booking {booking.booking_reference} has been soft deleted successfully.'
+                })
+            except Exception as save_error:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Error soft deleting booking {booking_id}: {str(save_error)}")
+                return JsonResponse({'error': f'Error soft deleting booking: {str(save_error)}'}, status=500)
+        
+        # GET request - return booking info for confirmation
+        context = {
+            'booking': booking,
+        }
+        return JsonResponse({
+            'booking_reference': booking.booking_reference,
+            'status': booking.booking_status,
+            'can_delete': booking.booking_status in ['cancelled', 'checked_out'] and not booking.is_deleted
+        })
+        
+    except Booking.DoesNotExist:
+        return JsonResponse({'error': 'Booking not found'}, status=404)
+    except Exception as e:
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error loading soft delete for booking {booking_id}: {str(e)}")
+        logger.error(traceback.format_exc())
+        return JsonResponse({'error': f'Error: {str(e)}'}, status=500)
+
+
+@login_required
+def api_booking_restore(request, booking_id):
+    """Restore a soft-deleted booking"""
+    try:
+        booking = Booking.objects.select_related('customer', 'property_obj', 'property_obj__property_type', 'created_by').get(id=booking_id)
+        
+        # Check if user has permission (must be admin/staff)
+        if not (request.user.is_staff or request.user.is_superuser):
+            return JsonResponse({'error': 'Permission denied. Only admins can restore bookings.'}, status=403)
+        
+        if request.method == 'POST':
+            try:
+                # Check if booking is soft deleted
+                if not booking.is_deleted:
+                    return JsonResponse({
+                        'error': 'Booking is not soft deleted.'
+                    }, status=400)
+                
+                # Restore the booking
+                booking.is_deleted = False
+                booking.deleted_at = None
+                booking.deleted_by = None
+                booking.save()
+                
+                return JsonResponse({
+                    'success': True,
+                    'message': f'Booking {booking.booking_reference} has been restored successfully.'
+                })
+            except Exception as save_error:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Error restoring booking {booking_id}: {str(save_error)}")
+                return JsonResponse({'error': f'Error restoring booking: {str(save_error)}'}, status=500)
+        
+        return JsonResponse({'error': 'Invalid request method'}, status=405)
+        
+    except Booking.DoesNotExist:
+        return JsonResponse({'error': 'Booking not found'}, status=404)
+    except Exception as e:
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error restoring booking {booking_id}: {str(e)}")
+        logger.error(traceback.format_exc())
+        return JsonResponse({'error': f'Error: {str(e)}'}, status=500)
 
 
 @login_required
@@ -7349,8 +8319,9 @@ def api_record_payment(request):
             from decimal import Decimal
             payment_amount = Decimal(str(amount))
             
-            # Validate amount against booking balance
-            remaining_balance = booking.total_amount - booking.paid_amount
+            # Calculate remaining balance (use calculated_total_amount if available)
+            calculated_total = booking.calculated_total_amount if booking.calculated_total_amount and booking.calculated_total_amount > 0 else (booking.total_amount or 0)
+            remaining_balance = max(Decimal('0'), Decimal(str(calculated_total)) - booking.paid_amount)
             
             # For deposits and partial payments, allow any amount up to remaining balance
             # For full payments, the amount should equal the remaining balance
@@ -7393,21 +8364,30 @@ def api_record_payment(request):
                 recorded_by=request.user
             )
             
-            # Update booking paid amount
-            # For refunds, subtract the amount; for other payments, add it
-            if payment_type == 'refund':
-                booking.paid_amount -= abs(payment_amount)
-            else:
-                booking.paid_amount += payment_amount
+            # Recalculate booking's paid_amount from all payments (not just add/subtract)
+            from django.db.models import Sum
+            actual_paid = Payment.objects.filter(
+                booking=booking
+            ).exclude(
+                payment_type='refund'
+            ).aggregate(
+                total=Sum('amount')
+            )['total'] or Decimal('0')
             
-            # Ensure paid_amount doesn't exceed total_amount
-            if booking.paid_amount > booking.total_amount:
-                booking.paid_amount = booking.total_amount
+            total_refunded = Payment.objects.filter(
+                booking=booking,
+                payment_type='refund'
+            ).aggregate(
+                total=Sum('amount')
+            )['total'] or Decimal('0')
             
-            # Ensure paid_amount doesn't go negative
-            if booking.paid_amount < 0:
-                booking.paid_amount = Decimal('0')
+            # Net paid amount = payments - refunds
+            net_paid_amount = max(Decimal('0'), actual_paid - total_refunded)
             
+            # Update booking's paid_amount
+            booking.paid_amount = net_paid_amount
+            
+            # Update payment status based on actual amounts
             booking.update_payment_status()
             booking.save()
             
@@ -7718,6 +8698,21 @@ def api_venue_booking_status(request, booking_id):
             elif action == 'cancel':
                 booking.booking_status = 'cancelled'
                 booking.save()
+                
+                # If booking has a room assigned, sync room status
+                # This applies to both hotel and lodge bookings
+                if booking.room_number and booking.property_obj:
+                    try:
+                        room = Room.objects.get(
+                            property_obj=booking.property_obj,
+                            room_number=booking.room_number
+                        )
+                        # Use the sync method to properly update room status based on all bookings
+                        room.sync_status_from_bookings()
+                    except Room.DoesNotExist:
+                        # Room might not exist (e.g., for venue bookings), that's okay
+                        pass
+                
                 return JsonResponse({'success': True, 'message': 'Booking cancelled successfully'})
             
             elif new_status:
@@ -7731,6 +8726,38 @@ def api_venue_booking_status(request, booking_id):
         return JsonResponse({'success': False, 'message': 'Booking not found'})
     except Exception as e:
         return JsonResponse({'success': False, 'message': str(e)})
+
+
+@login_required
+def api_venue_details(request, venue_id):
+    """API endpoint to get venue details (price, capacity)"""
+    try:
+        # MULTI-TENANCY: Ensure owner can only access their own venues
+        if request.user.is_authenticated and not (request.user.is_staff or request.user.is_superuser):
+            venue = Property.objects.get(id=venue_id, property_type__name__iexact='venue', owner=request.user)
+        else:
+            venue = Property.objects.get(id=venue_id, property_type__name__iexact='venue')
+        
+        return JsonResponse({
+            'success': True,
+            'venue': {
+                'id': venue.id,
+                'title': venue.title,
+                'capacity': venue.capacity or 0,
+                'rent_amount': float(venue.rent_amount) if venue.rent_amount else 0,
+                'rent_period': venue.rent_period or 'day',
+            }
+        })
+    except Property.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Venue not found'
+        }, status=404)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': str(e)
+        }, status=500)
 
 
 @login_required
@@ -7925,7 +8952,17 @@ def api_payment_view_details(request, payment_id):
         if not payment:
             return JsonResponse({'success': False, 'message': 'Payment not found'}, status=404)
         
+        # Add visit payment expiration info to context if it's a visit payment
         context = {'payment': payment, 'payment_type': payment_type}
+        if payment_type == 'visit' and hasattr(payment, 'visit_payment'):
+            # Add expiration info to context for template access
+            visit_payment = payment.visit_payment
+            expires_at = visit_payment.expires_at()
+            context['visit_payment'] = visit_payment
+            context['visit_payment_expires_at'] = expires_at
+            context['visit_payment_is_expired'] = visit_payment.is_expired()
+            context['visit_payment_is_active'] = visit_payment.is_active()
+        
         return render(request, 'properties/modals/payment_view_details.html', context)
     except Exception as e:
         import logging
@@ -8140,7 +9177,78 @@ def api_payment_edit(request, payment_id):
                     if paid_date_str:
                         payment.paid_date = parse_date(paid_date_str)
             
+            # Validate payment amount doesn't exceed remaining balance (for booking payments)
+            if payment_type == 'booking' and payment.booking:
+                from django.db.models import Sum
+                from decimal import Decimal
+                
+                # Calculate current paid amount (excluding the payment being edited)
+                old_payment_amount = Payment.objects.filter(id=payment_id).values_list('amount', flat=True).first() or Decimal('0')
+                
+                # Recalculate total paid from all payments (exclude refunds and current payment)
+                actual_paid = Payment.objects.filter(
+                    booking=payment.booking
+                ).exclude(
+                    payment_type='refund'
+                ).exclude(
+                    id=payment_id  # Exclude current payment being edited
+                ).aggregate(
+                    total=Sum('amount')
+                )['total'] or Decimal('0')
+                
+                # Get total refunded
+                total_refunded = Payment.objects.filter(
+                    booking=payment.booking,
+                    payment_type='refund'
+                ).aggregate(
+                    total=Sum('amount')
+                )['total'] or Decimal('0')
+                
+                # Calculate remaining balance before this payment
+                calculated_total = payment.booking.calculated_total_amount if payment.booking.calculated_total_amount and payment.booking.calculated_total_amount > 0 else (payment.booking.total_amount or 0)
+                current_paid = max(Decimal('0'), actual_paid - total_refunded)
+                remaining_balance = max(Decimal('0'), Decimal(str(calculated_total)) - current_paid)
+                
+                # Validate new payment amount doesn't exceed remaining balance
+                if payment.amount > remaining_balance:
+                    return JsonResponse({
+                        'success': False,
+                        'message': f'Payment amount (Tsh{payment.amount:,.2f}) exceeds remaining balance (Tsh{remaining_balance:,.2f}). Maximum allowed: Tsh{remaining_balance:,.2f}'
+                    }, status=400)
+            
             payment.save()
+            
+            # If this is a booking payment, recalculate booking's paid_amount and remaining amount
+            if payment_type == 'booking' and payment.booking:
+                from django.db.models import Sum
+                from decimal import Decimal
+                
+                # Recalculate total paid from all payments (exclude refunds)
+                actual_paid = Payment.objects.filter(
+                    booking=payment.booking
+                ).exclude(
+                    payment_type='refund'
+                ).aggregate(
+                    total=Sum('amount')
+                )['total'] or Decimal('0')
+                
+                # Get total refunded
+                total_refunded = Payment.objects.filter(
+                    booking=payment.booking,
+                    payment_type='refund'
+                ).aggregate(
+                    total=Sum('amount')
+                )['total'] or Decimal('0')
+                
+                # Net paid amount = payments - refunds
+                net_paid_amount = max(Decimal('0'), actual_paid - total_refunded)
+                
+                # Update booking's paid_amount
+                payment.booking.paid_amount = net_paid_amount
+                
+                # Update payment status based on actual amounts
+                payment.booking.update_payment_status()
+                payment.booking.save()
             
             return JsonResponse({'success': True, 'message': 'Payment updated successfully'})
         
@@ -8205,14 +9313,14 @@ def api_payment_mark_paid(request, payment_id):
                 booking.update_payment_status()
             else:  # unified payment (visit or other)
                 from django.utils import timezone
-                payment.status = 'successful'
+                payment.status = 'completed'  # Payment model uses 'completed', not 'successful'
                 if hasattr(payment, 'paid_date'):
                     payment.paid_date = timezone.now().date()
                 payment.save()
                 
                 # If it's a visit payment, update the visit payment status too
                 if payment_type == 'visit' and hasattr(payment, 'visit_payment'):
-                    payment.visit_payment.status = 'successful'
+                    payment.visit_payment.status = 'completed'
                     payment.visit_payment.paid_at = timezone.now()
                     payment.visit_payment.save()
             
@@ -8366,23 +9474,32 @@ def api_visit_payment_status(request, property_id):
                 'error': 'Visit payment is only available for house properties.'
             }, status=400)
         
-        # Check if user has already paid
+        # Check if user has already paid and if payment is still active
         visit_payment = PropertyVisitPayment.objects.filter(
             property=property_obj,
             user=request.user,
             status='completed'
         ).first()
         
-        has_paid = visit_payment is not None
+        # Check if payment exists and is still active (not expired)
+        has_paid = visit_payment is not None and visit_payment.is_active() if visit_payment else False
+        is_expired = visit_payment is not None and visit_payment.is_expired() if visit_payment else False
         
         response_data = {
             'has_paid': has_paid,
+            'is_expired': is_expired,
             'visit_cost': float(property_obj.visit_cost) if property_obj.visit_cost else None,
             'property_id': property_obj.id,
             'property_title': property_obj.title
         }
         
-        # If user has paid, include contact info
+        # Add expiration info if payment exists
+        if visit_payment:
+            expires_at = visit_payment.expires_at()
+            response_data['paid_at'] = visit_payment.paid_at.isoformat() if visit_payment.paid_at else None
+            response_data['expires_at'] = expires_at.isoformat() if expires_at else None
+        
+        # If user has paid and payment is active, include contact info
         if has_paid:
             owner = property_obj.owner
             owner_profile = getattr(owner, 'profile', None)
@@ -8399,7 +9516,6 @@ def api_visit_payment_status(request, property_id):
                 'latitude': float(property_obj.latitude) if property_obj.latitude else None,
                 'longitude': float(property_obj.longitude) if property_obj.longitude else None
             }
-            response_data['paid_at'] = visit_payment.paid_at.isoformat() if visit_payment.paid_at else None
         
         return JsonResponse(response_data)
         
@@ -8435,29 +9551,45 @@ def api_visit_payment_initiate(request, property_id):
                 'error': 'Visit cost is not set for this property.'
             }, status=400)
         
-        # Check if user has already paid
+        # Check if user has already paid and if payment is still active
         existing_payment = PropertyVisitPayment.objects.filter(
             property=property_obj,
             user=request.user,
             status='completed'
         ).first()
         
-        if existing_payment:
+        # If payment exists and is still active (not expired), return error
+        if existing_payment and existing_payment.is_active():
+            expires_at = existing_payment.expires_at()
             return JsonResponse({
                 'error': 'You have already paid for visit access to this property.',
                 'has_paid': True,
-                'payment_id': existing_payment.id
+                'is_expired': False,
+                'payment_id': existing_payment.id,
+                'expires_at': expires_at.isoformat() if expires_at else None
             }, status=400)
         
-        # Get or create pending visit payment
-        visit_payment, created = PropertyVisitPayment.objects.get_or_create(
-            property=property_obj,
-            user=request.user,
-            defaults={
-                'amount': property_obj.visit_cost,
-                'status': 'pending'
-            }
-        )
+        # If payment exists but expired, allow re-payment by updating the existing record
+        if existing_payment and existing_payment.is_expired():
+            # Reset to pending to allow new payment
+            existing_payment.status = 'pending'
+            existing_payment.paid_at = None
+            existing_payment.transaction_id = None
+            existing_payment.gateway_reference = None
+            existing_payment.amount = property_obj.visit_cost  # Update amount in case it changed
+            existing_payment.save()
+            visit_payment = existing_payment
+            created = False
+        else:
+            # Get or create pending visit payment
+            visit_payment, created = PropertyVisitPayment.objects.get_or_create(
+                property=property_obj,
+                user=request.user,
+                defaults={
+                    'amount': property_obj.visit_cost,
+                    'status': 'pending'
+                }
+            )
         
         # Get or create payment provider (AZAM Pay)
         provider, _ = PaymentProvider.objects.get_or_create(
@@ -8561,11 +9693,12 @@ def api_visit_payment_verify(request, property_id):
                 'error': 'Visit payment not found'
             }, status=404)
         
-        # If already successful, return contact info
-        if visit_payment.status == 'completed':
+        # If already completed and active, return contact info
+        if visit_payment.status == 'completed' and visit_payment.is_active():
             owner = property_obj.owner
             owner_profile = getattr(owner, 'profile', None)
             
+            expires_at = visit_payment.expires_at()
             return JsonResponse({
                 'success': True,
                 'message': 'Payment already verified',
@@ -8581,8 +9714,21 @@ def api_visit_payment_verify(request, property_id):
                     'latitude': float(property_obj.latitude) if property_obj.latitude else None,
                     'longitude': float(property_obj.longitude) if property_obj.longitude else None
                 },
-                'paid_at': visit_payment.paid_at.isoformat() if visit_payment.paid_at else None
+                'paid_at': visit_payment.paid_at.isoformat() if visit_payment.paid_at else None,
+                'expires_at': expires_at.isoformat() if expires_at else None,
+                'is_expired': False
             })
+        
+        # If payment exists but expired, prompt user to pay again
+        if visit_payment.status == 'completed' and visit_payment.is_expired():
+            expires_at = visit_payment.expires_at()
+            return JsonResponse({
+                'success': False,
+                'error': 'Visit payment has expired. Please pay again to access property details.',
+                'is_expired': True,
+                'paid_at': visit_payment.paid_at.isoformat() if visit_payment.paid_at else None,
+                'expires_at': expires_at.isoformat() if expires_at else None
+            }, status=400)
         
         # Verify payment with gateway
         if visit_payment.payment:
@@ -8595,13 +9741,13 @@ def api_visit_payment_verify(request, property_id):
             
             if verification_result.get('success') and verification_result.get('verified'):
                 # Update visit payment status
-                visit_payment.status = 'successful'
+                visit_payment.status = 'completed'
                 visit_payment.paid_at = timezone.now()
                 visit_payment.save()
                 
                 # Update unified payment
                 if visit_payment.payment:
-                    visit_payment.payment.status = 'successful'
+                    visit_payment.payment.status = 'completed'  # Payment model uses 'completed', not 'successful'
                     visit_payment.payment.paid_date = timezone.now().date()
                     visit_payment.payment.save()
                 
@@ -8609,6 +9755,7 @@ def api_visit_payment_verify(request, property_id):
                 owner = property_obj.owner
                 owner_profile = getattr(owner, 'profile', None)
                 
+                expires_at = visit_payment.expires_at()
                 return JsonResponse({
                     'success': True,
                     'message': 'Payment verified successfully',
@@ -8624,7 +9771,8 @@ def api_visit_payment_verify(request, property_id):
                         'latitude': float(property_obj.latitude) if property_obj.latitude else None,
                         'longitude': float(property_obj.longitude) if property_obj.longitude else None
                     },
-                    'paid_at': visit_payment.paid_at.isoformat()
+                    'paid_at': visit_payment.paid_at.isoformat(),
+                    'expires_at': expires_at.isoformat() if expires_at else None
                 })
             else:
                 return JsonResponse({
@@ -8671,9 +9819,38 @@ def api_payment_delete(request, payment_id):
             # Delete the payment
             payment.delete()
             
-            # Update booking payment status after deletion
-            if hasattr(booking_obj, 'update_payment_status'):
-                booking_obj.update_payment_status()
+            # Recalculate booking's paid_amount and remaining amount after deletion
+            if booking_obj:
+                from django.db.models import Sum
+                from decimal import Decimal
+                
+                # Recalculate total paid from all remaining payments (exclude refunds)
+                actual_paid = Payment.objects.filter(
+                    booking=booking_obj
+                ).exclude(
+                    payment_type='refund'
+                ).aggregate(
+                    total=Sum('amount')
+                )['total'] or Decimal('0')
+                
+                # Get total refunded
+                total_refunded = Payment.objects.filter(
+                    booking=booking_obj,
+                    payment_type='refund'
+                ).aggregate(
+                    total=Sum('amount')
+                )['total'] or Decimal('0')
+                
+                # Net paid amount = payments - refunds
+                net_paid_amount = max(Decimal('0'), actual_paid - total_refunded)
+                
+                # Update booking's paid_amount
+                booking_obj.paid_amount = net_paid_amount
+                
+                # Update payment status based on actual amounts
+                if hasattr(booking_obj, 'update_payment_status'):
+                    booking_obj.update_payment_status()
+                booking_obj.save()
             
             # Log the deletion activity
             from decimal import Decimal
