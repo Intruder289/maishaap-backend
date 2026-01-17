@@ -1,0 +1,7 @@
+[0;1;31m×[0m portal_website.service - Portal Website Gunicorn
+     Loaded: loaded (]8;;file://r23/etc/systemd/system/portal_website.service/etc/systemd/system/portal_website.service]8;;; [0;1;32menabled[0m; preset: [0;1;32menabled[0m)
+     Active: [0;1;31mfailed[0m (Result: exit-code) since Sat 2026-01-10 13:17:36 UTC; 19s ago
+   Duration: 317ms
+    Process: 639052 ExecStart=/home/maishaapp/apps/portal_website/venv/bin/gunicorn --workers 3 --bind unix:/home/maishaapp/apps/portal_website/portal_website.sock Maisha_backend.wsgi:application [0;1;31m(code=exited, status=1/FAILURE)[0m
+   Main PID: 639052 (code=exited, status=1/FAILURE)
+        CPU: 533ms
