@@ -532,13 +532,36 @@ class AZAMPayGateway:
             logger.info(f"Formatted phone number: {phone} -> {phone_number_clean}")
             
             # Determine provider from payment model (customer selected) or default
-            # Common providers: AIRTEL, TIGO, MPESA, HALOPESA
+            # Map our provider values to AzamPay's expected format
+            # AzamPay expects: "Airtel", "Tigo", "Mpesa", "Halopesa", "Azampesa" (title case)
+            # Our values are: "AIRTEL", "TIGO", "MPESA", "HALOPESA" (uppercase)
+            provider_mapping = {
+                'AIRTEL': 'Airtel',
+                'TIGO': 'Tigo',
+                'MPESA': 'Mpesa',
+                'HALOPESA': 'Halopesa',
+                'AZAMPESA': 'Azampesa',
+                # Handle case variations
+                'airtel': 'Airtel',
+                'tigo': 'Tigo',
+                'mpesa': 'Mpesa',
+                'halopesa': 'Halopesa',
+                'azampesa': 'Azampesa',
+                'Airtel': 'Airtel',
+                'Tigo': 'Tigo',
+                'Mpesa': 'Mpesa',
+                'Halopesa': 'Halopesa',
+                'Azampesa': 'Azampesa',
+            }
+            
             if hasattr(payment, 'mobile_money_provider') and payment.mobile_money_provider:
-                provider = payment.mobile_money_provider.upper()
-                logger.info(f"Using customer-selected provider: {provider}")
+                provider_raw = payment.mobile_money_provider.upper()
+                provider = provider_mapping.get(provider_raw, 'Airtel')  # Default to Airtel if not found
+                logger.info(f"Using customer-selected provider: {payment.mobile_money_provider} -> {provider}")
             else:
-                provider = cls.AZAM_PAY_CONFIG.get('default_provider', 'AIRTEL').upper()
-                logger.info(f"Using default provider: {provider}")
+                default_raw = cls.AZAM_PAY_CONFIG.get('default_provider', 'AIRTEL').upper()
+                provider = provider_mapping.get(default_raw, 'Airtel')
+                logger.info(f"Using default provider: {default_raw} -> {provider}")
             
             # Prepare redirect URL (success page)
             # Use callback URL as redirect if no separate redirect URL configured
@@ -547,12 +570,13 @@ class AZAMPayGateway:
             # ✅ CORRECT PAYLOAD FORMAT (Official AzamPay REST API)
             # According to API spec: accountNumber (not phoneNumber), amount as number (not string)
             # Required fields: accountNumber, amount, currency, externalId, provider
+            # Provider must be in title case: "Airtel", "Tigo", "Mpesa", "Halopesa", "Azampesa"
             payload = {
                 "accountNumber": phone_number_clean,  # MSISDN/phone number (Format: "2557XXXXXXXX")
                 "amount": int(float(payment.amount)),  # Amount as number (in TZS)
                 "currency": "TZS",
                 "externalId": reference,
-                "provider": provider  # AIRTEL, TIGO, MPESA, etc.
+                "provider": provider  # "Airtel", "Tigo", "Mpesa", "Halopesa", "Azampesa" (title case)
             }
             
             # Optional: Add additionalProperties if needed
@@ -567,13 +591,20 @@ class AZAMPayGateway:
             }
             # Add X-API-Key (uppercase as shown in API spec code samples)
             # Required for checkout endpoints
-            if cls.AZAM_PAY_CONFIG.get('api_key'):
-                headers["X-API-Key"] = cls.AZAM_PAY_CONFIG['api_key']
-            elif cls.AZAM_PAY_CONFIG['sandbox'] and cls.AZAM_PAY_CONFIG['client_id']:
-                # Use client_id as X-API-Key fallback for sandbox
-                headers["X-API-Key"] = cls.AZAM_PAY_CONFIG['client_id']
+            api_key_value = cls.AZAM_PAY_CONFIG.get('api_key', '').strip()
+            client_id_value = cls.AZAM_PAY_CONFIG.get('client_id', '').strip()
+            
+            if api_key_value:
+                headers["X-API-Key"] = api_key_value
+                logger.debug("Using AZAM_PAY_API_KEY for X-API-Key header")
+            elif client_id_value:
+                # Use client_id as X-API-Key fallback (works for both sandbox and production)
+                # According to AzamPay docs, Client ID can be used as API Key
+                headers["X-API-Key"] = client_id_value
+                logger.info(f"Using CLIENT_ID as X-API-Key (API_KEY not set): {client_id_value[:20]}...")
             else:
-                logger.warning("No X-API-Key available - authentication may fail")
+                logger.error("CRITICAL: No X-API-Key available - both API_KEY and CLIENT_ID are missing!")
+                logger.error("This will cause 'Invalid Vendor' errors. Please set AZAM_PAY_API_KEY or AZAM_PAY_CLIENT_ID in .env")
             
             # Make API call to AZAMpay Mobile Money Checkout endpoint
             try:
