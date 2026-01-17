@@ -557,11 +557,13 @@ class AZAMPayGateway:
             if hasattr(payment, 'mobile_money_provider') and payment.mobile_money_provider:
                 provider_raw = payment.mobile_money_provider.upper()
                 provider = provider_mapping.get(provider_raw, 'Airtel')  # Default to Airtel if not found
-                logger.info(f"Using customer-selected provider: {payment.mobile_money_provider} -> {provider}")
+                logger.error(f"[AZAMPAY FIX] Using customer-selected provider: {payment.mobile_money_provider} -> {provider}")
+                print(f"[AZAMPAY FIX] Provider mapping: {payment.mobile_money_provider} -> {provider}")
             else:
                 default_raw = cls.AZAM_PAY_CONFIG.get('default_provider', 'AIRTEL').upper()
                 provider = provider_mapping.get(default_raw, 'Airtel')
-                logger.info(f"Using default provider: {default_raw} -> {provider}")
+                logger.error(f"[AZAMPAY FIX] Using default provider: {default_raw} -> {provider}")
+                print(f"[AZAMPAY FIX] Provider mapping: {default_raw} -> {provider}")
             
             # Prepare redirect URL (success page)
             # Use callback URL as redirect if no separate redirect URL configured
@@ -596,15 +598,18 @@ class AZAMPayGateway:
             
             if api_key_value:
                 headers["X-API-Key"] = api_key_value
-                logger.debug("Using AZAM_PAY_API_KEY for X-API-Key header")
+                logger.error("[AZAMPAY FIX] Using AZAM_PAY_API_KEY for X-API-Key header")
+                print("[AZAMPAY FIX] Using AZAM_PAY_API_KEY for X-API-Key header")
             elif client_id_value:
                 # Use client_id as X-API-Key fallback (works for both sandbox and production)
                 # According to AzamPay docs, Client ID can be used as API Key
                 headers["X-API-Key"] = client_id_value
-                logger.info(f"Using CLIENT_ID as X-API-Key (API_KEY not set): {client_id_value[:20]}...")
+                logger.error(f"[AZAMPAY FIX] Using CLIENT_ID as X-API-Key (API_KEY not set): {client_id_value[:20]}...")
+                print(f"[AZAMPAY FIX] Using CLIENT_ID as X-API-Key (API_KEY not set): {client_id_value[:20]}...")
             else:
-                logger.error("CRITICAL: No X-API-Key available - both API_KEY and CLIENT_ID are missing!")
-                logger.error("This will cause 'Invalid Vendor' errors. Please set AZAM_PAY_API_KEY or AZAM_PAY_CLIENT_ID in .env")
+                logger.error("[AZAMPAY FIX] CRITICAL: No X-API-Key available - both API_KEY and CLIENT_ID are missing!")
+                logger.error("[AZAMPAY FIX] This will cause 'Invalid Vendor' errors. Please set AZAM_PAY_API_KEY or AZAM_PAY_CLIENT_ID in .env")
+                print("[AZAMPAY FIX] CRITICAL: No X-API-Key available!")
             
             # Make API call to AZAMpay Mobile Money Checkout endpoint
             try:
@@ -612,11 +617,12 @@ class AZAMPayGateway:
                 print(f"[AZAMPAY CHECKOUT] Payload: {json.dumps(payload, indent=2)}")
                 print(f"[AZAMPAY CHECKOUT] Headers: Authorization=Bearer ***, X-API-Key={'***' if headers.get('X-API-Key') else 'none'}")
                 
-                logger.info(f"🔍 [AZAMPAY] Calling checkout endpoint: {checkout_url_endpoint}")
-                logger.info(f"   [AZAMPAY] Method: POST")
-                logger.info(f"   [AZAMPAY] Token: {access_token[:50]}...")
-                logger.info(f"   [AZAMPAY] Headers: Authorization=Bearer ***, X-API-Key={'***' if headers.get('X-API-Key') else 'none'}")
-                logger.info(f"   [AZAMPAY] Payload: {json.dumps(payload, indent=2)}")
+                logger.error(f"[AZAMPAY FIX] Calling checkout endpoint: {checkout_url_endpoint}")
+                logger.error(f"[AZAMPAY FIX] Method: POST")
+                logger.error(f"[AZAMPAY FIX] Token: {access_token[:50]}...")
+                logger.error(f"[AZAMPAY FIX] Headers: Authorization=Bearer ***, X-API-Key={'***' if headers.get('X-API-Key') else 'NONE - THIS WILL FAIL!'}")
+                logger.error(f"[AZAMPAY FIX] Payload: {json.dumps(payload, indent=2)}")
+                print(f"[AZAMPAY FIX] Headers: X-API-Key={'SET' if headers.get('X-API-Key') else 'NOT SET - WILL FAIL!'}")
                 
                 # Make API call
                 response = requests.post(checkout_url_endpoint, json=payload, headers=headers, timeout=30)
