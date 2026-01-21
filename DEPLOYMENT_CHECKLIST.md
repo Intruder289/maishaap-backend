@@ -1,317 +1,125 @@
-# Production Deployment Checklist
+# Deployment Checklist for Invalid Vendor Fix
 
-## 🎯 Deployment Goal
-Replace current production at `https://portal.maishaapp.co.tz/` with your local code (including AzamPay webhook fix).
+## ✅ Files to Upload
 
----
+**ONLY ONE FILE NEEDS TO BE UPDATED:**
+- `payments/gateway_service.py`
 
-## ✅ Pre-Deployment Checklist
+## 📋 Deployment Steps
 
-### 1. Code Changes to Deploy
-- [x] AzamPay webhook signature validation removed
-- [x] Enhanced webhook error handling
-- [x] All hardcoded values fixed (statistics now dynamic)
-- [x] Swagger documentation complete
-- [x] All recent fixes and improvements
+### Step 1: Upload the File
 
-### 2. Environment Variables (.env file)
+Upload `payments/gateway_service.py` to your server at:
+```
+/home/maishaapp/app/payments/gateway_service.py
+```
+(Adjust path based on your actual server structure)
 
-**Critical settings to verify on production:**
+### Step 2: Clear Python Cache (IMPORTANT!)
+
+Python caches compiled bytecode (.pyc files). Clear it to ensure new code loads:
 
 ```bash
-# Database
-DATABASE_NAME=maisha
-DATABASE_USER=postgres
-DATABASE_PASSWORD=your_production_password
-DATABASE_HOST=localhost
-DATABASE_PORT=5432
+# SSH into your server
+ssh your-server
 
-# Django
-SECRET_KEY=your_production_secret_key
-DEBUG=False  # IMPORTANT: Set to False in production
-ALLOWED_HOSTS=portal.maishaapp.co.tz,www.portal.maishaapp.co.tz
+# Navigate to your project directory
+cd /home/maishaapp/app  # or wherever your project is
 
-# AzamPay Configuration
-AZAM_PAY_CLIENT_ID=your_production_client_id
-AZAM_PAY_CLIENT_SECRET=your_production_client_secret
-AZAM_PAY_API_KEY=your_production_api_key
-AZAM_PAY_APP_NAME=mishap
-AZAM_PAY_SANDBOX=False  # Set to False for production
-AZAM_PAY_BASE_URL=https://api.azampay.co.tz  # Production URL
-AZAM_PAY_PRODUCTION_URL=https://api.azampay.co.tz
-AZAM_PAY_WEBHOOK_URL=https://portal.maishaapp.co.tz/api/v1/payments/webhook/azam-pay/
-AZAM_PAY_WEBHOOK_SECRET=  # Not needed (signature validation removed)
+# Remove all Python cache files
+find . -type d -name __pycache__ -exec rm -r {} + 2>/dev/null
+find . -name "*.pyc" -delete
 
-# Base URL
-BASE_URL=https://portal.maishaapp.co.tz
-
-# Other settings
-# ... (copy from your local .env, but update production values)
+# Or manually remove cache in payments directory
+rm -rf payments/__pycache__
+rm -f payments/*.pyc
 ```
 
-### 3. Database Backup
-- [ ] **BACKUP PRODUCTION DATABASE FIRST!**
-  ```bash
-  pg_dump -U postgres -d maisha > backup_before_deployment_$(date +%Y%m%d_%H%M%S).sql
-  ```
+### Step 3: Restart Gunicorn
 
-### 4. Static Files
-- [ ] Collect static files:
-  ```bash
-  python manage.py collectstatic --noinput
-  ```
-
-### 5. Database Migrations
-- [ ] Check for pending migrations:
-  ```bash
-  python manage.py showmigrations
-  ```
-- [ ] Apply migrations if needed:
-  ```bash
-  python manage.py migrate
-  ```
-
----
-
-## 🚀 Deployment Steps
-
-### Step 1: Backup Current Production
 ```bash
-# 1. Backup database
-pg_dump -U postgres -d maisha > production_backup.sql
-
-# 2. Backup current code (if using version control)
-git tag production-backup-$(date +%Y%m%d)
-
-# 3. Backup .env file
-cp .env .env.backup
-```
-
-### Step 2: Upload Code to Production Server
-```bash
-# Option A: Using Git
-git pull origin main  # or your branch name
-
-# Option B: Using FTP/SFTP
-# Upload all files except:
-# - .env (keep existing)
-# - __pycache__/
-# - *.pyc
-# - media/ (if separate)
-# - staticfiles/ (will regenerate)
-```
-
-### Step 3: Update Environment Variables
-```bash
-# Edit production .env file
-nano .env  # or vi .env
-
-# Verify critical settings:
-# - DEBUG=False
-# - AZAM_PAY_SANDBOX=False
-# - AZAM_PAY_WEBHOOK_URL=https://portal.maishaapp.co.tz/api/v1/payments/webhook/azam-pay/
-# - Database credentials
-```
-
-### Step 4: Install Dependencies
-```bash
-# Activate virtual environment (if using)
-source venv/bin/activate  # or your venv path
-
-# Install/update packages
-pip install -r requirements.txt
-```
-
-### Step 5: Run Database Migrations
-```bash
-python manage.py migrate
-```
-
-### Step 6: Collect Static Files
-```bash
-python manage.py collectstatic --noinput
-```
-
-### Step 7: Restart Application Server
-
-**For Gunicorn:**
-```bash
+# Option 1: Using systemd
 sudo systemctl restart gunicorn
-# or
+
+# Option 2: Using supervisor
 sudo supervisorctl restart gunicorn
+
+# Option 3: Send HUP signal to reload
+sudo pkill -HUP gunicorn
+
+# Option 4: Full restart (if using systemd)
+sudo systemctl stop gunicorn
+sudo systemctl start gunicorn
 ```
 
-**For uWSGI:**
+### Step 4: Verify Deployment
+
+After restarting, make a test payment and check logs. You should see:
+
+**✅ GOOD - Fix is working:**
+```
+[AZAMPAY FIX] Using CLIENT_ID as X-API-Key (API_KEY not set): 019bb775-c4be-7171-9...
+[AZAMPAY FIX] Headers: Authorization=Bearer ***, X-API-Key=***
+[AZAMPAY FIX] Provider mapping: AIRTEL -> Airtel
+```
+
+**❌ BAD - Old code still running:**
+```
+No X-API-Key available - authentication may fail
+[AZAMPAY] Headers: Authorization=Bearer ***, X-API-Key=none
+```
+
+## 🔍 Troubleshooting
+
+### If logs don't show "[AZAMPAY FIX]" messages:
+
+1. **Verify file was uploaded:**
+   ```bash
+   grep -n "AZAMPAY FIX" /home/maishaapp/app/payments/gateway_service.py
+   ```
+   Should show multiple lines with "[AZAMPAY FIX]"
+
+2. **Check file permissions:**
+   ```bash
+   ls -la /home/maishaapp/app/payments/gateway_service.py
+   ```
+   Should be readable by gunicorn user
+
+3. **Clear cache again and restart:**
+   ```bash
+   find . -name "*.pyc" -delete
+   find . -type d -name __pycache__ -exec rm -r {} +
+   sudo systemctl restart gunicorn
+   ```
+
+4. **Check gunicorn is using correct Python:**
+   ```bash
+   # Check which Python gunicorn uses
+   ps aux | grep gunicorn
+   # Should show Python path
+   ```
+
+### If you see "[AZAMPAY FIX]" but still get "Invalid Vendor":
+
+This means the code is working, but there's a vendor account issue:
+
+1. **Check AzamPay Production Dashboard:**
+   - Login: https://developers.azampay.co.tz/
+   - Verify vendor account is **ACTIVATED** and **APPROVED**
+   - Verify providers (Airtel, Tigo, Mpesa) are **ENABLED**
+   - Contact AzamPay support if account appears inactive
+
+## 📝 Quick Verification Command
+
+Run this on your server to verify the fix is in the file:
+
 ```bash
-sudo systemctl restart uwsgi
+grep -A 2 "Using CLIENT_ID as X-API-Key" /home/maishaapp/app/payments/gateway_service.py
 ```
 
-**For Apache/mod_wsgi:**
-```bash
-sudo systemctl restart apache2
+Should output:
+```python
+                headers["X-API-Key"] = client_id_value
+                logger.error(f"[AZAMPAY FIX] Using CLIENT_ID as X-API-Key (API_KEY not set): {client_id_value[:20]}...")
+                print(f"[AZAMPAY FIX] Using CLIENT_ID as X-API-Key (API_KEY not set): {client_id_value[:20]}...")
 ```
-
-**For Nginx + Gunicorn:**
-```bash
-sudo systemctl restart gunicorn
-sudo systemctl reload nginx
-```
-
-### Step 8: Verify Deployment
-```bash
-# Check if server is running
-curl https://portal.maishaapp.co.tz/
-
-# Check application logs
-tail -f /var/log/gunicorn/error.log
-# or
-tail -f /path/to/your/app.log
-```
-
----
-
-## 🧪 Post-Deployment Testing
-
-### 1. Basic Functionality
-- [ ] Homepage loads: `https://portal.maishaapp.co.tz/`
-- [ ] Login works
-- [ ] Dashboard accessible
-- [ ] Static files loading (CSS, JS, images)
-
-### 2. AzamPay Webhook Test (CRITICAL)
-- [ ] Make a test payment through AzamPay
-- [ ] Check server logs for webhook receipt:
-  ```bash
-  tail -f /var/log/gunicorn/error.log | grep "AzamPay webhook"
-  ```
-- [ ] Verify payment status updated in database
-- [ ] Confirm NO "Invalid webhook signature" error
-
-### 3. API Endpoints
-- [ ] Swagger docs accessible: `https://portal.maishaapp.co.tz/swagger/`
-- [ ] API endpoints responding correctly
-- [ ] Authentication working
-
-### 4. Database
-- [ ] All data intact
-- [ ] New features working
-- [ ] Statistics calculating correctly (no hardcoded values)
-
----
-
-## 🔍 Verification Commands
-
-### Check Application Status
-```bash
-# Check if Django is running
-python manage.py check --deploy
-
-# Check for errors
-python manage.py check
-```
-
-### Check Webhook Endpoint
-```bash
-# Test webhook endpoint (should return error but not "Invalid signature")
-curl -X POST https://portal.maishaapp.co.tz/api/v1/payments/webhook/azam-pay/ \
-  -H "Content-Type: application/json" \
-  -d '{"test": "data"}'
-```
-
-### Check Logs
-```bash
-# Application logs
-tail -f /var/log/gunicorn/error.log
-
-# Django logs (if configured)
-tail -f /path/to/your/app/logs/django.log
-
-# System logs
-journalctl -u gunicorn -f
-```
-
----
-
-## ⚠️ Important Notes
-
-### 1. AzamPay Configuration
-- **Production Mode**: Set `AZAM_PAY_SANDBOX=False`
-- **Webhook URL**: Must be `https://portal.maishaapp.co.tz/api/v1/payments/webhook/azam-pay/`
-- **No Signature Validation**: Webhook will accept callbacks without signature (as per AzamPay instructions)
-
-### 2. Security
-- **DEBUG=False**: Critical for production security
-- **SECRET_KEY**: Must be different from development
-- **HTTPS**: Already configured (good!)
-
-### 3. Database
-- **Backup First**: Always backup before deployment
-- **Migrations**: Test migrations on staging if possible
-
-### 4. Static Files
-- **Collect Static**: Run `collectstatic` after deployment
-- **Nginx/Apache**: Ensure static files are served correctly
-
----
-
-## 🐛 Troubleshooting
-
-### If Webhook Still Shows "Invalid Signature" Error:
-1. **Check code is updated**: Verify `payments/api_views.py` has signature validation removed
-2. **Restart server**: Make sure application server restarted
-3. **Check logs**: Look for "AzamPay webhook received" message
-4. **Clear cache**: If using caching, clear it
-
-### If Static Files Not Loading:
-```bash
-# Recollect static files
-python manage.py collectstatic --noinput --clear
-
-# Check permissions
-chmod -R 755 /path/to/staticfiles/
-```
-
-### If Database Errors:
-```bash
-# Check migrations
-python manage.py showmigrations
-
-# Rollback if needed (from backup)
-psql -U postgres -d maisha < production_backup.sql
-```
-
----
-
-## 📞 After Deployment
-
-### 1. Monitor Logs
-- Watch for errors in first 24 hours
-- Check webhook processing
-- Monitor payment transactions
-
-### 2. Test AzamPay Integration
-- Make test payment
-- Verify webhook received
-- Confirm payment status updated
-- Report to AzamPay technical support
-
-### 3. User Communication
-- Inform users of deployment (if needed)
-- Monitor for user-reported issues
-
----
-
-## ✅ Deployment Confirmation
-
-After deployment, verify:
-- [ ] Application running without errors
-- [ ] Webhook endpoint accessible
-- [ ] Test payment processed successfully
-- [ ] No "Invalid webhook signature" errors
-- [ ] All features working correctly
-
----
-
-**Status:** Ready for deployment  
-**Date:** Review Date  
-**Next Step:** Deploy to production and test

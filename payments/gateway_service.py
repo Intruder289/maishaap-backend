@@ -410,32 +410,42 @@ class AZAMPayGateway:
             # Get base URL
             base_url = cls.get_base_url()
             
-            # Get user phone number
-            # Try to get from user profile first
-            user_profile = getattr(payment.tenant, 'profile', None)
-            phone_number = user_profile.phone if user_profile and user_profile.phone else None
+            # Smart Logic: Select phone number based on user role
+            # - Admin/Staff: Use customer phone (from booking) so customer receives payment prompt
+            # - Customer: Use logged-in user's phone (their own profile phone)
+            phone_number = None
             
-            # If no phone in profile, try to get from booking customer
-            if not phone_number and payment.booking:
-                phone_number = payment.booking.customer.phone
+            # Check if logged-in user is admin/staff
+            is_admin_or_staff = payment.tenant.is_staff or payment.tenant.is_superuser
             
-            # If still no phone, try to get from tenant email (as last resort)
+            if is_admin_or_staff and payment.booking:
+                # Admin/Staff creating payment: Use customer phone
+                # This ensures the customer receives the payment prompt
+                phone_number = payment.booking.customer.phone if payment.booking.customer else None
+                logger.info(f"[SMART LOGIC] Admin/Staff payment -> Using customer phone: {phone_number}")
+            else:
+                # Customer creating payment: Use their own profile phone
+                user_profile = getattr(payment.tenant, 'profile', None)
+                phone_number = user_profile.phone if user_profile and user_profile.phone else None
+                logger.info(f"[SMART LOGIC] Customer payment -> Using tenant profile phone: {phone_number}")
+            
+            # Fallback: Try to get from tenant email (as last resort)
             if not phone_number:
-                # Try to extract phone from user model if it has phone field
                 phone_number = getattr(payment.tenant, 'phone', None)
             
-            # If no phone found, use default test phone for sandbox (if configured)
-            if not phone_number and cls.AZAM_PAY_CONFIG.get('sandbox') and cls.AZAM_PAY_CONFIG.get('test_phone'):
-                phone_number = cls.AZAM_PAY_CONFIG['test_phone']
-                logger.info(f"Using test phone number from config: {phone_number}")
-            
             if not phone_number:
+                # Provide helpful error message based on user role
+                if is_admin_or_staff and payment.booking:
+                    error_msg = f'Phone number is required for payment. Customer ({payment.booking.customer.full_name if payment.booking.customer else "N/A"}) does not have a phone number. Please add a phone number to the customer profile.'
+                else:
+                    error_msg = f'Phone number is required for payment. Please add a phone number to your profile (User: {payment.tenant.username}).'
+                
                 return {
                     'success': False,
                     'payment_link': None,
                     'transaction_id': None,
                     'reference': None,
-                    'error': 'Phone number is required for payment. Please ensure customer has a phone number.'
+                    'error': error_msg
                 }
             
             # Normalize phone number (ensure it starts with country code)
@@ -472,14 +482,17 @@ class AZAMPayGateway:
             
             # ✅ CORRECT ENDPOINT: Mobile Money Checkout
             # Official AZAMpay API endpoint for Mobile Money Operator checkout
+            # Confirmed by AzamPay: https://checkout.azampay.co.tz/azampay/mno/checkout
             # Documentation: https://developerdocs.azampay.co.tz/redoc
             # Endpoint: POST /azampay/mno/checkout
-            # In production, checkout uses a separate base URL: https://checkout.azampay.co.tz
             if cls.AZAM_PAY_CONFIG['sandbox']:
                 checkout_base = base_url
             else:
-                # Production uses separate checkout base URL
+                # Production: Use checkout.azampay.co.tz (confirmed by AzamPay)
+                # AzamPay confirmed: https://checkout.azampay.co.tz/azampay/mno/checkout
                 checkout_base = cls.AZAM_PAY_CONFIG.get('checkout_base_url', 'https://checkout.azampay.co.tz')
+                logger.error(f"[AZAMPAY FIX] Using AzamPay confirmed endpoint: {checkout_base}/azampay/mno/checkout")
+            
             checkout_url_endpoint = f"{checkout_base}/azampay/mno/checkout"
             
             # Format phone number: Must be exactly 12 digits starting with "2557" (E.164 format for Tanzania)

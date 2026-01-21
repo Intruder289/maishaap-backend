@@ -15,7 +15,7 @@ class Profile(models.Model):
 	]
 	
 	user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-	phone = models.CharField(max_length=30, blank=True, null=True, unique=True)
+	phone = models.CharField(max_length=30, blank=False, null=False, unique=True, help_text="Phone number is required and must be unique")
 	image = models.ImageField(upload_to=user_profile_image_path, null=True, blank=True)
 	role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='tenant')
 	is_approved = models.BooleanField(default=False)

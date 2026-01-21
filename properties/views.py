@@ -5993,13 +5993,11 @@ def create_payment(request, booking_id=None, payment_id=None):
                 defaults={'description': 'AZAM Pay Payment Gateway'}
             )
             
-            # Get customer user - try to find user by email, otherwise use request.user
-            from django.contrib.auth import get_user_model
-            User = get_user_model()
-            try:
-                customer_user = User.objects.get(email=booking.customer.email)
-            except User.DoesNotExist:
-                customer_user = request.user
+            # Smart Logic: Use logged-in user as tenant
+            # Phone number selection happens in gateway service based on user role:
+            # - Admin/Staff: Uses customer phone (from booking) so customer receives payment prompt
+            # - Customer: Uses their own profile phone
+            customer_user = request.user
             
             # Get mobile money provider if mobile_money payment
             mobile_money_provider = None
@@ -6153,13 +6151,11 @@ def create_payment(request, booking_id=None, payment_id=None):
                 messages.error(request, f'Payment amount (Tsh{payment_amount:,.0f}) exceeds remaining balance (Tsh{remaining:,.0f}). Maximum allowed: Tsh{remaining:,.0f}')
                 return redirect('properties:create_payment', booking_id=booking.pk)
             
-            # Get customer user - try to find user by email, otherwise use request.user
-            from django.contrib.auth import get_user_model
-            User = get_user_model()
-            try:
-                customer_user = User.objects.get(email=booking.customer.email)
-            except User.DoesNotExist:
-                customer_user = request.user
+            # Smart Logic: Use logged-in user as tenant
+            # Phone number selection happens in gateway service based on user role:
+            # - Admin/Staff: Uses customer phone (from booking) so customer receives payment prompt
+            # - Customer: Uses their own profile phone
+            customer_user = request.user
             
             # Create unified payment record for cash payments (bypasses AZAMPAY)
             unified_payment = UnifiedPayment.objects.create(

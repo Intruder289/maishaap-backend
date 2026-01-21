@@ -2243,6 +2243,3 @@ Traceback (most recent call last):
            ^^^^^^^^^^^^^^^^^^^^^
 AttributeError: 'NoneType' object has no attribute 'startswith'
 ERROR 2026-01-15 17:14:58,744 log 13424 44456 Internal Server Error: /api/v1/bookings/12334/edit/
-ERROR 2026-01-21 06:54:22,564 log 992453 139718210080896 Internal Server Error: /api/v1/users/update/
-ERROR 2026-01-21 06:54:29,710 log 992451 139718210080896 Internal Server Error: /api/v1/users/update/
-ERROR 2026-01-21 06:54:44,763 log 992451 139718210080896 Internal Server Error: /api/v1/users/update/

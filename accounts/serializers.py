@@ -13,7 +13,7 @@ class TenantSignupSerializer(serializers.Serializer):
     confirm_password = serializers.CharField(write_only=True)
     first_name = serializers.CharField(max_length=30)
     last_name = serializers.CharField(max_length=30)
-    phone = serializers.CharField(max_length=15, required=False, allow_blank=True)
+    phone = serializers.CharField(max_length=15, required=True, allow_blank=False, help_text="Phone number is required")
     role = serializers.ChoiceField(choices=[('tenant', 'Tenant'), ('owner', 'Property Owner')], default='tenant')
     
     def validate_username(self, value):
@@ -29,22 +29,22 @@ class TenantSignupSerializer(serializers.Serializer):
         return value
     
     def validate_phone(self, value):
-        """Validate phone number format and uniqueness"""
-        # Allow empty/blank phone numbers
+        """Validate phone number format and uniqueness - phone is mandatory"""
+        # Phone is required - reject empty/blank values
         if not value or (isinstance(value, str) and value.strip() == ''):
-            return None  # Return None instead of empty string
+            raise serializers.ValidationError("Phone number is required and cannot be empty")
         
         # Normalize phone number
         phone = value.strip()
         
-        # Validate format if provided
+        # Validate format
         if not re.match(r'^\+?[1-9]\d{1,14}$', phone):
-            raise serializers.ValidationError("Invalid phone number format")
+            raise serializers.ValidationError("Invalid phone number format. Please use format: +255712345678 or 075712345678")
         
-        # Check uniqueness (only if phone is provided)
+        # Check uniqueness
         from accounts.models import Profile
         if Profile.objects.filter(phone=phone).exists():
-            raise serializers.ValidationError("Phone number already exists")
+            raise serializers.ValidationError("Phone number already exists. Please use a different phone number.")
         
         return phone
     
@@ -77,17 +77,17 @@ class TenantSignupSerializer(serializers.Serializer):
         # This ensures users can login immediately after registration
         is_approved = True
         
-        # Convert empty phone to None (not empty string) to avoid unique constraint violations
-        # The Profile model has phone as unique=True, null=True, so None is allowed but '' is not
-        if phone and isinstance(phone, str) and phone.strip():
-            phone = phone.strip()
-        else:
-            phone = None  # Set to None if empty, blank, or not provided
+        # Phone is mandatory - ensure it's provided and not empty
+        if not phone or (isinstance(phone, str) and not phone.strip()):
+            raise serializers.ValidationError({"phone": "Phone number is required and cannot be empty"})
+        
+        # Normalize phone number
+        phone = phone.strip()
         
         # Create profile with role and approval status
         profile = Profile.objects.create(
             user=user,
-            phone=phone,  # None if empty, actual phone if provided
+            phone=phone,  # Phone is mandatory
             role=role,
             is_approved=is_approved
         )

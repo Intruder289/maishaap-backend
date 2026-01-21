@@ -457,9 +457,20 @@ def profile_update_api(request):
         
         # Update phone field - only if value is different
         if 'phone' in request.POST:
-            new_phone = request.POST.get('phone', '')
+            new_phone = request.POST.get('phone', '').strip()
             if new_phone != profile.phone:
-                profile.phone = new_phone
+                # Check if phone is already taken by another user (phone field is unique)
+                if new_phone:
+                    existing_profile = Profile.objects.filter(phone=new_phone).exclude(user=user).first()
+                    if existing_profile:
+                        return JsonResponse({
+                            'success': False,
+                            'message': f'Phone number {new_phone} is already taken by user {existing_profile.user.username}'
+                        })
+                    profile.phone = new_phone
+                else:
+                    # Allow clearing phone number (set to None for unique constraint)
+                    profile.phone = None
                 updated_fields.append('phone')
                 has_changes = True
         
@@ -674,6 +685,14 @@ def user_create_api(request):
         
         if not role:
             errors.append('Role is required.')
+        
+        if not phone:
+            errors.append('Phone number is required.')
+        elif phone:
+            # Check phone uniqueness
+            from accounts.models import Profile
+            if Profile.objects.filter(phone=phone).exists():
+                errors.append('Phone number already exists. Please use a different phone number.')
         
         # Check if username already exists
         if username and User.objects.filter(username=username).exists():
@@ -1258,7 +1277,19 @@ def user_update_api(request):
         from accounts.models import Profile
         profile, created = Profile.objects.get_or_create(user=user)
         if 'phone' in request.POST:
-            profile.phone = request.POST.get('phone', '')
+            new_phone = request.POST.get('phone', '').strip()
+            # Check if phone is already taken by another user (phone field is unique)
+            if new_phone:
+                existing_profile = Profile.objects.filter(phone=new_phone).exclude(user=user).first()
+                if existing_profile:
+                    return JsonResponse({
+                        'success': False,
+                        'message': f'Phone number {new_phone} is already taken by user {existing_profile.user.username}'
+                    })
+                profile.phone = new_phone
+            else:
+                # Allow clearing phone number (set to None for unique constraint)
+                profile.phone = None
         # Note: role and is_approved are NOT updated here - they have dedicated actions:
         # - Role: Use "Assign Roles" from dropdown menu
         # - Approval: Use "Approve/Unapprove" from dropdown menu

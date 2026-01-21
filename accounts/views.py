@@ -684,7 +684,15 @@ def edit_user(request, user_id):
 		# Update profile fields
 		phone = request.POST.get('phone', '').strip()
 		if phone:
-			profile.phone = phone
+			# Check if phone is already taken by another user (phone field is unique)
+			existing_profile = Profile.objects.filter(phone=phone).exclude(user=user_obj).first()
+			if existing_profile:
+				errors.append(f'Phone number {phone} is already taken by user {existing_profile.user.username}.')
+			else:
+				profile.phone = phone
+		elif phone == '':
+			# Allow clearing phone number (set to None for unique constraint)
+			profile.phone = None
 		
 		role = request.POST.get('role', '').strip()
 		if role in ['tenant', 'owner', 'admin']:
@@ -1085,9 +1093,20 @@ def profile_update(request):
 				has_changes = True
 		
 		if 'phone' in request.POST:
-			new_phone = request.POST.get('phone', '')
+			new_phone = request.POST.get('phone', '').strip()
 			if new_phone != profile.phone:
-				profile.phone = new_phone
+				# Check if phone is already taken by another user (phone field is unique)
+				if new_phone:
+					existing_profile = Profile.objects.filter(phone=new_phone).exclude(user=request.user).first()
+					if existing_profile:
+						return JsonResponse({
+							'success': False,
+							'message': f'Phone number {new_phone} is already taken by user {existing_profile.user.username}'
+						})
+					profile.phone = new_phone
+				else:
+					# Allow clearing phone number (set to None for unique constraint)
+					profile.phone = None
 				updated_fields.append('phone')
 				has_changes = True
 		
@@ -2803,12 +2822,16 @@ def register_owner(request):
 		# Validation
 		if not username or not email or not password:
 			messages.error(request, 'Username, email, and password are required.')
+		elif not phone or not phone.strip():
+			messages.error(request, 'Phone number is required.')
 		elif password != confirm_password:
 			messages.error(request, 'Passwords do not match.')
 		elif User.objects.filter(username=username).exists():
 			messages.error(request, 'Username already exists.')
 		elif User.objects.filter(email=email).exists():
 			messages.error(request, 'Email already exists.')
+		elif Profile.objects.filter(phone=phone.strip()).exists():
+			messages.error(request, 'Phone number already exists. Please use a different phone number.')
 		else:
 			try:
 				with transaction.atomic():
