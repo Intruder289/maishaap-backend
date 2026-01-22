@@ -2501,6 +2501,65 @@ def booking_edit_api(request, booking_id):
             if 'special_requests' in request.data:
                 booking.special_requests = request.data['special_requests']
             
+            if 'notes' in request.data:
+                booking.notes = request.data['notes']
+            
+            # Update customer information if provided
+            if 'customer' in request.data:
+                customer_data = request.data['customer']
+                customer = booking.customer
+                
+                try:
+                    if 'first_name' in customer_data:
+                        customer.first_name = customer_data['first_name'].strip() if customer_data['first_name'] else ''
+                    if 'last_name' in customer_data:
+                        customer.last_name = customer_data['last_name'].strip() if customer_data['last_name'] else ''
+                    if 'email' in customer_data:
+                        email = customer_data['email'].strip() if customer_data['email'] else ''
+                        if email:
+                            # Validate email uniqueness (excluding current customer)
+                            from .models import Customer as CustomerModel
+                            existing_customer = CustomerModel.objects.filter(email=email).exclude(id=customer.id).first()
+                            if existing_customer:
+                                return Response(
+                                    {"detail": f"Email {email} is already in use by another customer ({existing_customer.full_name})."},
+                                    status=status.HTTP_400_BAD_REQUEST
+                                )
+                            customer.email = email
+                    if 'phone' in customer_data:
+                        # Validate phone uniqueness (excluding current customer)
+                        phone = customer_data['phone'].strip() if customer_data['phone'] else ''
+                        if phone:
+                            # Check if phone already exists for another customer
+                            from .models import Customer as CustomerModel
+                            existing_customer = CustomerModel.objects.filter(phone=phone).exclude(id=customer.id).first()
+                            if existing_customer:
+                                return Response(
+                                    {"detail": f"Phone number {phone} is already in use by another customer ({existing_customer.full_name})."},
+                                    status=status.HTTP_400_BAD_REQUEST
+                                )
+                            customer.phone = phone
+                        elif not phone:
+                            # Phone is required - don't allow empty phone
+                            return Response(
+                                {"detail": "Phone number is required and cannot be empty."},
+                                status=status.HTTP_400_BAD_REQUEST
+                            )
+                    if 'address' in customer_data:
+                        customer.address = customer_data['address'].strip() if customer_data['address'] else None
+                    
+                    customer.save()
+                except Exception as e:
+                    import traceback
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.error(f"Error updating customer for booking {booking_id}: {str(e)}")
+                    logger.error(traceback.format_exc())
+                    return Response(
+                        {"detail": f"Error updating customer information: {str(e)}"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
             booking.save()
             
             return Response({
@@ -2510,6 +2569,16 @@ def booking_edit_api(request, booking_id):
             }, status=status.HTTP_200_OK)
         except PropertiesBooking.DoesNotExist:
             pass
+        except Exception as e:
+            import traceback
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error updating booking {booking_id}: {str(e)}")
+            logger.error(traceback.format_exc())
+            return Response(
+                {"detail": f"Error updating booking: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
         
         # Try documents.Booking (mobile app bookings)
         from documents.models import Booking as DocumentBooking

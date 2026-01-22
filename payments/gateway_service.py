@@ -423,15 +423,18 @@ class AZAMPayGateway:
                 # This ensures the customer receives the payment prompt
                 phone_number = payment.booking.customer.phone if payment.booking.customer else None
                 logger.info(f"[SMART LOGIC] Admin/Staff payment -> Using customer phone: {phone_number}")
+                logger.info(f"[SMART LOGIC] Customer: {payment.booking.customer.full_name if payment.booking.customer else 'N/A'}")
+                logger.info(f"[SMART LOGIC] Customer ID: {payment.booking.customer.id if payment.booking.customer else 'N/A'}")
             else:
                 # Customer creating payment: Use their own profile phone
                 user_profile = getattr(payment.tenant, 'profile', None)
                 phone_number = user_profile.phone if user_profile and user_profile.phone else None
                 logger.info(f"[SMART LOGIC] Customer payment -> Using tenant profile phone: {phone_number}")
+                logger.info(f"[SMART LOGIC] Tenant: {payment.tenant.username}")
+                logger.info(f"[SMART LOGIC] Tenant Profile ID: {user_profile.id if user_profile else 'No profile'}")
             
-            # Fallback: Try to get from tenant email (as last resort)
-            if not phone_number:
-                phone_number = getattr(payment.tenant, 'phone', None)
+            # REMOVED: Fallback to tenant.phone attribute - this was causing wrong phone to be used
+            # If phone is not found, we should fail with clear error message instead of using wrong phone
             
             if not phone_number:
                 # Provide helpful error message based on user role
@@ -528,21 +531,40 @@ class AZAMPayGateway:
             # Take exactly 9 digits (mobile number part)
             if len(mobile_part) > 9:
                 mobile_part = mobile_part[:9]
+            elif len(mobile_part) < 9:
+                # Pad with zeros if too short (shouldn't happen, but handle it)
+                mobile_part = mobile_part.ljust(9, '0')
             
             # Construct final format: 255 + 9-digit mobile (must start with 7)
             if len(mobile_part) == 9 and mobile_part.startswith('7'):
                 phone_number_clean = '255' + mobile_part
             else:
-                # If format is invalid, use test phone
-                logger.warning(f"Phone number '{phone}' could not be formatted correctly (mobile_part='{mobile_part}'), using test phone")
-                phone_number_clean = '255758285812'
+                # If format is invalid, log error and return error
+                error_msg = f"Phone number '{phone}' could not be formatted correctly. Mobile part: '{mobile_part}' (must be 9 digits starting with 7). Original phone: {phone_number}"
+                logger.error(f"[SMART LOGIC ERROR] {error_msg}")
+                return {
+                    'success': False,
+                    'payment_link': None,
+                    'transaction_id': None,
+                    'reference': None,
+                    'error': f'Invalid phone number format: {phone}. Phone number must be a valid Tanzanian mobile number (e.g., 0758123456 or +255758123456).'
+                }
             
             # Final validation: Must be exactly 12 digits starting with 2557
             if not (len(phone_number_clean) == 12 and phone_number_clean.startswith('2557')):
-                logger.warning(f"Phone number '{phone}' formatted to '{phone_number_clean}' doesn't match required format (2557XXXXXXXX), using test phone")
-                phone_number_clean = '255758285812'
+                error_msg = f"Phone number '{phone}' formatted to '{phone_number_clean}' doesn't match required format (2557XXXXXXXX). Original phone: {phone_number}"
+                logger.error(f"[SMART LOGIC ERROR] {error_msg}")
+                return {
+                    'success': False,
+                    'payment_link': None,
+                    'transaction_id': None,
+                    'reference': None,
+                    'error': f'Invalid phone number format: {phone}. Phone number must be a valid Tanzanian mobile number (e.g., 0758123456 or +255758123456).'
+                }
             
-            logger.info(f"Formatted phone number: {phone} -> {phone_number_clean}")
+            logger.info(f"[SMART LOGIC] Formatted phone number: {phone} -> {phone_number_clean}")
+            logger.info(f"[SMART LOGIC] Phone source: {'Customer phone' if (is_admin_or_staff and payment.booking) else 'Tenant profile phone'}")
+            logger.info(f"[SMART LOGIC] Account number to be sent to AzamPay: {phone_number_clean}")
             
             # Determine provider from payment model (customer selected) or default
             # Map our provider values to AzamPay's expected format
@@ -593,6 +615,9 @@ class AZAMPayGateway:
                 "externalId": reference,
                 "provider": provider  # "Airtel", "Tigo", "Mpesa", "Halopesa", "Azampesa" (title case)
             }
+            
+            logger.info(f"[SMART LOGIC] Final payload accountNumber: {payload['accountNumber']}")
+            logger.info(f"[SMART LOGIC] Phone source confirmation: {'Customer phone from booking' if (is_admin_or_staff and payment.booking) else 'Tenant profile phone'}")
             
             # Optional: Add additionalProperties if needed
             # payload["additionalProperties"] = {}

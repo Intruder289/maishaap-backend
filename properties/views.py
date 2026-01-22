@@ -1410,6 +1410,17 @@ def hotel_bookings(request):
     
     bookings_query = bookings_query.select_related('customer', 'property_obj').order_by('-created_at')
     
+    # Automatic checkout: Check and update bookings where stay period has ended
+    from django.utils import timezone
+    today = timezone.now().date()
+    auto_checked_out = bookings_query.filter(
+        check_out_date__lt=today,
+        booking_status__in=['pending', 'confirmed', 'checked_in']
+    ).update(
+        booking_status='checked_out',
+        checked_out_at=timezone.now()
+    )
+    
     # Filter by selected property if specified
     selected_property = None
     if selected_property_id:
@@ -5569,25 +5580,72 @@ def edit_customer(request, pk):
     customer = get_object_or_404(Customer, pk=pk)
     
     if request.method == 'POST':
-        customer.first_name = request.POST.get('first_name')
-        customer.last_name = request.POST.get('last_name')
-        customer.email = request.POST.get('email')
-        customer.phone = request.POST.get('phone')
-        customer.gender = request.POST.get('gender')
-        customer.date_of_birth = request.POST.get('date_of_birth') or None
-        customer.address = request.POST.get('address')
-        customer.city = request.POST.get('city')
-        customer.country = request.POST.get('country')
-        customer.postal_code = request.POST.get('postal_code')
-        customer.id_type = request.POST.get('id_type')
-        customer.id_number = request.POST.get('id_number')
-        customer.emergency_contact_name = request.POST.get('emergency_contact_name')
-        customer.emergency_contact_phone = request.POST.get('emergency_contact_phone')
-        customer.notes = request.POST.get('notes')
-        customer.save()
+        errors = []
         
-        messages.success(request, f'Customer {customer.full_name} updated successfully!')
-        return redirect('properties:customer_detail', pk=customer.pk)
+        # Get and validate form data
+        first_name = request.POST.get('first_name', '').strip()
+        last_name = request.POST.get('last_name', '').strip()
+        email = request.POST.get('email', '').strip()
+        phone = request.POST.get('phone', '').strip()
+        
+        # Validate required fields
+        if not first_name:
+            errors.append('First name is required.')
+        else:
+            customer.first_name = first_name
+            
+        if not last_name:
+            errors.append('Last name is required.')
+        else:
+            customer.last_name = last_name
+        
+        if not email:
+            errors.append('Email is required.')
+        else:
+            # Check email uniqueness (excluding current customer)
+            existing_customer = Customer.objects.filter(email__iexact=email).exclude(id=customer.id).first()
+            if existing_customer:
+                errors.append(f'Email {email} is already in use by another customer ({existing_customer.full_name}).')
+            else:
+                customer.email = email
+        
+        if not phone:
+            errors.append('Phone number is required.')
+        else:
+            # Check phone uniqueness (excluding current customer)
+            existing_customer = Customer.objects.filter(phone=phone).exclude(id=customer.id).first()
+            if existing_customer:
+                errors.append(f'Phone number {phone} is already in use by another customer ({existing_customer.full_name}).')
+            else:
+                customer.phone = phone
+        
+        # Update other fields
+        customer.gender = request.POST.get('gender') or None
+        date_of_birth = request.POST.get('date_of_birth')
+        customer.date_of_birth = date_of_birth if date_of_birth else None
+        customer.address = request.POST.get('address', '').strip() or None
+        customer.city = request.POST.get('city', '').strip() or None
+        customer.country = request.POST.get('country', '').strip() or None
+        customer.postal_code = request.POST.get('postal_code', '').strip() or None
+        customer.id_type = request.POST.get('id_type', '').strip() or None
+        customer.id_number = request.POST.get('id_number', '').strip() or None
+        customer.emergency_contact_name = request.POST.get('emergency_contact_name', '').strip() or None
+        customer.emergency_contact_phone = request.POST.get('emergency_contact_phone', '').strip() or None
+        customer.notes = request.POST.get('notes', '').strip() or None
+        
+        if errors:
+            for error in errors:
+                messages.error(request, error)
+        else:
+            try:
+                customer.save()
+                messages.success(request, f'Customer {customer.full_name} updated successfully!')
+                return redirect('properties:customer_detail', pk=customer.pk)
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Error saving customer {pk}: {str(e)}")
+                messages.error(request, f'Error saving customer: {str(e)}')
     
     context = {
         'customer': customer,
@@ -5627,24 +5685,70 @@ def customer_edit_modal(request, pk):
     customer = get_object_or_404(Customer, pk=pk)
     
     if request.method == 'POST':
-        customer.first_name = request.POST.get('first_name')
-        customer.last_name = request.POST.get('last_name')
-        customer.email = request.POST.get('email')
-        customer.phone = request.POST.get('phone')
-        customer.gender = request.POST.get('gender')
-        customer.date_of_birth = request.POST.get('date_of_birth') or None
-        customer.address = request.POST.get('address')
-        customer.city = request.POST.get('city')
-        customer.country = request.POST.get('country')
-        customer.postal_code = request.POST.get('postal_code')
-        customer.id_type = request.POST.get('id_type')
-        customer.id_number = request.POST.get('id_number')
-        customer.emergency_contact_name = request.POST.get('emergency_contact_name')
-        customer.emergency_contact_phone = request.POST.get('emergency_contact_phone')
-        customer.notes = request.POST.get('notes')
-        customer.save()
+        errors = []
         
-        return JsonResponse({'success': True, 'message': 'Customer updated successfully!'})
+        # Get and validate form data
+        first_name = request.POST.get('first_name', '').strip()
+        last_name = request.POST.get('last_name', '').strip()
+        email = request.POST.get('email', '').strip()
+        phone = request.POST.get('phone', '').strip()
+        
+        # Validate required fields
+        if not first_name:
+            errors.append('First name is required.')
+        else:
+            customer.first_name = first_name
+            
+        if not last_name:
+            errors.append('Last name is required.')
+        else:
+            customer.last_name = last_name
+        
+        if not email:
+            errors.append('Email is required.')
+        else:
+            # Check email uniqueness (excluding current customer)
+            existing_customer = Customer.objects.filter(email__iexact=email).exclude(id=customer.id).first()
+            if existing_customer:
+                errors.append(f'Email {email} is already in use by another customer ({existing_customer.full_name}).')
+            else:
+                customer.email = email
+        
+        if not phone:
+            errors.append('Phone number is required.')
+        else:
+            # Check phone uniqueness (excluding current customer)
+            existing_customer = Customer.objects.filter(phone=phone).exclude(id=customer.id).first()
+            if existing_customer:
+                errors.append(f'Phone number {phone} is already in use by another customer ({existing_customer.full_name}).')
+            else:
+                customer.phone = phone
+        
+        # Update other fields
+        customer.gender = request.POST.get('gender') or None
+        date_of_birth = request.POST.get('date_of_birth')
+        customer.date_of_birth = date_of_birth if date_of_birth else None
+        customer.address = request.POST.get('address', '').strip() or None
+        customer.city = request.POST.get('city', '').strip() or None
+        customer.country = request.POST.get('country', '').strip() or None
+        customer.postal_code = request.POST.get('postal_code', '').strip() or None
+        customer.id_type = request.POST.get('id_type', '').strip() or None
+        customer.id_number = request.POST.get('id_number', '').strip() or None
+        customer.emergency_contact_name = request.POST.get('emergency_contact_name', '').strip() or None
+        customer.emergency_contact_phone = request.POST.get('emergency_contact_phone', '').strip() or None
+        customer.notes = request.POST.get('notes', '').strip() or None
+        
+        if errors:
+            return JsonResponse({'success': False, 'errors': errors, 'message': 'Validation failed. Please correct the errors.'}, status=400)
+        
+        try:
+            customer.save()
+            return JsonResponse({'success': True, 'message': 'Customer updated successfully!'})
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error saving customer {pk}: {str(e)}")
+            return JsonResponse({'success': False, 'message': f'Error saving customer: {str(e)}'}, status=500)
     
     context = {
         'customer': customer,
@@ -6325,6 +6429,14 @@ def create_payment(request, booking_id=None, payment_id=None):
 def booking_detail(request, pk):
     """View booking details and payment history"""
     booking = get_object_or_404(Booking.objects.select_related('customer', 'property_obj', 'property_obj__property_type'), pk=pk)
+    
+    # Automatic checkout: If stay period has ended and booking is not already checked out, update status
+    if booking.is_stay_over and booking.booking_status not in ['checked_out', 'cancelled']:
+        booking.booking_status = 'checked_out'
+        if not booking.checked_out_at:
+            from django.utils import timezone
+            booking.checked_out_at = timezone.now()
+        booking.save()
     
     # Get payment history for this booking
     payments = Payment.objects.filter(booking=booking).order_by('-payment_date')
