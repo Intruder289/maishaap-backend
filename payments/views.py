@@ -807,9 +807,17 @@ def payment_view_details(request, payment_id):
         # Get related transactions
         transactions = payment.transactions.all().order_by('-created_at')
         
+        # Extract phone number from the most recent transaction's request_payload
+        phone_number_used = None
+        if transactions.exists():
+            latest_transaction = transactions.first()
+            if latest_transaction.request_payload and isinstance(latest_transaction.request_payload, dict):
+                phone_number_used = latest_transaction.request_payload.get('accountNumber')
+        
         context = {
             'payment': payment,
             'transactions': transactions,
+            'phone_number_used': phone_number_used,  # Phone number used in payment
         }
         
         return render(request, 'payments/modals/payment_view_details.html', context)

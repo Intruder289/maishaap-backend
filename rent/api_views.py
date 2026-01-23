@@ -426,13 +426,19 @@ class RentPaymentViewSet(viewsets.ModelViewSet):
                 'details': gateway_result
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Create PaymentTransaction record
+        # Create PaymentTransaction record with the actual payload sent to AZAM Pay
+        # This includes accountNumber (phone number) used for the payment
+        request_payload = gateway_result.get('request_payload', {})
+        if not request_payload:
+            # Fallback: create minimal payload if not provided
+            request_payload = {'amount': str(payment.amount), 'callback_url': callback_url}
+        
         transaction = PaymentTransaction.objects.create(
             payment=payment,
             provider=provider,
             azam_reference=gateway_result.get('reference'),
             gateway_transaction_id=gateway_result.get('transaction_id'),
-            request_payload={'amount': str(payment.amount), 'callback_url': callback_url},
+            request_payload=request_payload,  # Store actual payload sent to AZAM Pay
             response_payload=gateway_result,
             status='initiated'
         )

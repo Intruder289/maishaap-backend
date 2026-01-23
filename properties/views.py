@@ -5998,14 +5998,20 @@ def create_payment(request, booking_id=None, payment_id=None):
             )
             
             if gateway_result.get('success'):
-                # Create payment transaction
+                # Create payment transaction with the actual payload sent to AZAM Pay
+                # This includes accountNumber (phone number) used for the payment
+                request_payload = gateway_result.get('request_payload', {})
+                if not request_payload:
+                    # Fallback: create minimal payload if not provided
+                    request_payload = {'visit_payment_id': visit_payment.id}
+                
                 PaymentTransaction.objects.create(
                     payment=unified_payment,
                     provider=provider,
                     gateway_transaction_id=gateway_result.get('transaction_id'),
                     azam_reference=gateway_result.get('reference'),
                     status='initiated',
-                    request_payload={'visit_payment_id': visit_payment.id}
+                    request_payload=request_payload  # Store actual payload sent to AZAM Pay
                 )
                 
                 transaction_id = gateway_result.get('transaction_id')
@@ -6141,14 +6147,20 @@ def create_payment(request, booking_id=None, payment_id=None):
             )
             
             if gateway_result.get('success'):
-                # Create payment transaction
+                # Create payment transaction with the actual payload sent to AZAM Pay
+                # This includes accountNumber (phone number) used for the payment
+                request_payload = gateway_result.get('request_payload', {})
+                if not request_payload:
+                    # Fallback: create minimal payload if not provided
+                    request_payload = {'booking_id': booking.id}
+                
                 PaymentTransaction.objects.create(
                     payment=unified_payment,
                     provider=provider,
                     gateway_transaction_id=gateway_result.get('transaction_id'),
                     azam_reference=gateway_result.get('reference'),
                     status='initiated',
-                    request_payload={'booking_id': booking.id}
+                    request_payload=request_payload  # Store actual payload sent to AZAM Pay
                 )
                 
                 transaction_id = gateway_result.get('transaction_id')

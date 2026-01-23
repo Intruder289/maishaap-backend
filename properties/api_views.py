@@ -20,13 +20,70 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import parsers
 # Swagger documentation - using drf-spectacular
+# Always import extend_schema from drf-spectacular as it's used throughout the file
+try:
+    from drf_spectacular.utils import extend_schema, OpenApiParameter
+    from drf_spectacular.types import OpenApiTypes
+except ImportError:
+    # Fallback if drf-spectacular is not available
+    extend_schema = lambda *args, **kwargs: lambda func: func  # No-op decorator
+    OpenApiParameter = None
+    OpenApiTypes = None
+
+# Also try to import drf-yasg for backward compatibility (if available)
 try:
     from drf_yasg.utils import swagger_auto_schema
     from drf_yasg import openapi
 except ImportError:
-    # drf-yasg not installed, use drf-spectacular instead
-    from drf_spectacular.utils import extend_schema, OpenApiParameter
-    from drf_spectacular.types import OpenApiTypes
+    # drf-yasg not installed, create fallback openapi class first
+    class openapi:
+        class Response:
+            def __init__(self, *args, **kwargs):
+                pass
+        class Schema:
+            def __init__(self, *args, **kwargs):
+                pass
+        class Items:
+            def __init__(self, *args, **kwargs):
+                pass
+        class Contact:
+            def __init__(self, *args, **kwargs):
+                pass
+        class License:
+            def __init__(self, *args, **kwargs):
+                pass
+        class Info:
+            def __init__(self, *args, **kwargs):
+                pass
+        TYPE_OBJECT = 'object'
+        TYPE_STRING = 'string'
+        TYPE_INTEGER = 'integer'
+        TYPE_NUMBER = 'number'
+        TYPE_BOOLEAN = 'boolean'
+        TYPE_ARRAY = 'array'
+        FORMAT_EMAIL = 'email'
+        FORMAT_DATE = 'date'
+        FORMAT_DATETIME = 'date-time'
+        FORMAT_DECIMAL = 'decimal'
+        FORMAT_URI = 'uri'
+        FORMAT_UUID = 'uuid'
+        IN_QUERY = 'query'
+        IN_PATH = 'path'
+        IN_BODY = 'body'
+        IN_FORM = 'formData'
+        IN_HEADER = 'header'
+        
+        # Create a proper Parameter class that stores arguments
+        class Parameter:
+            def __init__(self, name, in_, description=None, type=None, required=False, **kwargs):
+                self.name = name
+                self.in_ = in_
+                self.description = description or ''
+                self.type = type or 'string'
+                self.required = required
+                # Store all kwargs for compatibility
+                for key, value in kwargs.items():
+                    setattr(self, key, value)
     
     # Create a wrapper to convert swagger_auto_schema to extend_schema for drf-spectacular
     def swagger_auto_schema(*args, **kwargs):
@@ -164,56 +221,6 @@ except ImportError:
             schema_kwargs['request'] = kwargs.get('request')
         
         return extend_schema(**schema_kwargs)
-    
-    # Fallback openapi class for backward compatibility
-    class openapi:
-        class Response:
-            def __init__(self, *args, **kwargs):
-                pass
-        class Schema:
-            def __init__(self, *args, **kwargs):
-                pass
-        class Items:
-            def __init__(self, *args, **kwargs):
-                pass
-        class Contact:
-            def __init__(self, *args, **kwargs):
-                pass
-        class License:
-            def __init__(self, *args, **kwargs):
-                pass
-        class Info:
-            def __init__(self, *args, **kwargs):
-                pass
-        TYPE_OBJECT = 'object'
-        TYPE_STRING = 'string'
-        TYPE_INTEGER = 'integer'
-        TYPE_NUMBER = 'number'
-        TYPE_BOOLEAN = 'boolean'
-        TYPE_ARRAY = 'array'
-        FORMAT_EMAIL = 'email'
-        FORMAT_DATE = 'date'
-        FORMAT_DATETIME = 'date-time'
-        FORMAT_DECIMAL = 'decimal'
-        FORMAT_URI = 'uri'
-        FORMAT_UUID = 'uuid'
-        IN_QUERY = 'query'
-        IN_PATH = 'path'
-        IN_BODY = 'body'
-        IN_FORM = 'formData'
-        IN_HEADER = 'header'
-        
-        # Create a proper Parameter class that stores arguments
-        class Parameter:
-            def __init__(self, name, in_, description=None, type=None, required=False, **kwargs):
-                self.name = name
-                self.in_ = in_
-                self.description = description or ''
-                self.type = type or 'string'
-                self.required = required
-                # Store all kwargs for compatibility
-                for key, value in kwargs.items():
-                    setattr(self, key, value)
 
 from .models import (
     PropertyType, Region, PropertyFavorite, Property, PropertyImage,

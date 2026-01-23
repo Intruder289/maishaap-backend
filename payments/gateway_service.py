@@ -411,20 +411,35 @@ class AZAMPayGateway:
             base_url = cls.get_base_url()
             
             # Smart Logic: Select phone number based on user role
-            # - Admin/Staff: Use customer phone (from booking) so customer receives payment prompt
+            # - Admin/Staff: MUST use customer phone from booking - admin phone NOT allowed
             # - Customer: Use logged-in user's phone (their own profile phone)
+            # Note: All payments (house, hotel, venue, lodge) use booking - no invoice/rent_invoice support
             phone_number = None
             
             # Check if logged-in user is admin/staff
             is_admin_or_staff = payment.tenant.is_staff or payment.tenant.is_superuser
             
-            if is_admin_or_staff and payment.booking:
-                # Admin/Staff creating payment: Use customer phone
-                # This ensures the customer receives the payment prompt
-                phone_number = payment.booking.customer.phone if payment.booking.customer else None
-                logger.info(f"[SMART LOGIC] Admin/Staff payment -> Using customer phone: {phone_number}")
-                logger.info(f"[SMART LOGIC] Customer: {payment.booking.customer.full_name if payment.booking.customer else 'N/A'}")
-                logger.info(f"[SMART LOGIC] Customer ID: {payment.booking.customer.id if payment.booking.customer else 'N/A'}")
+            if is_admin_or_staff:
+                # Admin/Staff creating payment: MUST use customer phone from booking
+                # Admin's own phone is NOT allowed - payment must be linked to a booking
+                
+                if payment.booking:
+                    # Booking payment: Use customer phone from booking
+                    phone_number = payment.booking.customer.phone if payment.booking.customer else None
+                    logger.info(f"[SMART LOGIC] Admin/Staff payment -> Using customer phone from booking: {phone_number}")
+                    logger.info(f"[SMART LOGIC] Customer: {payment.booking.customer.full_name if payment.booking.customer else 'N/A'}")
+                    logger.info(f"[SMART LOGIC] Customer ID: {payment.booking.customer.id if payment.booking.customer else 'N/A'}")
+                else:
+                    # Admin/Staff payment without booking: NOT ALLOWED
+                    error_msg = 'Admin/Staff payments must be linked to a booking. Payment must have a customer associated with it.'
+                    logger.error(f"[SMART LOGIC ERROR] {error_msg}")
+                    return {
+                        'success': False,
+                        'payment_link': None,
+                        'transaction_id': None,
+                        'reference': None,
+                        'error': error_msg
+                    }
             else:
                 # Customer creating payment: Use their own profile phone
                 user_profile = getattr(payment.tenant, 'profile', None)
@@ -438,8 +453,11 @@ class AZAMPayGateway:
             
             if not phone_number:
                 # Provide helpful error message based on user role
-                if is_admin_or_staff and payment.booking:
-                    error_msg = f'Phone number is required for payment. Customer ({payment.booking.customer.full_name if payment.booking.customer else "N/A"}) does not have a phone number. Please add a phone number to the customer profile.'
+                if is_admin_or_staff:
+                    if payment.booking:
+                        error_msg = f'Phone number is required for payment. Customer ({payment.booking.customer.full_name if payment.booking.customer else "N/A"}) does not have a phone number. Please add a phone number to the customer profile.'
+                    else:
+                        error_msg = 'Phone number is required for payment. Admin/Staff payments must be linked to a booking with a valid customer phone number.'
                 else:
                     error_msg = f'Phone number is required for payment. Please add a phone number to your profile (User: {payment.tenant.username}).'
                 
@@ -498,68 +516,78 @@ class AZAMPayGateway:
             
             checkout_url_endpoint = f"{checkout_base}/azampay/mno/checkout"
             
-            # Format phone number: Must be exactly 12 digits starting with "2557" (E.164 format for Tanzania)
-            # AZAMpay requires: 2557XXXXXXXX (exactly 12 digits, starting with 2557)
+            # Format phone number: Must be exactly 12 digits starting with "255" (E.164 format for Tanzania)
+            # AZAMpay requires: 255XXXXXXXXX (exactly 12 digits, starting with 255)
+            # Tanzanian mobile numbers can start with 6, 7, or other digits after the country code
             # Remove all non-digit characters
             digits_only = ''.join(filter(str.isdigit, phone))
             
-            # Remove leading zeros
-            digits_only = digits_only.lstrip('0')
-            
-            # Extract mobile number part (should be 9 digits starting with 7)
+            # Extract mobile number part
             if digits_only.startswith('255'):
-                # Remove 255 prefix to get mobile number
-                mobile_part = digits_only[3:]
-            elif digits_only.startswith('0'):
-                # Remove leading 0
-                mobile_part = digits_only[1:]
-            else:
-                # Assume it's already a mobile number
-                mobile_part = digits_only
-            
-            # Ensure mobile part starts with 7 (Tanzanian mobile numbers start with 7)
-            if not mobile_part.startswith('7'):
-                # Try to find 7 in the number
-                if '7' in mobile_part:
-                    # Find first occurrence of 7 and take from there
-                    idx = mobile_part.index('7')
-                    mobile_part = mobile_part[idx:]
+                # Already has country code: 255XXXXXXXXX
+                if len(digits_only) == 12:
+                    # Perfect format: 255XXXXXXXXX (12 digits)
+                    phone_number_clean = digits_only
+                elif len(digits_only) > 12:
+                    # Too long: take first 12 digits
+                    phone_number_clean = digits_only[:12]
                 else:
-                    # If no 7 found, prepend 7
-                    mobile_part = '7' + mobile_part
-            
-            # Take exactly 9 digits (mobile number part)
-            if len(mobile_part) > 9:
-                mobile_part = mobile_part[:9]
-            elif len(mobile_part) < 9:
-                # Pad with zeros if too short (shouldn't happen, but handle it)
-                mobile_part = mobile_part.ljust(9, '0')
-            
-            # Construct final format: 255 + 9-digit mobile (must start with 7)
-            if len(mobile_part) == 9 and mobile_part.startswith('7'):
-                phone_number_clean = '255' + mobile_part
+                    # Too short: invalid
+                    error_msg = f"Phone number '{phone}' has country code 255 but is too short ({len(digits_only)} digits). Expected 12 digits total."
+                    logger.error(f"[SMART LOGIC ERROR] {error_msg}")
+                    return {
+                        'success': False,
+                        'payment_link': None,
+                        'transaction_id': None,
+                        'reference': None,
+                        'error': f'Invalid phone number format: {phone}. Phone number with country code must be exactly 12 digits (e.g., 255653294241).'
+                    }
+            elif digits_only.startswith('0'):
+                # Local format: 0XXXXXXXXX (10 digits) -> convert to 255XXXXXXXXX (12 digits)
+                if len(digits_only) == 10:
+                    # Remove leading 0 and add 255
+                    mobile_part = digits_only[1:]  # Remove leading 0
+                    phone_number_clean = '255' + mobile_part  # Add country code
+                else:
+                    error_msg = f"Phone number '{phone}' starts with 0 but has wrong length ({len(digits_only)} digits). Expected 10 digits (e.g., 0653294241)."
+                    logger.error(f"[SMART LOGIC ERROR] {error_msg}")
+                    return {
+                        'success': False,
+                        'payment_link': None,
+                        'transaction_id': None,
+                        'reference': None,
+                        'error': f'Invalid phone number format: {phone}. Local format must be exactly 10 digits starting with 0 (e.g., 0653294241).'
+                    }
+            elif len(digits_only) == 9:
+                # 9-digit mobile number (without country code or leading 0)
+                # Add country code 255
+                phone_number_clean = '255' + digits_only
+            elif len(digits_only) == 10:
+                # 10 digits without leading 0 - assume it's local format missing the 0
+                # This shouldn't happen, but handle it by adding 255
+                phone_number_clean = '255' + digits_only
             else:
-                # If format is invalid, log error and return error
-                error_msg = f"Phone number '{phone}' could not be formatted correctly. Mobile part: '{mobile_part}' (must be 9 digits starting with 7). Original phone: {phone_number}"
+                # Invalid format
+                error_msg = f"Phone number '{phone}' has invalid format ({len(digits_only)} digits). Expected: 10 digits starting with 0 (e.g., 0653294241) or 12 digits with country code (e.g., 255653294241)."
                 logger.error(f"[SMART LOGIC ERROR] {error_msg}")
                 return {
                     'success': False,
                     'payment_link': None,
                     'transaction_id': None,
                     'reference': None,
-                    'error': f'Invalid phone number format: {phone}. Phone number must be a valid Tanzanian mobile number (e.g., 0758123456 or +255758123456).'
+                    'error': f'Invalid phone number format: {phone}. Phone number must be 10 digits starting with 0 (e.g., 0653294241) or 12 digits with country code (e.g., 255653294241).'
                 }
             
-            # Final validation: Must be exactly 12 digits starting with 2557
-            if not (len(phone_number_clean) == 12 and phone_number_clean.startswith('2557')):
-                error_msg = f"Phone number '{phone}' formatted to '{phone_number_clean}' doesn't match required format (2557XXXXXXXX). Original phone: {phone_number}"
+            # Final validation: Must be exactly 12 digits starting with 255
+            if not (len(phone_number_clean) == 12 and phone_number_clean.startswith('255')):
+                error_msg = f"Phone number '{phone}' formatted to '{phone_number_clean}' doesn't match required format (255XXXXXXXXX). Original phone: {phone_number}"
                 logger.error(f"[SMART LOGIC ERROR] {error_msg}")
                 return {
                     'success': False,
                     'payment_link': None,
                     'transaction_id': None,
                     'reference': None,
-                    'error': f'Invalid phone number format: {phone}. Phone number must be a valid Tanzanian mobile number (e.g., 0758123456 or +255758123456).'
+                    'error': f'Invalid phone number format: {phone}. Phone number must be a valid Tanzanian mobile number (e.g., 0653294241 or 255653294241).'
                 }
             
             logger.info(f"[SMART LOGIC] Formatted phone number: {phone} -> {phone_number_clean}")
@@ -718,6 +746,7 @@ class AZAMPayGateway:
                             'reference': reference,
                             'message': message,
                             'message_code': message_code,
+                            'request_payload': payload,  # Include the payload sent to AZAM Pay (includes accountNumber)
                             'error': None
                         }
                     else:
