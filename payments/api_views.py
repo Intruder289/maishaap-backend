@@ -117,10 +117,11 @@ class PaymentViewSet(viewsets.ModelViewSet):
     
     list: Get all payments (filtered by user role)
     retrieve: Get a specific payment
-    create: Create a new payment
+    create: Create a new payment (for booking payments - hotel, house, lodge, venue)
     update: Update a payment
     partial_update: Partially update a payment
     destroy: Delete a payment
+    initiate_gateway: Initiate AZAM Pay gateway payment for booking
     """
     queryset = models.Payment.objects.all()
     serializer_class = serializers.PaymentSerializer
@@ -135,38 +136,162 @@ class PaymentViewSet(viewsets.ModelViewSet):
         if user.is_staff or user.is_superuser:
             return super().get_queryset()
         return self.queryset.filter(tenant=user)
+    
+    def perform_create(self, serializer):
+        """Set tenant to logged-in user when creating payment"""
+        serializer.save(tenant=self.request.user, recorded_by=self.request.user)
 
     @swagger_auto_schema(
         method='post',
-        operation_description="Initiate a payment transaction for a payment record. Creates a PaymentTransaction and returns transaction details.",
-        operation_summary="Initiate Payment Transaction",
+        operation_description="Initiate payment with payment gateway (AZAM Pay) for booking payments. Works for all property types (hotel, house, lodge, venue). Uses smart phone logic to select correct phone number.",
+        operation_summary="Initiate Gateway Payment for Booking",
         tags=['Payments'],
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             properties={
-                'request_payload': openapi.Schema(type=openapi.TYPE_OBJECT, description='Additional request payload')
+                'mobile_money_provider': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description='Mobile money provider (required for mobile_money payments): AIRTEL, TIGO, MPESA, HALOPESA',
+                    enum=['AIRTEL', 'TIGO', 'MPESA', 'HALOPESA']
+                )
             }
         ),
         responses={
-            201: serializers.PaymentTransactionSerializer,
+            201: openapi.Response(
+                description="Payment initiated successfully",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                        'payment_id': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'transaction_id': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'transaction_reference': openapi.Schema(type=openapi.TYPE_STRING),
+                        'gateway_transaction_id': openapi.Schema(type=openapi.TYPE_STRING),
+                        'message': openapi.Schema(type=openapi.TYPE_STRING),
+                        'phone_number_used': openapi.Schema(type=openapi.TYPE_STRING, description='Phone number used for payment')
+                    }
+                )
+            ),
+            400: "Payment already completed, missing booking, or gateway error",
             404: "Payment not found",
             401: "Authentication required"
         },
         security=[{'Bearer': []}]
     )
-    @action(detail=True, methods=['post'])
-    def initiate(self, request, pk=None):
-        """Initiate a payment transaction for a payment record."""
-        payment = get_object_or_404(models.Payment, pk=pk)
-        # Simulate creating a transaction record and returning a provider redirect
-        tx = models.PaymentTransaction.objects.create(
+    @action(detail=True, methods=['post'], url_path='initiate-gateway')
+    def initiate_gateway(self, request, pk=None):
+        """
+        Initiate payment with payment gateway (AZAM Pay) for booking payments.
+        
+        Works for all property types: hotel, house, lodge, venue.
+        Uses smart phone logic:
+        - Admin/Staff: Uses customer phone from booking
+        - Customer: Uses their own profile phone
+        
+        Flow:
+        1. Validates payment has booking
+        2. Gets mobile money provider from request (if mobile_money payment)
+        3. Calls AZAM Pay API with smart phone selection
+        4. Creates PaymentTransaction
+        5. Returns transaction details to mobile app
+        """
+        payment = self.get_object()
+        
+        # Check if payment is already completed
+        if payment.status == 'completed':
+            return Response({
+                'error': 'Payment already completed'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validate payment has booking (required for booking payments)
+        if not payment.booking:
+            return Response({
+                'error': 'Payment must be linked to a booking. This endpoint is for booking payments only.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get mobile money provider if this is a mobile_money payment
+        if payment.payment_method == 'mobile_money':
+            mobile_money_provider = request.data.get('mobile_money_provider', '').strip()
+            if not mobile_money_provider:
+                return Response({
+                    'error': 'Mobile Money Provider is required for mobile money payments. Please provide: AIRTEL, TIGO, MPESA, or HALOPESA'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Update payment with mobile money provider
+            payment.mobile_money_provider = mobile_money_provider.upper()
+            payment.save()
+        
+        # Get or create AZAM Pay provider
+        provider, _ = models.PaymentProvider.objects.get_or_create(
+            name='AZAM Pay',
+            defaults={'description': 'AZAM Pay Payment Gateway'}
+        )
+        
+        # Update payment provider if not set
+        if not payment.provider:
+            payment.provider = provider
+            payment.save()
+        
+        # Get callback URL - use configured webhook URL (production) instead of localhost
+        from django.conf import settings
+        callback_url = getattr(settings, 'AZAM_PAY_WEBHOOK_URL', None)
+        if not callback_url:
+            # Fallback to BASE_URL if webhook URL not configured
+            base_domain = getattr(settings, 'BASE_URL', 'https://portal.maishaapp.co.tz')
+            callback_url = f"{base_domain}/api/v1/payments/webhook/azam-pay/"
+        
+        # Determine payment method for gateway
+        payment_method = 'mobile_money' if payment.payment_method == 'mobile_money' else 'mobile_money'
+        
+        # Initiate payment with gateway (uses smart phone logic)
+        gateway_result = PaymentGatewayService.initiate_payment(
             payment=payment,
-            provider=payment.provider,
-            request_payload=request.data.get('request_payload', {}),
+            provider_name='azam pay',
+            callback_url=callback_url,
+            payment_method=payment_method
+        )
+        
+        if not gateway_result['success']:
+            return Response({
+                'error': gateway_result.get('error', 'Failed to initiate payment'),
+                'details': gateway_result
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Create PaymentTransaction record with the actual payload sent to AZAM Pay
+        # This includes accountNumber (phone number) used for the payment
+        request_payload = gateway_result.get('request_payload', {})
+        if not request_payload:
+            # Fallback: create minimal payload if not provided
+            request_payload = {'amount': str(payment.amount), 'callback_url': callback_url}
+        
+        transaction = models.PaymentTransaction.objects.create(
+            payment=payment,
+            provider=provider,
+            azam_reference=gateway_result.get('reference'),
+            gateway_transaction_id=gateway_result.get('transaction_id'),
+            request_payload=request_payload,  # Store actual payload sent to AZAM Pay (includes phone number)
+            response_payload=gateway_result,
             status='initiated'
         )
-        serializer = serializers.PaymentTransactionSerializer(tx)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        
+        # Update payment with transaction ID
+        payment.transaction_id = gateway_result.get('transaction_id')
+        payment.status = 'pending'
+        payment.save()
+        
+        # Extract phone number from request payload for response
+        phone_number_used = request_payload.get('accountNumber') if isinstance(request_payload, dict) else None
+        
+        return Response({
+            'success': True,
+            'payment_id': payment.id,
+            'transaction_id': transaction.id,
+            'transaction_reference': gateway_result.get('reference'),
+            'gateway_transaction_id': gateway_result.get('transaction_id'),
+            'message': gateway_result.get('message', 'Payment initiated successfully. The customer will receive a payment prompt on their phone.'),
+            'phone_number_used': phone_number_used,  # Phone number used for payment
+            'booking_reference': payment.booking.booking_reference if payment.booking else None,
+        }, status=status.HTTP_201_CREATED)
 
 
 class PaymentTransactionViewSet(viewsets.ModelViewSet):

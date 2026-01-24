@@ -17,10 +17,18 @@ class InvoiceSerializer(serializers.ModelSerializer):
 
 
 class PaymentSerializer(serializers.ModelSerializer):
+    booking_reference = serializers.CharField(source='booking.booking_reference', read_only=True)
+    booking_id = serializers.IntegerField(source='booking.id', read_only=True)
+    
     class Meta:
         model = models.Payment
-        fields = ['id', 'invoice', 'tenant', 'provider', 'amount', 'paid_date', 'status', 'transaction_ref', 'created_at']
-        read_only_fields = ['created_at']
+        fields = [
+            'id', 'invoice', 'rent_invoice', 'booking', 'tenant', 'provider', 
+            'amount', 'payment_method', 'mobile_money_provider', 'paid_date', 
+            'status', 'transaction_ref', 'reference_number', 'transaction_id',
+            'notes', 'created_at', 'updated_at', 'booking_reference', 'booking_id'
+        ]
+        read_only_fields = ['created_at', 'updated_at', 'booking_reference', 'booking_id']
 
 
 class PaymentTransactionSerializer(serializers.ModelSerializer):

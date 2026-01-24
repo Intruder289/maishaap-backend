@@ -410,28 +410,44 @@ class AZAMPayGateway:
             # Get base URL
             base_url = cls.get_base_url()
             
-            # Smart Logic: Select phone number based on user role
-            # - Admin/Staff: MUST use customer phone from booking - admin phone NOT allowed
-            # - Customer: Use logged-in user's phone (their own profile phone)
-            # Note: All payments (house, hotel, venue, lodge) use booking - no invoice/rent_invoice support
+            # Smart Logic: Select phone number based on user role and payment type
+            # - Admin/Staff booking payment: MUST use customer phone from booking - admin phone NOT allowed
+            # - Visit payment (no booking): Always use customer's own phone (regardless of admin status)
+            # - Customer booking payment: Use logged-in user's phone (their own profile phone)
+            # Note: All booking payments (house, hotel, venue, lodge) use booking - no invoice/rent_invoice support
             phone_number = None
             
             # Check if logged-in user is admin/staff
             is_admin_or_staff = payment.tenant.is_staff or payment.tenant.is_superuser
             
+            # Check if this is a visit payment (no booking, rent_invoice, or invoice)
+            is_visit_payment = not payment.booking and not payment.rent_invoice and not payment.invoice
+            
             if is_admin_or_staff:
-                # Admin/Staff creating payment: MUST use customer phone from booking
-                # Admin's own phone is NOT allowed - payment must be linked to a booking
-                
+                # Admin/Staff creating payment
                 if payment.booking:
                     # Booking payment: Use customer phone from booking
                     phone_number = payment.booking.customer.phone if payment.booking.customer else None
-                    logger.info(f"[SMART LOGIC] Admin/Staff payment -> Using customer phone from booking: {phone_number}")
+                    logger.info(f"[SMART LOGIC] Admin/Staff booking payment -> Using customer phone from booking: {phone_number}")
                     logger.info(f"[SMART LOGIC] Customer: {payment.booking.customer.full_name if payment.booking.customer else 'N/A'}")
                     logger.info(f"[SMART LOGIC] Customer ID: {payment.booking.customer.id if payment.booking.customer else 'N/A'}")
+                elif payment.rent_invoice:
+                    # Rent payment: Use tenant's phone from rent_invoice (tenant paying their own rent)
+                    tenant_profile = getattr(payment.rent_invoice.tenant, 'profile', None)
+                    phone_number = tenant_profile.phone if tenant_profile and tenant_profile.phone else None
+                    logger.info(f"[SMART LOGIC] Admin/Staff rent payment -> Using tenant phone from rent_invoice: {phone_number}")
+                    logger.info(f"[SMART LOGIC] Tenant: {payment.rent_invoice.tenant.username}")
+                    logger.info(f"[SMART LOGIC] Tenant Profile ID: {tenant_profile.id if tenant_profile else 'No profile'}")
+                elif is_visit_payment:
+                    # Visit payment: Use admin's own phone (they're paying for themselves to visit)
+                    user_profile = getattr(payment.tenant, 'profile', None)
+                    phone_number = user_profile.phone if user_profile and user_profile.phone else None
+                    logger.info(f"[SMART LOGIC] Admin/Staff visit payment -> Using admin's own profile phone: {phone_number}")
+                    logger.info(f"[SMART LOGIC] Tenant: {payment.tenant.username}")
+                    logger.info(f"[SMART LOGIC] Tenant Profile ID: {user_profile.id if user_profile else 'No profile'}")
                 else:
-                    # Admin/Staff payment without booking: NOT ALLOWED
-                    error_msg = 'Admin/Staff payments must be linked to a booking. Payment must have a customer associated with it.'
+                    # Admin/Staff payment without booking/rent_invoice/visit: NOT ALLOWED
+                    error_msg = 'Admin/Staff payments must be linked to a booking, rent_invoice, or visit payment. Payment must have a customer/tenant associated with it.'
                     logger.error(f"[SMART LOGIC ERROR] {error_msg}")
                     return {
                         'success': False,
@@ -441,10 +457,10 @@ class AZAMPayGateway:
                         'error': error_msg
                     }
             else:
-                # Customer creating payment: Use their own profile phone
+                # Customer/Tenant creating payment: Use their own profile phone
                 user_profile = getattr(payment.tenant, 'profile', None)
                 phone_number = user_profile.phone if user_profile and user_profile.phone else None
-                logger.info(f"[SMART LOGIC] Customer payment -> Using tenant profile phone: {phone_number}")
+                logger.info(f"[SMART LOGIC] Customer/Tenant payment -> Using tenant profile phone: {phone_number}")
                 logger.info(f"[SMART LOGIC] Tenant: {payment.tenant.username}")
                 logger.info(f"[SMART LOGIC] Tenant Profile ID: {user_profile.id if user_profile else 'No profile'}")
             
@@ -452,12 +468,16 @@ class AZAMPayGateway:
             # If phone is not found, we should fail with clear error message instead of using wrong phone
             
             if not phone_number:
-                # Provide helpful error message based on user role
+                # Provide helpful error message based on user role and payment type
                 if is_admin_or_staff:
                     if payment.booking:
                         error_msg = f'Phone number is required for payment. Customer ({payment.booking.customer.full_name if payment.booking.customer else "N/A"}) does not have a phone number. Please add a phone number to the customer profile.'
+                    elif payment.rent_invoice:
+                        error_msg = f'Phone number is required for payment. Tenant ({payment.rent_invoice.tenant.get_full_name() or payment.rent_invoice.tenant.username}) does not have a phone number. Please add a phone number to the tenant profile.'
+                    elif is_visit_payment:
+                        error_msg = f'Phone number is required for payment. Please add a phone number to your profile (User: {payment.tenant.username}).'
                     else:
-                        error_msg = 'Phone number is required for payment. Admin/Staff payments must be linked to a booking with a valid customer phone number.'
+                        error_msg = 'Phone number is required for payment. Admin/Staff payments must be linked to a booking, rent_invoice, or visit payment with a valid phone number.'
                 else:
                     error_msg = f'Phone number is required for payment. Please add a phone number to your profile (User: {payment.tenant.username}).'
                 
@@ -498,6 +518,9 @@ class AZAMPayGateway:
                 reference = f"BOOKING-{payment.booking.booking_reference}-{int(timezone.now().timestamp())}"
             elif payment.rent_invoice:
                 reference = f"RENT-{payment.id}-{int(timezone.now().timestamp())}"
+            elif is_visit_payment:
+                # Visit payment (no booking/rent_invoice/invoice)
+                reference = f"VISIT-{payment.id}-{int(timezone.now().timestamp())}"
             else:
                 reference = f"PAY-{payment.id}-{int(timezone.now().timestamp())}"
             

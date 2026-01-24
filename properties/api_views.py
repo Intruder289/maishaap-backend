@@ -2813,17 +2813,37 @@ def property_visit_status(request, property_id):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def property_visit_initiate(request, property_id):
-    """Initiate property visit payment"""
+    """
+    Initiate property visit payment for house properties.
+    
+    Creates a payment record and initiates AZAM Pay gateway payment.
+    Uses smart phone logic: Always uses the customer's own profile phone
+    (since visit payments are always made by the customer themselves).
+    
+    Only available for house properties.
+    """
     property_obj = get_object_or_404(Property, pk=property_id)
+    
+    # Only house properties support visit payments
+    if property_obj.property_type.name.lower() != 'house':
+        return Response(
+            {"error": "Visit payment is only available for house properties."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
     
     if not property_obj.visit_cost or property_obj.visit_cost <= 0:
         return Response(
-            {"detail": "This property does not require a visit payment."},
+            {"error": "Visit cost is not set for this property."},
             status=status.HTTP_400_BAD_REQUEST
         )
     
     # Check if already paid and still active
     from .models import PropertyVisitPayment
+    from payments.models import Payment, PaymentProvider, PaymentTransaction
+    from payments.gateway_service import PaymentGatewayService
+    from django.conf import settings
+    from django.utils import timezone
+    
     existing_payment = PropertyVisitPayment.objects.filter(
         property=property_obj,
         user=request.user,
@@ -2833,6 +2853,7 @@ def property_visit_initiate(request, property_id):
     # If payment exists and is still active (not expired), return success
     if existing_payment and existing_payment.is_active():
         return Response({
+            'success': True,
             'message': 'Visit payment already completed and active',
             'payment_id': existing_payment.id,
             'status': 'completed',
@@ -2848,14 +2869,119 @@ def property_visit_initiate(request, property_id):
         existing_payment.gateway_reference = None
         existing_payment.amount = property_obj.visit_cost  # Update amount in case it changed
         existing_payment.save()
+        visit_payment = existing_payment
+        created = False
+    else:
+        # Get or create pending visit payment
+        visit_payment, created = PropertyVisitPayment.objects.get_or_create(
+            property=property_obj,
+            user=request.user,
+            defaults={
+                'amount': property_obj.visit_cost,
+                'status': 'pending'
+            }
+        )
     
-    # Create payment record (stub - actual payment processing would go here)
+    # Get payment method from request (default: mobile_money)
+    payment_method = request.data.get('payment_method', 'mobile_money')
+    
+    # Get mobile money provider if this is a mobile_money payment
+    mobile_money_provider = None
+    if payment_method == 'mobile_money':
+        mobile_money_provider = request.data.get('mobile_money_provider', '').strip()
+        if not mobile_money_provider:
+            return Response({
+                'error': 'Mobile Money Provider is required for mobile money payments. Please provide: AIRTEL, TIGO, MPESA, or HALOPESA'
+            }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Get or create payment provider (AZAM Pay)
+    provider, _ = PaymentProvider.objects.get_or_create(
+        name='AZAM Pay',
+        defaults={'description': 'AZAM Pay Payment Gateway'}
+    )
+    
+    # Create or get payment record
+    if visit_payment.payment:
+        payment = visit_payment.payment
+        payment.amount = visit_payment.amount
+        payment.payment_method = payment_method
+        if mobile_money_provider:
+            payment.mobile_money_provider = mobile_money_provider.upper()
+        payment.status = 'pending'
+        payment.save()
+    else:
+        payment = Payment.objects.create(
+            tenant=request.user,
+            provider=provider,
+            amount=visit_payment.amount,
+            payment_method=payment_method,
+            mobile_money_provider=mobile_money_provider.upper() if mobile_money_provider else None,
+            status='pending',
+            notes=f'Visit payment for property: {property_obj.title}',
+            recorded_by=request.user
+        )
+        
+        # Link visit payment to unified payment
+        visit_payment.payment = payment
+        visit_payment.save()
+    
+    # Get callback URL
+    callback_url = getattr(settings, 'AZAM_PAY_WEBHOOK_URL', None)
+    if not callback_url:
+        base_domain = getattr(settings, 'BASE_URL', 'https://portal.maishaapp.co.tz')
+        callback_url = f"{base_domain}/api/v1/payments/webhook/azam-pay/"
+    
+    # Initiate payment with gateway (uses smart phone logic)
+    # For visit payments, smart logic will use customer's own phone (payment.tenant.profile.phone)
+    gateway_result = PaymentGatewayService.initiate_payment(
+        payment=payment,
+        provider_name='azam pay',
+        callback_url=callback_url,
+        payment_method='mobile_money'  # Visit payments always use mobile_money
+    )
+    
+    if not gateway_result.get('success'):
+        return Response({
+            'error': gateway_result.get('error', 'Failed to initiate payment'),
+            'details': gateway_result
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Create PaymentTransaction record with the actual payload sent to AZAM Pay
+    request_payload = gateway_result.get('request_payload', {})
+    if not request_payload:
+        request_payload = {'property_id': property_id, 'visit_payment_id': visit_payment.id}
+    
+    transaction = PaymentTransaction.objects.create(
+        payment=payment,
+        provider=provider,
+        gateway_transaction_id=gateway_result.get('transaction_id'),
+        azam_reference=gateway_result.get('reference'),
+        status='initiated',
+        request_payload=request_payload,  # Store actual payload sent to AZAM Pay (includes phone number)
+        response_payload=gateway_result
+    )
+    
+    # Update visit payment with transaction details
+    visit_payment.transaction_id = gateway_result.get('transaction_id')
+    visit_payment.gateway_reference = gateway_result.get('reference')
+    visit_payment.save()
+    
+    # Extract phone number from request payload for response
+    phone_number_used = request_payload.get('accountNumber') if isinstance(request_payload, dict) else None
+    
     return Response({
-        'message': 'Visit payment initiated',
+        'success': True,
+        'message': 'Payment initiated successfully. You will receive a payment prompt on your phone.',
+        'payment_id': payment.id,
+        'visit_payment_id': visit_payment.id,
+        'transaction_id': transaction.id,
+        'gateway_transaction_id': gateway_result.get('transaction_id'),
+        'transaction_reference': gateway_result.get('reference'),
+        'phone_number_used': phone_number_used,  # Phone number used for payment
+        'amount': float(visit_payment.amount),
         'property_id': property_obj.id,
-        'visit_cost': float(property_obj.visit_cost),
-        'status': 'pending'
-    }, status=status.HTTP_200_OK)
+        'property_title': property_obj.title
+    }, status=status.HTTP_201_CREATED)
 
 
 # CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular
@@ -2922,23 +3048,126 @@ def property_visit_initiate(request, property_id):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def property_visit_verify(request, property_id):
-    """Verify property visit payment"""
+    """
+    Verify property visit payment and retrieve owner contact information.
+    
+    After payment is completed, this endpoint verifies the payment and returns
+    owner contact details and property location.
+    """
     property_obj = get_object_or_404(Property, pk=property_id)
     
-    payment_reference = request.data.get('payment_reference')
-    if not payment_reference:
+    transaction_id = request.data.get('transaction_id')
+    if not transaction_id:
         return Response(
-            {"detail": "payment_reference is required."},
+            {"error": "transaction_id is required."},
             status=status.HTTP_400_BAD_REQUEST
         )
     
-    # Verify payment (stub - actual verification would go here)
-    return Response({
-        'message': 'Visit payment verified',
-        'property_id': property_obj.id,
-        'payment_reference': payment_reference,
-        'status': 'completed'
-    }, status=status.HTTP_200_OK)
+    from .models import PropertyVisitPayment
+    from payments.gateway_service import PaymentGatewayService
+    from django.utils import timezone
+    
+    # Get visit payment
+    visit_payment = PropertyVisitPayment.objects.filter(
+        property=property_obj,
+        user=request.user,
+        transaction_id=transaction_id
+    ).first()
+    
+    if not visit_payment:
+        return Response({
+            'error': 'Visit payment not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+    
+    # If already completed and active, return contact info
+    if visit_payment.status == 'completed' and visit_payment.is_active():
+        owner = property_obj.owner
+        owner_profile = getattr(owner, 'profile', None)
+        
+        expires_at = visit_payment.expires_at()
+        return Response({
+            'success': True,
+            'message': 'Payment already verified',
+            'owner_contact': {
+                'phone': owner_profile.phone if owner_profile and owner_profile.phone else None,
+                'email': owner.email,
+                'name': owner.get_full_name() or owner.username
+            },
+            'location': {
+                'address': property_obj.address,
+                'region': property_obj.region.name if property_obj.region else None,
+                'district': property_obj.district.name if property_obj.district else None,
+                'latitude': float(property_obj.latitude) if property_obj.latitude else None,
+                'longitude': float(property_obj.longitude) if property_obj.longitude else None
+            },
+            'paid_at': visit_payment.paid_at.isoformat() if visit_payment.paid_at else None,
+            'expires_at': expires_at.isoformat() if expires_at else None,
+            'is_expired': False
+        })
+    
+    # If payment exists but expired, prompt user to pay again
+    if visit_payment.status == 'completed' and visit_payment.is_expired():
+        expires_at = visit_payment.expires_at()
+        return Response({
+            'success': False,
+            'error': 'Visit payment has expired. Please pay again to access property details.',
+            'is_expired': True,
+            'paid_at': visit_payment.paid_at.isoformat() if visit_payment.paid_at else None,
+            'expires_at': expires_at.isoformat() if expires_at else None
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Verify payment with gateway
+    if visit_payment.payment:
+        verification_result = PaymentGatewayService.verify_payment(
+            visit_payment.payment,
+            transaction_id
+        )
+        
+        if verification_result.get('success') and verification_result.get('verified'):
+            # Update visit payment status
+            visit_payment.status = 'completed'
+            visit_payment.paid_at = timezone.now()
+            visit_payment.save()
+            
+            # Update unified payment
+            if visit_payment.payment:
+                visit_payment.payment.status = 'completed'
+                visit_payment.payment.paid_date = timezone.now().date()
+                visit_payment.payment.save()
+            
+            # Get owner contact info
+            owner = property_obj.owner
+            owner_profile = getattr(owner, 'profile', None)
+            
+            expires_at = visit_payment.expires_at()
+            return Response({
+                'success': True,
+                'message': 'Payment verified successfully',
+                'owner_contact': {
+                    'phone': owner_profile.phone if owner_profile and owner_profile.phone else None,
+                    'email': owner.email,
+                    'name': owner.get_full_name() or owner.username
+                },
+                'location': {
+                    'address': property_obj.address,
+                    'region': property_obj.region.name if property_obj.region else None,
+                    'district': property_obj.district.name if property_obj.district else None,
+                    'latitude': float(property_obj.latitude) if property_obj.latitude else None,
+                    'longitude': float(property_obj.longitude) if property_obj.longitude else None
+                },
+                'paid_at': visit_payment.paid_at.isoformat(),
+                'expires_at': expires_at.isoformat() if expires_at else None
+            })
+        else:
+            return Response({
+                'error': 'Payment verification failed',
+                'status': 'failed',
+                'details': verification_result
+            }, status=status.HTTP_400_BAD_REQUEST)
+    else:
+        return Response({
+            'error': 'Payment record not found'
+        }, status=status.HTTP_404_NOT_FOUND)
 
 
 # ---------------------------------------------------------------------------
