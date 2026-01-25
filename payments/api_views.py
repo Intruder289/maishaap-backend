@@ -200,13 +200,20 @@ class PaymentViewSet(viewsets.ModelViewSet):
         # Check if payment is already completed
         if payment.status == 'completed':
             return Response({
-                'error': 'Payment already completed'
+                'success': False,
+                'error': 'Payment already completed',
+                'message': f'This payment (ID: {payment.id}) has already been completed. No further action is needed.',
+                'payment_id': payment.id,
+                'status': payment.status
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Validate payment has booking (required for booking payments)
         if not payment.booking:
             return Response({
-                'error': 'Payment must be linked to a booking. This endpoint is for booking payments only.'
+                'success': False,
+                'error': 'Booking required',
+                'message': 'This payment must be linked to a booking. This endpoint is for booking payments only. Please create a payment with a valid booking ID.',
+                'payment_id': payment.id
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Get mobile money provider if this is a mobile_money payment
@@ -214,7 +221,10 @@ class PaymentViewSet(viewsets.ModelViewSet):
             mobile_money_provider = request.data.get('mobile_money_provider', '').strip()
             if not mobile_money_provider:
                 return Response({
-                    'error': 'Mobile Money Provider is required for mobile money payments. Please provide: AIRTEL, TIGO, MPESA, or HALOPESA'
+                    'success': False,
+                    'error': 'Mobile Money Provider required',
+                    'message': 'Please select your mobile money provider. Choose one of: AIRTEL, TIGO, MPESA, or HALOPESA',
+                    'valid_providers': ['AIRTEL', 'TIGO', 'MPESA', 'HALOPESA']
                 }, status=status.HTTP_400_BAD_REQUEST)
             
             # Update payment with mobile money provider
@@ -252,9 +262,13 @@ class PaymentViewSet(viewsets.ModelViewSet):
         )
         
         if not gateway_result['success']:
+            error_msg = gateway_result.get('error', 'Failed to initiate payment')
             return Response({
-                'error': gateway_result.get('error', 'Failed to initiate payment'),
-                'details': gateway_result
+                'success': False,
+                'error': 'Payment gateway error',
+                'message': f'Unable to initiate payment: {error_msg}. Please try again or contact support if the problem persists.',
+                'payment_id': payment.id,
+                'details': gateway_result.get('details', {})
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Create PaymentTransaction record with the actual payload sent to AZAM Pay
@@ -465,8 +479,10 @@ def azam_pay_webhook(request):
         if not webhook_data:
             logger.error(f"Failed to parse webhook payload: {payload}")
             return JsonResponse({
-                'error': 'Failed to parse webhook payload',
-                'received_payload': payload
+                'success': False,
+                'error': 'Invalid webhook payload',
+                'message': 'Unable to parse the webhook payload. The payment gateway may have sent data in an unexpected format.',
+                'received_payload': str(payload)[:500]  # Limit payload size in response
             }, status=400)
         
         # Get payment from metadata or transaction_id
@@ -575,7 +591,9 @@ def azam_pay_webhook(request):
             logger.error(f"Could not find payment - payment_id: {payment_id}, transaction_id: {transaction_id}, utilityref: {utilityref}")
             # Return 200 to prevent webhook retries, but log the error
             return JsonResponse({
+                'success': False,
                 'error': 'Payment or transaction not found',
+                'message': f'Could not find payment or transaction with the provided information. Payment ID: {payment_id}, Transaction ID: {transaction_id}',
                 'payment_id': payment_id,
                 'transaction_id': transaction_id,
                 'utilityref': utilityref,
@@ -702,6 +720,8 @@ def azam_pay_webhook(request):
         logger.error(f"Webhook processing error: {str(e)}", exc_info=True)
         
         return JsonResponse({
+            'success': False,
             'error': 'Webhook processing failed',
-            'message': str(e)
+            'message': f'An error occurred while processing the webhook: {str(e)}. The payment status may need to be checked manually.',
+            'details': str(e)[:200]  # Limit error details length
         }, status=200)  # Return 200 to prevent retries

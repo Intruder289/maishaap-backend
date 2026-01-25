@@ -7,6 +7,13 @@ from documents.models import Lease
 from properties.models import Property
 
 
+def format_currency(amount):
+    """Format decimal amount as currency string"""
+    if amount is None:
+        return "0.00"
+    return f"{float(amount):,.2f}"
+
+
 class TenantSerializer(serializers.ModelSerializer):
     """Minimal tenant info for API responses"""
     full_name = serializers.SerializerMethodField()
@@ -68,32 +75,150 @@ class RentPaymentCreateSerializer(serializers.ModelSerializer):
             'transaction_id', 'notes', 'lease', 'tenant'
         ]
     
+    def validate(self, data):
+        """Validate that payment amount doesn't exceed invoice balance - STRICT: No overpayment allowed"""
+        rent_invoice = data.get('rent_invoice')
+        amount = data.get('amount')
+        
+        if rent_invoice and amount:
+            from decimal import Decimal
+            from django.db.models import Sum
+            from django.db import transaction
+            
+            # Use select_for_update to prevent race conditions
+            with transaction.atomic():
+                # Lock the invoice row to prevent concurrent modifications
+                locked_invoice = RentInvoice.objects.select_for_update().get(pk=rent_invoice.pk)
+                
+                # Calculate ALL payments (completed + pending) to get accurate balance
+                total_completed = Payment.objects.filter(
+                    rent_invoice=locked_invoice,
+                    status='completed'
+                ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+                
+                # Also consider pending payments (they will eventually complete)
+                total_pending = Payment.objects.filter(
+                    rent_invoice=locked_invoice,
+                    status='pending'
+                ).exclude(id=self.instance.pk if self.instance else None).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+                
+                # Total amount that will be paid (completed + pending)
+                total_will_be_paid = total_completed + total_pending
+                
+                # Calculate remaining balance (what's actually still due)
+                balance_due = locked_invoice.total_amount - total_completed
+                
+                # STRICT VALIDATION: Invoice must not be fully paid
+                if balance_due <= 0:
+                    raise serializers.ValidationError({
+                        'rent_invoice': f'This invoice ({locked_invoice.invoice_number}) is already fully paid. No additional payment is needed. Total amount: TZS {format_currency(locked_invoice.total_amount)}, Amount paid: TZS {format_currency(total_completed)}.'
+                    })
+                
+                # STRICT VALIDATION: Payment amount cannot exceed remaining balance
+                if amount > balance_due:
+                    raise serializers.ValidationError({
+                        'amount': f'Payment amount (TZS {format_currency(amount)}) exceeds the remaining balance (TZS {format_currency(balance_due)}). Please pay TZS {format_currency(balance_due)} or less. Invoice: {locked_invoice.invoice_number}'
+                    })
+                
+                # STRICT VALIDATION: Combined payments (completed + pending + this new one) cannot exceed total
+                if total_will_be_paid + amount > locked_invoice.total_amount:
+                    excess = (total_will_be_paid + amount) - locked_invoice.total_amount
+                    raise serializers.ValidationError({
+                        'amount': f'This payment would cause overpayment. Remaining balance: TZS {format_currency(balance_due)}, Pending payments: TZS {format_currency(total_pending)}, Your payment: TZS {format_currency(amount)}. Maximum you can pay: TZS {format_currency(balance_due)}'
+                    })
+                
+                # Ensure amount is positive
+                if amount <= 0:
+                    raise serializers.ValidationError({
+                        'amount': 'Payment amount must be greater than zero. Please enter a valid payment amount.'
+                    })
+        
+        return data
+    
     def create(self, validated_data):
-        # If rent_invoice is provided, use it to set lease and tenant
-        rent_invoice = validated_data.pop('rent_invoice', None)
-        if rent_invoice:
-            validated_data['lease'] = rent_invoice.lease
-            validated_data['tenant'] = rent_invoice.tenant
+        from django.db import transaction
+        from decimal import Decimal
+        from django.db.models import Sum
         
-        # Ensure required fields are set
-        if 'lease' not in validated_data or not validated_data.get('lease'):
-            raise serializers.ValidationError({
-                'lease': 'Lease is required when rent_invoice is not provided.'
-            })
-        if 'tenant' not in validated_data or not validated_data.get('tenant'):
-            # Try to get tenant from lease if not provided
-            lease = validated_data.get('lease')
-            if lease and hasattr(lease, 'tenant'):
-                validated_data['tenant'] = lease.tenant
+        # Get rent_invoice before popping (needed for locking)
+        rent_invoice_id = None
+        if 'rent_invoice' in validated_data:
+            rent_invoice_obj = validated_data['rent_invoice']
+            rent_invoice_id = rent_invoice_obj.pk if rent_invoice_obj else None
+        
+        # Use transaction with select_for_update to prevent race conditions
+        with transaction.atomic():
+            if rent_invoice_id:
+                # Lock invoice to prevent concurrent modifications
+                locked_invoice = RentInvoice.objects.select_for_update().get(pk=rent_invoice_id)
+                
+                # Re-validate balance after locking (double-check)
+                total_completed = Payment.objects.filter(
+                    rent_invoice=locked_invoice,
+                    status='completed'
+                ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+                
+                total_pending = Payment.objects.filter(
+                    rent_invoice=locked_invoice,
+                    status='pending'
+                ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+                
+                balance_due = locked_invoice.total_amount - total_completed
+                amount = validated_data.get('amount', Decimal('0'))
+                
+                # Final validation check after lock
+                if balance_due <= 0:
+                    raise serializers.ValidationError({
+                        'rent_invoice': f'This invoice ({locked_invoice.invoice_number}) is already fully paid. No additional payment is needed. Total amount: TZS {format_currency(locked_invoice.total_amount)}, Amount paid: TZS {format_currency(total_completed)}.'
+                    })
+                
+                if amount > balance_due:
+                    raise serializers.ValidationError({
+                        'amount': f'Payment amount (TZS {format_currency(amount)}) exceeds the remaining balance (TZS {format_currency(balance_due)}). Please pay TZS {format_currency(balance_due)} or less. Invoice: {locked_invoice.invoice_number}'
+                    })
+                
+                if total_completed + total_pending + amount > locked_invoice.total_amount:
+                    raise serializers.ValidationError({
+                        'amount': f'This payment would cause overpayment. Remaining balance: TZS {format_currency(balance_due)}, Pending payments: TZS {format_currency(total_pending)}, Your payment: TZS {format_currency(amount)}. Maximum you can pay: TZS {format_currency(balance_due)}'
+                    })
+                
+                validated_data['rent_invoice'] = locked_invoice
+                validated_data['lease'] = locked_invoice.lease
+                validated_data['tenant'] = locked_invoice.tenant
             else:
+                # If rent_invoice is provided, use it to set lease and tenant
+                rent_invoice = validated_data.pop('rent_invoice', None)
+                if rent_invoice:
+                    validated_data['lease'] = rent_invoice.lease
+                    validated_data['tenant'] = rent_invoice.tenant
+            
+            # Ensure required fields are set
+            if 'lease' not in validated_data or not validated_data.get('lease'):
                 raise serializers.ValidationError({
-                    'tenant': 'Tenant is required when rent_invoice is not provided.'
+                    'lease': 'Lease information is required. Please provide a valid lease when creating a payment without an invoice.'
                 })
-        
-        validated_data['paid_date'] = timezone.now().date()
-        validated_data['status'] = 'completed'
-        validated_data['recorded_by'] = self.context['request'].user
-        return super().create(validated_data)
+            if 'tenant' not in validated_data or not validated_data.get('tenant'):
+                # Try to get tenant from lease if not provided
+                lease = validated_data.get('lease')
+                if lease and hasattr(lease, 'tenant'):
+                    validated_data['tenant'] = lease.tenant
+                else:
+                    raise serializers.ValidationError({
+                        'tenant': 'Tenant information is required. Please provide a valid tenant when creating a payment without an invoice.'
+                    })
+            
+            validated_data['paid_date'] = timezone.now().date()
+            validated_data['status'] = 'completed'
+            validated_data['recorded_by'] = self.context['request'].user
+            
+            # Create payment
+            payment = super().create(validated_data)
+            
+            # Refresh invoice to update amount_paid (Payment.save() handles this automatically)
+            if rent_invoice_id:
+                locked_invoice.refresh_from_db()
+            
+            return payment
 
 
 class RentInvoiceSerializer(serializers.ModelSerializer):

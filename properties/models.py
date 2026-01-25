@@ -1041,11 +1041,13 @@ class Room(models.Model):
                 self.current_booking = None
         
         # Check for active bookings for this room (exclude cancelled and checked_out)
+        # Use check_out_date__gt (not __gte) so rooms become available on checkout day
+        # Example: Booking ends 27/1, room becomes available on 27/1, new booking can start 28/1
         active_bookings = Booking.objects.filter(
             property_obj=self.property_obj,
             room_number=self.room_number,
             booking_status__in=['pending', 'confirmed', 'checked_in'],
-            check_out_date__gte=today
+            check_out_date__gt=today  # Changed from __gte to __gt - room available on checkout day
         ).exclude(
             booking_status__in=['cancelled', 'checked_out', 'no_show']  # Exclude cancelled/checked_out bookings
         )

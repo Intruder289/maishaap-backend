@@ -165,30 +165,112 @@ class RentInvoiceViewSet(viewsets.ModelViewSet):
     )
     @action(detail=True, methods=['post'])
     def mark_paid(self, request, pk=None):
-        """Mark an invoice as paid"""
+        """Mark an invoice as paid - STRICT: No overpayment allowed"""
+        from decimal import Decimal
+        from django.db.models import Sum
+        from django.db import transaction
+        
         invoice = self.get_object()
-        amount = request.data.get('amount', invoice.balance_due)
+        amount = Decimal(str(request.data.get('amount', invoice.balance_due)))
         payment_method = request.data.get('payment_method', 'cash')
         reference = request.data.get('reference_number', '')
         
-        # Create payment record using unified Payment model
-        payment = Payment.objects.create(
-            rent_invoice=invoice,
-            lease=invoice.lease,
-            tenant=invoice.tenant,
-            amount=amount,
-            payment_method=payment_method,
-            reference_number=reference,
-            paid_date=timezone.now().date(),
-            status='completed',
-            recorded_by=request.user
-        )
-        
-        return Response({
-            'message': 'Payment recorded successfully',
-            'payment_id': payment.id,
-            'invoice_status': invoice.status
-        })
+        # Use transaction with select_for_update to prevent race conditions
+        with transaction.atomic():
+            # Lock invoice row to prevent concurrent modifications
+            locked_invoice = RentInvoice.objects.select_for_update().get(pk=invoice.pk)
+            
+            # Calculate ALL payments (completed + pending) to get accurate balance
+            total_completed = Payment.objects.filter(
+                rent_invoice=locked_invoice,
+                status='completed'
+            ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+            
+            # Also consider pending payments
+            total_pending = Payment.objects.filter(
+                rent_invoice=locked_invoice,
+                status='pending'
+            ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+            
+            # Calculate remaining balance (what's actually still due)
+            balance_due = locked_invoice.total_amount - total_completed
+            
+            # Helper function to format currency
+            def format_currency(amt):
+                return f"{float(amt):,.2f}"
+            
+            # STRICT VALIDATION: Invoice must not be fully paid
+            if balance_due <= 0:
+                return Response({
+                    'success': False,
+                    'error': f'This invoice ({locked_invoice.invoice_number}) is already fully paid. No additional payment is needed.',
+                    'message': f'Total amount: TZS {format_currency(locked_invoice.total_amount)}, Amount paid: TZS {format_currency(total_completed)}',
+                    'invoice_number': locked_invoice.invoice_number,
+                    'total_amount': str(locked_invoice.total_amount),
+                    'amount_paid': str(total_completed),
+                    'balance_due': '0.00'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # STRICT VALIDATION: Payment amount cannot exceed remaining balance
+            if amount > balance_due:
+                return Response({
+                    'success': False,
+                    'error': f'Payment amount exceeds remaining balance',
+                    'message': f'You tried to pay TZS {format_currency(amount)}, but the remaining balance is only TZS {format_currency(balance_due)}. Please pay TZS {format_currency(balance_due)} or less.',
+                    'invoice_number': locked_invoice.invoice_number,
+                    'payment_amount': str(amount),
+                    'balance_due': str(balance_due),
+                    'total_amount': str(locked_invoice.total_amount),
+                    'amount_paid': str(total_completed),
+                    'maximum_allowed': str(balance_due)
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # STRICT VALIDATION: Combined payments cannot exceed total
+            if total_completed + total_pending + amount > locked_invoice.total_amount:
+                excess = (total_completed + total_pending + amount) - locked_invoice.total_amount
+                return Response({
+                    'success': False,
+                    'error': 'This payment would cause overpayment',
+                    'message': f'Remaining balance: TZS {format_currency(balance_due)}, Pending payments: TZS {format_currency(total_pending)}, Your payment: TZS {format_currency(amount)}. Maximum you can pay: TZS {format_currency(balance_due)}',
+                    'invoice_number': locked_invoice.invoice_number,
+                    'balance_due': str(balance_due),
+                    'pending_payments': str(total_pending),
+                    'your_payment': str(amount),
+                    'maximum_allowed': str(balance_due)
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Validate amount is positive
+            if amount <= 0:
+                return Response({
+                    'success': False,
+                    'error': 'Invalid payment amount',
+                    'message': 'Payment amount must be greater than zero. Please enter a valid payment amount.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Create payment record using unified Payment model
+            payment = Payment.objects.create(
+                rent_invoice=locked_invoice,
+                lease=locked_invoice.lease,
+                tenant=locked_invoice.tenant,
+                amount=amount,
+                payment_method=payment_method,
+                reference_number=reference,
+                paid_date=timezone.now().date(),
+                status='completed',
+                recorded_by=request.user
+            )
+            
+            # Refresh invoice to get updated status
+            locked_invoice.refresh_from_db()
+            
+            return Response({
+                'message': 'Payment recorded successfully',
+                'payment_id': payment.id,
+                'invoice_status': locked_invoice.status,
+                'balance_due': str(locked_invoice.balance_due),
+                'amount_paid': str(locked_invoice.amount_paid),
+                'total_amount': str(locked_invoice.total_amount)
+            })
     
     @swagger_auto_schema(
         method='get',
@@ -243,7 +325,11 @@ class RentInvoiceViewSet(viewsets.ModelViewSet):
     def generate_monthly(self, request):
         """Generate monthly invoices for all active leases"""
         if not request.user.is_staff:
-            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({
+                'success': False,
+                'error': 'Permission denied',
+                'message': 'You do not have permission to generate invoices. This feature is only available to administrators and staff members.'
+            }, status=status.HTTP_403_FORBIDDEN)
         
         month = request.data.get('month', timezone.now().month)
         year = request.data.get('year', timezone.now().year)
@@ -305,6 +391,32 @@ class RentPaymentViewSet(viewsets.ModelViewSet):
         if self.action == 'create':
             return RentPaymentCreateSerializer
         return RentPaymentSerializer
+    
+    def create(self, request, *args, **kwargs):
+        """Create payment and return updated invoice balance"""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payment = serializer.save()
+        
+        # Refresh invoice to get updated balance
+        if payment.rent_invoice:
+            payment.rent_invoice.refresh_from_db()
+            invoice = payment.rent_invoice
+            
+            # Return payment with updated balance information
+            response_data = RentPaymentSerializer(payment).data
+            response_data['invoice'] = {
+                'id': invoice.id,
+                'invoice_number': invoice.invoice_number,
+                'total_amount': str(invoice.total_amount),
+                'amount_paid': str(invoice.amount_paid),
+                'balance_due': str(invoice.balance_due),
+                'status': invoice.status
+            }
+            
+            return Response(response_data, status=status.HTTP_201_CREATED)
+        
+        return Response(RentPaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
     
     def get_queryset(self):
         # Handle schema generation (swagger_fake_view)
@@ -396,7 +508,11 @@ class RentPaymentViewSet(viewsets.ModelViewSet):
         # Check if payment is already completed
         if payment.status == 'completed':
             return Response({
-                'error': 'Payment already completed'
+                'success': False,
+                'error': 'Payment already completed',
+                'message': f'This payment (ID: {payment.id}) has already been completed. No further action is needed.',
+                'payment_id': payment.id,
+                'status': payment.status
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Get or create AZAM Pay provider
@@ -421,9 +537,13 @@ class RentPaymentViewSet(viewsets.ModelViewSet):
         )
         
         if not gateway_result['success']:
+            error_msg = gateway_result.get('error', 'Failed to initiate payment')
             return Response({
-                'error': gateway_result.get('error', 'Failed to initiate payment'),
-                'details': gateway_result
+                'success': False,
+                'error': 'Payment gateway error',
+                'message': f'Unable to initiate payment: {error_msg}. Please try again or contact support if the problem persists.',
+                'payment_id': payment.id,
+                'details': gateway_result.get('details', {})
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Create PaymentTransaction record with the actual payload sent to AZAM Pay
@@ -497,12 +617,18 @@ class RentPaymentViewSet(viewsets.ModelViewSet):
         
         if not transaction:
             return Response({
-                'error': 'No transaction found for this payment'
+                'success': False,
+                'error': 'Transaction not found',
+                'message': f'No transaction found for payment ID {payment.id}. Please ensure the payment was initiated successfully.',
+                'payment_id': payment.id
             }, status=status.HTTP_404_NOT_FOUND)
         
         if not transaction.gateway_transaction_id:
             return Response({
-                'error': 'No gateway transaction ID found'
+                'success': False,
+                'error': 'Missing transaction information',
+                'message': 'No gateway transaction ID found. The payment may not have been initiated properly. Please try initiating the payment again.',
+                'payment_id': payment.id
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Verify with gateway
@@ -512,9 +638,14 @@ class RentPaymentViewSet(viewsets.ModelViewSet):
         )
         
         if not verify_result['success']:
+            error_msg = verify_result.get('error', 'Failed to verify payment')
             return Response({
-                'error': verify_result.get('error', 'Failed to verify payment'),
-                'details': verify_result
+                'success': False,
+                'error': 'Payment verification failed',
+                'message': f'Unable to verify payment status: {error_msg}. Please check your payment or try again later.',
+                'payment_id': payment.id,
+                'transaction_id': transaction.id if transaction else None,
+                'details': verify_result.get('details', {})
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Update transaction status
@@ -697,7 +828,11 @@ class RentDashboardViewSet(viewsets.ViewSet):
         tenant_id = request.query_params.get('tenant_id')
         
         if not request.user.is_staff and str(request.user.id) != tenant_id:
-            return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({
+                'success': False,
+                'error': 'Permission denied',
+                'message': 'You do not have permission to view this tenant\'s information. Only staff members can view other tenants\' data.'
+            }, status=status.HTTP_403_FORBIDDEN)
         
         tenant = get_object_or_404(User, id=tenant_id) if tenant_id else request.user
         
@@ -705,7 +840,13 @@ class RentDashboardViewSet(viewsets.ViewSet):
         active_lease = Lease.objects.filter(tenant=tenant, status='active').first()
         
         if not active_lease:
-            return Response({'error': 'No active lease found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({
+                'success': False,
+                'error': 'No active lease found',
+                'message': f'No active lease found for tenant "{tenant.get_full_name() or tenant.username}". Please contact the property owner to set up a lease agreement.',
+                'tenant_id': tenant.id,
+                'tenant_name': tenant.get_full_name() or tenant.username
+            }, status=status.HTTP_404_NOT_FOUND)
         
         # Get current invoice
         current_invoice = RentInvoice.objects.filter(

@@ -43,6 +43,7 @@ urlpatterns = [
     path('stats/', api_views.property_stats, name='property_stats'),
     
     # Booking endpoints
+    path('bookings/', api_views.bookings_list_api, name='bookings_list_api'),
     path('bookings/<int:booking_id>/details/', api_views.booking_details_api, name='booking_details_api'),
     path('bookings/<int:booking_id>/status-update/', api_views.booking_status_update_api, name='booking_status_update_api'),
     path('bookings/<int:booking_id>/edit/', api_views.booking_edit_api, name='booking_edit_api'),

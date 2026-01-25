@@ -19,6 +19,13 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import parsers
+
+
+def format_currency(amount):
+    """Format decimal amount as currency string"""
+    if amount is None:
+        return "0.00"
+    return f"{float(amount):,.2f}"
 # Swagger documentation - using drf-spectacular
 # Always import extend_schema from drf-spectacular as it's used throughout the file
 try:
@@ -2099,6 +2106,138 @@ def property_stats(request):
     },
     security=[{'Bearer': []}]
 )
+@extend_schema(
+    summary="List Bookings",
+    description="Get list of bookings for properties owned by the current user. Supports filtering by property_id and property_type.",
+    tags=['Bookings'],
+    parameters=[
+        OpenApiParameter('property_id', OpenApiTypes.INT, OpenApiParameter.QUERY, description="Filter by property ID", required=False),
+        OpenApiParameter('property_type', OpenApiTypes.STR, OpenApiParameter.QUERY, description="Filter by property type: hotel, lodge, venue", required=False),
+        OpenApiParameter('status', OpenApiTypes.STR, OpenApiParameter.QUERY, description="Filter by booking status: pending, confirmed, checked_in, checked_out, cancelled", required=False),
+        OpenApiParameter('page', OpenApiTypes.INT, OpenApiParameter.QUERY, description="Page number", required=False),
+        OpenApiParameter('page_size', OpenApiTypes.INT, OpenApiParameter.QUERY, description="Items per page", required=False),
+    ],
+    responses={
+        200: {'description': 'List of bookings'},
+        401: {'description': 'Authentication required'}
+    }
+)
+@swagger_auto_schema(
+    method='get',
+    operation_description="Get list of bookings for properties owned by the current user. Supports filtering by property_id and property_type.",
+    operation_summary="List Bookings",
+    tags=['Bookings'],
+    manual_parameters=[
+        openapi.Parameter('property_id', openapi.IN_QUERY, description="Filter by property ID", type=openapi.TYPE_INTEGER, required=False),
+        openapi.Parameter('property_type', openapi.IN_QUERY, description="Filter by property type: hotel, lodge, venue", type=openapi.TYPE_STRING, required=False),
+        openapi.Parameter('status', openapi.IN_QUERY, description="Filter by booking status", type=openapi.TYPE_STRING, required=False),
+        openapi.Parameter('page', openapi.IN_QUERY, description="Page number", type=openapi.TYPE_INTEGER, required=False),
+        openapi.Parameter('page_size', openapi.IN_QUERY, description="Items per page", type=openapi.TYPE_INTEGER, required=False),
+    ],
+    responses={
+        200: openapi.Response(description="List of bookings", schema=openapi.Schema(type=openapi.TYPE_OBJECT)),
+        401: "Authentication required"
+    },
+    security=[{'Bearer': []}]
+)
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def bookings_list_api(request):
+    """
+    Get list of bookings.
+    
+    - **Admin/Staff**: See ALL bookings (all properties, all owners)
+    - **Property Owners**: See only bookings for their own properties
+    
+    Returns bookings from properties.Booking model (created via mobile app or web).
+    Supports filtering by property_id, property_type, and status.
+    """
+    from django.core.paginator import Paginator
+    
+    # Get filter parameters
+    property_id = request.query_params.get('property_id')
+    property_type = request.query_params.get('property_type', '').strip().lower()
+    status_filter = request.query_params.get('status', '').strip().lower()
+    page = int(request.query_params.get('page', 1))
+    page_size = int(request.query_params.get('page_size', 20))
+    
+    # Get bookings for properties owned by current user
+    if request.user.is_staff or request.user.is_superuser:
+        # Admin/staff can see all bookings
+        bookings_query = Booking.objects.filter(is_deleted=False).select_related(
+            'customer', 'property_obj', 'property_obj__property_type', 'created_by'
+        ).order_by('-created_at')
+    else:
+        # Property owners see only bookings for their properties
+        bookings_query = Booking.objects.filter(
+            property_obj__owner=request.user,
+            is_deleted=False
+        ).select_related(
+            'customer', 'property_obj', 'property_obj__property_type', 'created_by'
+        ).order_by('-created_at')
+    
+    # Filter by property_id if provided
+    if property_id:
+        try:
+            bookings_query = bookings_query.filter(property_obj_id=int(property_id))
+        except (ValueError, TypeError):
+            pass
+    
+    # Filter by property_type if provided
+    if property_type:
+        bookings_query = bookings_query.filter(
+            property_obj__property_type__name__iexact=property_type
+        )
+    
+    # Filter by status if provided
+    if status_filter:
+        bookings_query = bookings_query.filter(booking_status=status_filter)
+    
+    # Pagination
+    paginator = Paginator(bookings_query, page_size)
+    try:
+        bookings_page = paginator.page(page)
+    except:
+        bookings_page = paginator.page(1)
+    
+    # Serialize bookings
+    bookings_data = []
+    for booking in bookings_page:
+        bookings_data.append({
+            'id': booking.id,
+            'booking_reference': booking.booking_reference,
+            'property_id': booking.property_obj.id,
+            'property_title': booking.property_obj.title,
+            'property_type': booking.property_obj.property_type.name if booking.property_obj.property_type else None,
+            'customer': {
+                'id': booking.customer.id,
+                'full_name': booking.customer.full_name,
+                'email': booking.customer.email,
+                'phone': booking.customer.phone,
+            },
+            'check_in_date': booking.check_in_date.strftime('%Y-%m-%d'),
+            'check_out_date': booking.check_out_date.strftime('%Y-%m-%d'),
+            'number_of_guests': booking.number_of_guests,
+            'room_number': booking.room_number,
+            'room_type': booking.room_type,
+            'total_amount': str(booking.total_amount),
+            'paid_amount': str(booking.paid_amount),
+            'booking_status': booking.booking_status,
+            'payment_status': booking.payment_status,
+            'special_requests': booking.special_requests,
+            'created_at': booking.created_at.strftime('%Y-%m-%d %H:%M:%S') if booking.created_at else None,
+            'created_by': booking.created_by.username if booking.created_by else None,
+        })
+    
+    return Response({
+        'count': paginator.count,
+        'page': page,
+        'page_size': page_size,
+        'total_pages': paginator.num_pages,
+        'results': bookings_data
+    }, status=status.HTTP_200_OK)
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def booking_details_api(request, booking_id):
@@ -2298,9 +2437,10 @@ def booking_status_update_api(request, booking_id):
             booking.booking_status = new_status
             booking.save()
             
-            # If booking is cancelled and has a room assigned, sync room status
+            # If booking is cancelled or checked_out and has a room assigned, sync room status
+            # This ensures rooms become available when bookings end or are cancelled
             # This applies to both hotel and lodge bookings
-            if new_status == 'cancelled' and booking.room_number and booking.property_obj:
+            if new_status in ['cancelled', 'checked_out'] and booking.room_number and booking.property_obj:
                 try:
                     from .models import Room
                     room = Room.objects.get(
@@ -2308,6 +2448,7 @@ def booking_status_update_api(request, booking_id):
                         room_number=booking.room_number
                     )
                     # Use the sync method to properly update room status based on all bookings
+                    # This will automatically set room to available if no other active bookings exist
                     room.sync_status_from_bookings()
                 except Room.DoesNotExist:
                     # Room might not exist (e.g., for house bookings), that's okay
@@ -2826,16 +2967,21 @@ def property_visit_initiate(request, property_id):
     
     # Only house properties support visit payments
     if property_obj.property_type.name.lower() != 'house':
-        return Response(
-            {"error": "Visit payment is only available for house properties."},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        return Response({
+            "success": False,
+            "error": "Visit payment not available",
+            "message": f"Visit payments are only available for house properties. This property is a {property_obj.property_type.name.lower()}. Please select a house property to make a visit payment.",
+            "property_type": property_obj.property_type.name.lower()
+        }, status=status.HTTP_400_BAD_REQUEST)
     
     if not property_obj.visit_cost or property_obj.visit_cost <= 0:
-        return Response(
-            {"error": "Visit cost is not set for this property."},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        return Response({
+            "success": False,
+            "error": "Visit cost not set",
+            "message": f"Visit cost has not been set for this property ({property_obj.title}). Please contact the property owner or administrator.",
+            "property_id": property_obj.id,
+            "property_title": property_obj.title
+        }, status=status.HTTP_400_BAD_REQUEST)
     
     # Check if already paid and still active
     from .models import PropertyVisitPayment
@@ -2891,7 +3037,10 @@ def property_visit_initiate(request, property_id):
         mobile_money_provider = request.data.get('mobile_money_provider', '').strip()
         if not mobile_money_provider:
             return Response({
-                'error': 'Mobile Money Provider is required for mobile money payments. Please provide: AIRTEL, TIGO, MPESA, or HALOPESA'
+                'success': False,
+                'error': 'Mobile Money Provider required',
+                'message': 'Please select your mobile money provider. Choose one of: AIRTEL, TIGO, MPESA, or HALOPESA',
+                'valid_providers': ['AIRTEL', 'TIGO', 'MPESA', 'HALOPESA']
             }, status=status.HTTP_400_BAD_REQUEST)
     
     # Get or create payment provider (AZAM Pay)
@@ -3058,10 +3207,11 @@ def property_visit_verify(request, property_id):
     
     transaction_id = request.data.get('transaction_id')
     if not transaction_id:
-        return Response(
-            {"error": "transaction_id is required."},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        return Response({
+            "success": False,
+            "error": "Transaction ID required",
+            "message": "Please provide a transaction_id in your request. This is the transaction ID from your payment."
+        }, status=status.HTTP_400_BAD_REQUEST)
     
     from .models import PropertyVisitPayment
     from payments.gateway_service import PaymentGatewayService
@@ -3076,7 +3226,11 @@ def property_visit_verify(request, property_id):
     
     if not visit_payment:
         return Response({
-            'error': 'Visit payment not found'
+            'success': False,
+            'error': 'Visit payment not found',
+            'message': f'No visit payment found for property ID {property_id} with transaction ID "{transaction_id}". Please ensure you have completed the payment and use the correct transaction ID.',
+            'property_id': property_id,
+            'transaction_id': transaction_id
         }, status=status.HTTP_404_NOT_FOUND)
     
     # If already completed and active, return contact info
@@ -3110,7 +3264,8 @@ def property_visit_verify(request, property_id):
         expires_at = visit_payment.expires_at()
         return Response({
             'success': False,
-            'error': 'Visit payment has expired. Please pay again to access property details.',
+            'error': 'Visit payment expired',
+            'message': f'Your visit payment expired on {expires_at.strftime("%Y-%m-%d %H:%M") if expires_at else "unknown"}. Please make a new payment to access property details.',
             'is_expired': True,
             'paid_at': visit_payment.paid_at.isoformat() if visit_payment.paid_at else None,
             'expires_at': expires_at.isoformat() if expires_at else None
@@ -3316,10 +3471,12 @@ def property_availability_api(request, property_id):
         )
 
     except Exception as e:
-        return Response(
-            {"error": f"Failed to fetch availability: {str(e)}"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        )
+        return Response({
+            "success": False,
+            "error": "Failed to fetch availability",
+            "message": f"An error occurred while fetching property availability: {str(e)}. Please try again or contact support if the problem persists.",
+            "property_id": property_id if 'property_id' in locals() else None
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 # ---------------------------------------------------------------------------
@@ -3369,6 +3526,13 @@ def property_availability_api(request, property_id):
             type=OpenApiTypes.STR,
             location=OpenApiParameter.QUERY,
             description='Check-out date (YYYY-MM-DD) - optional',
+            required=False
+        ),
+        OpenApiParameter(
+            name='show_unavailable',
+            type=OpenApiTypes.BOOL,
+            location=OpenApiParameter.QUERY,
+            description='If true, also returns unavailable rooms with booking dates (default: false)',
             required=False
         ),
     ],
@@ -3438,6 +3602,13 @@ def property_availability_api(request, property_id):
             type=openapi.TYPE_STRING,
             required=False
         ),
+        openapi.Parameter(
+            'show_unavailable',
+            openapi.IN_QUERY,
+            description="If true, also returns unavailable rooms with booking dates (default: false)",
+            type=openapi.TYPE_BOOLEAN,
+            required=False
+        ),
     ],
     responses={
         200: openapi.Response(
@@ -3468,18 +3639,20 @@ def available_rooms_api(request):
         # Get property_id from query parameters
         property_id = request.query_params.get('property_id')
         if not property_id:
-            return Response(
-                {"error": "property_id is required"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({
+                "success": False,
+                "error": "Property ID required",
+                "message": "Please provide a property_id in the query parameters. Example: /api/v1/properties/available-rooms/?property_id=123"
+            }, status=status.HTTP_400_BAD_REQUEST)
         
         try:
             property_id = int(property_id)
         except (ValueError, TypeError):
-            return Response(
-                {"error": "property_id must be a valid integer"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({
+                "success": False,
+                "error": "Invalid property ID",
+                "message": f"Property ID must be a valid number. You provided: '{request.query_params.get('property_id')}'"
+            }, status=status.HTTP_400_BAD_REQUEST)
         
         # Get the property
         property_obj = get_object_or_404(Property, pk=property_id)
@@ -3487,13 +3660,13 @@ def available_rooms_api(request):
         # Check if it's a hotel or lodge
         property_type_name = property_obj.property_type.name.lower() if property_obj.property_type else ''
         if property_type_name not in ['hotel', 'lodge']:
-            return Response(
-                {
-                    "error": "This endpoint is only available for hotel and lodge properties",
-                    "property_type": property_type_name
-                },
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({
+                "success": False,
+                "error": "Property type not supported",
+                "message": f"This endpoint is only available for hotel and lodge properties. The selected property is a {property_type_name}. Please select a hotel or lodge property to view available rooms.",
+                "property_type": property_type_name,
+                "supported_types": ["hotel", "lodge"]
+            }, status=status.HTTP_400_BAD_REQUEST)
         
         # Parse optional date parameters
         check_in_date = None
@@ -3501,32 +3674,38 @@ def available_rooms_api(request):
         
         check_in_str = request.query_params.get('check_in_date')
         check_out_str = request.query_params.get('check_out_date')
+        show_unavailable = request.query_params.get('show_unavailable', 'false').lower() == 'true'  # Optional: show unavailable rooms with booking dates
         
         if check_in_str:
             try:
                 check_in_date = datetime.strptime(check_in_str, '%Y-%m-%d').date()
             except (ValueError, TypeError):
-                return Response(
-                    {"error": "check_in_date must be in YYYY-MM-DD format"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                return Response({
+                    "success": False,
+                    "error": "Invalid check-in date format",
+                    "message": f"Check-in date must be in YYYY-MM-DD format (e.g., 2026-01-25). You provided: '{check_in_str}'"
+                }, status=status.HTTP_400_BAD_REQUEST)
         
         if check_out_str:
             try:
                 check_out_date = datetime.strptime(check_out_str, '%Y-%m-%d').date()
             except (ValueError, TypeError):
-                return Response(
-                    {"error": "check_out_date must be in YYYY-MM-DD format"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                return Response({
+                    "success": False,
+                    "error": "Invalid check-out date format",
+                    "message": f"Check-out date must be in YYYY-MM-DD format (e.g., 2026-01-27). You provided: '{check_out_str}'"
+                }, status=status.HTTP_400_BAD_REQUEST)
         
         # Validate date range if both dates provided
         if check_in_date and check_out_date:
             if check_out_date <= check_in_date:
-                return Response(
-                    {"error": "check_out_date must be after check_in_date"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                return Response({
+                    "success": False,
+                    "error": "Invalid date range",
+                    "message": f"Check-out date ({check_out_date}) must be after check-in date ({check_in_date}). Please select a valid date range.",
+                    "check_in_date": str(check_in_date),
+                    "check_out_date": str(check_out_date)
+                }, status=status.HTTP_400_BAD_REQUEST)
         
         # Get all active rooms for this property
         rooms = Room.objects.filter(
@@ -3534,35 +3713,79 @@ def available_rooms_api(request):
             is_active=True
         ).order_by('room_number')
         
-        # Filter available rooms
+        # Filter available rooms and track unavailable rooms with booking info
         available_rooms_list = []
+        unavailable_rooms_list = []
+        
+        from django.utils import timezone
+        today = timezone.now().date()
         
         for room in rooms:
             # Sync room status to ensure it's up-to-date with bookings
             # This fixes cases where current_booking points to cancelled bookings
             room.sync_status_from_bookings()
             
-            # Basic availability check: status must be 'available'
-            if room.status != 'available':
-                continue
-            
-            # If room has a current booking, it's not available
-            if room.current_booking:
-                continue
+            # Check for active bookings (even if dates aren't provided)
+            # Use check_out_date__gt (not __gte) so rooms become available on checkout day
+            active_bookings = Booking.objects.filter(
+                property_obj=property_obj,
+                room_number=room.room_number,
+                booking_status__in=['pending', 'confirmed', 'checked_in'],
+                check_out_date__gt=today,  # Changed from __gte to __gt - room available on checkout day
+                is_deleted=False
+            ).exclude(
+                booking_status__in=['cancelled', 'checked_out', 'no_show']
+            ).order_by('check_in_date')
             
             # If date range is provided, check for booking conflicts
             if check_in_date and check_out_date:
-                # Check if room has any bookings that conflict with the requested dates
-                conflicting_bookings = Booking.objects.filter(
-                    property_obj=property_obj,
-                    room_number=room.room_number,
-                    booking_status__in=['pending', 'confirmed', 'checked_in'],
+                conflicting_bookings = active_bookings.filter(
                     check_in_date__lt=check_out_date,
                     check_out_date__gt=check_in_date
-                ).exists()
-                
-                if conflicting_bookings:
-                    continue
+                )
+            else:
+                # If no dates provided, check if room has any active bookings
+                conflicting_bookings = active_bookings
+            
+            # If room has conflicting bookings, it's not available
+            if conflicting_bookings.exists():
+                # Get the earliest active booking to show when room will be free
+                earliest_booking = conflicting_bookings.first()
+                unavailable_rooms_list.append({
+                    'room_id': room.id,
+                    'room_number': room.room_number,
+                    'room_type': room.room_type,
+                    'status': room.status,
+                    'reason': 'booked',
+                    'booked_from': earliest_booking.check_in_date.strftime('%Y-%m-%d') if earliest_booking else None,
+                    'booked_until': earliest_booking.check_out_date.strftime('%Y-%m-%d') if earliest_booking else None,
+                    'booking_reference': earliest_booking.booking_reference if earliest_booking else None,
+                })
+                continue
+            
+            # Additional checks: status must be 'available' and no current booking
+            if room.status != 'available':
+                unavailable_rooms_list.append({
+                    'room_id': room.id,
+                    'room_number': room.room_number,
+                    'room_type': room.room_type,
+                    'status': room.status,
+                    'reason': f'room_status_{room.status}',
+                })
+                continue
+            
+            if room.current_booking:
+                unavailable_rooms_list.append({
+                    'room_id': room.id,
+                    'room_number': room.room_number,
+                    'room_type': room.room_type,
+                    'status': room.status,
+                    'reason': 'has_current_booking',
+                    'booked_from': room.current_booking.check_in_date.strftime('%Y-%m-%d') if room.current_booking else None,
+                    'booked_until': room.current_booking.check_out_date.strftime('%Y-%m-%d') if room.current_booking else None,
+                    'booking_reference': room.current_booking.booking_reference if room.current_booking else None,
+                })
+                continue
             
             # Room is available, add to list
             available_rooms_list.append(room)
@@ -3570,30 +3793,39 @@ def available_rooms_api(request):
         # Serialize available rooms
         serializer = RoomSerializer(available_rooms_list, many=True, context={'request': request})
         
-        return Response(
-            {
-                "property_id": property_obj.id,
-                "property_title": property_obj.title,
-                "property_type": property_type_name,
-                "total_rooms": rooms.count(),
-                "available_count": len(available_rooms_list),
-                "check_in_date": check_in_str if check_in_str else None,
-                "check_out_date": check_out_str if check_out_str else None,
-                "rooms": serializer.data
-            },
-            status=status.HTTP_200_OK
-        )
+        # Build response - only show available rooms by default
+        response_data = {
+            "property_id": property_obj.id,
+            "property_title": property_obj.title,
+            "property_type": property_type_name,
+            "total_rooms": rooms.count(),
+            "available_count": len(available_rooms_list),
+            "check_in_date": check_in_str if check_in_str else None,
+            "check_out_date": check_out_str if check_out_str else None,
+            "rooms": serializer.data  # Only available rooms - backward compatible
+        }
+        
+        # Optionally include unavailable rooms with booking dates if requested
+        if show_unavailable:
+            response_data["unavailable_count"] = len(unavailable_rooms_list)
+            response_data["unavailable_rooms"] = unavailable_rooms_list  # Shows booking dates
+        
+        return Response(response_data, status=status.HTTP_200_OK)
         
     except Property.DoesNotExist:
-        return Response(
-            {"error": "Property not found"},
-            status=status.HTTP_404_NOT_FOUND
-        )
+        return Response({
+            "success": False,
+            "error": "Property not found",
+            "message": f"Property with ID {property_id if 'property_id' in locals() else 'unknown'} was not found. Please check the property ID and try again.",
+            "property_id": property_id if 'property_id' in locals() else None
+        }, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
-        return Response(
-            {"error": f"Failed to fetch available rooms: {str(e)}"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        return Response({
+            "success": False,
+            "error": "Failed to fetch available rooms",
+            "message": f"An error occurred while fetching available rooms: {str(e)}. Please try again or contact support if the problem persists.",
+            "property_id": property_id if 'property_id' in locals() else None
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @extend_schema(
@@ -3787,13 +4019,13 @@ def create_booking_with_room_api(request):
         
         # Validate property_type
         if property_type not in ['hotel', 'lodge', 'venue']:
-            return Response(
-                {
-                    'success': False,
-                    'error': 'property_type must be "hotel", "lodge", or "venue"'
-                },
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({
+                'success': False,
+                'error': 'Invalid property type',
+                'message': f'Property type must be one of: "hotel", "lodge", or "venue". You provided: "{property_type}"',
+                'valid_types': ['hotel', 'lodge', 'venue'],
+                'provided_type': property_type
+            }, status=status.HTTP_400_BAD_REQUEST)
         
         # Handle venue bookings differently
         if property_type == 'venue':
@@ -3809,14 +4041,24 @@ def create_booking_with_room_api(request):
             room_number = None  # Venues don't have rooms
             
             # Validate required fields for venue
-            if not all([event_name, event_type, event_date, expected_guests, customer_name, phone, email, total_amount]):
-                return Response(
-                    {
-                        'success': False,
-                        'error': 'Please provide all required fields: event_name, event_type, event_date, expected_guests, customer_name, phone, email, total_amount'
-                    },
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+            missing_fields = []
+            if not event_name: missing_fields.append('event_name')
+            if not event_type: missing_fields.append('event_type')
+            if not event_date: missing_fields.append('event_date')
+            if not expected_guests: missing_fields.append('expected_guests')
+            if not customer_name: missing_fields.append('customer_name')
+            if not phone: missing_fields.append('phone')
+            if not email: missing_fields.append('email')
+            if not total_amount: missing_fields.append('total_amount')
+            
+            if missing_fields:
+                return Response({
+                    'success': False,
+                    'error': 'Missing required fields',
+                    'message': f'Please provide all required fields for venue booking. Missing: {", ".join(missing_fields)}',
+                    'missing_fields': missing_fields,
+                    'required_fields': ['event_name', 'event_type', 'event_date', 'expected_guests', 'customer_name', 'phone', 'email', 'total_amount']
+                }, status=status.HTTP_400_BAD_REQUEST)
         else:
             # Hotel/Lodge fields
             room_number = data.get('room_number', '').strip()
@@ -3826,36 +4068,41 @@ def create_booking_with_room_api(request):
             number_of_guests = data.get('number_of_guests')
             
             # Validate required fields for hotel/lodge
-            if not all([customer_name, phone, email, room_type, room_number, 
-                       check_in_date, check_out_date, total_amount]):
-                return Response(
-                    {
-                        'success': False,
-                        'error': 'Please provide all required fields: customer_name, phone, email, room_type, room_number, check_in_date, check_out_date, total_amount'
-                    },
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+            missing_fields = []
+            if not customer_name: missing_fields.append('customer_name')
+            if not phone: missing_fields.append('phone')
+            if not email: missing_fields.append('email')
+            if not room_type: missing_fields.append('room_type')
+            if not room_number: missing_fields.append('room_number')
+            if not check_in_date: missing_fields.append('check_in_date')
+            if not check_out_date: missing_fields.append('check_out_date')
+            if not total_amount: missing_fields.append('total_amount')
+            
+            if missing_fields:
+                return Response({
+                    'success': False,
+                    'error': 'Missing required fields',
+                    'message': f'Please provide all required fields for {property_type} booking. Missing: {", ".join(missing_fields)}',
+                    'missing_fields': missing_fields,
+                    'required_fields': ['customer_name', 'phone', 'email', 'room_type', 'room_number', 'check_in_date', 'check_out_date', 'total_amount']
+                }, status=status.HTTP_400_BAD_REQUEST)
         
         # Validate property_id
         if not property_id:
-            return Response(
-                {
-                    'success': False,
-                    'error': 'property_id is required'
-                },
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({
+                'success': False,
+                'error': 'Property ID required',
+                'message': 'Please provide a property_id in your request. This identifies which property you want to book.'
+            }, status=status.HTTP_400_BAD_REQUEST)
         
         try:
             property_id = int(property_id)
         except (ValueError, TypeError):
-            return Response(
-                {
-                    'success': False,
-                    'error': 'property_id must be a valid integer'
-                },
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({
+                'success': False,
+                'error': 'Invalid property ID',
+                'message': f'Property ID must be a valid number. You provided: "{data.get("property_id")}"'
+            }, status=status.HTTP_400_BAD_REQUEST)
         
         # Validate number_of_guests
         try:
@@ -3863,13 +4110,11 @@ def create_booking_with_room_api(request):
             if number_of_guests < 1:
                 raise ValueError("Number of guests must be at least 1")
         except (ValueError, TypeError):
-            return Response(
-                {
-                    'success': False,
-                    'error': 'number_of_guests must be a valid integer greater than 0'
-                },
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({
+                'success': False,
+                'error': 'Invalid number of guests',
+                'message': f'Number of guests must be a valid whole number greater than 0. You provided: "{number_of_guests}"'
+            }, status=status.HTTP_400_BAD_REQUEST)
         
         # Validate total_amount
         try:
@@ -3878,46 +4123,57 @@ def create_booking_with_room_api(request):
                 raise ValueError("Total amount must be greater than 0")
             total_amount_decimal = Decimal(str(total_amount))
         except (ValueError, TypeError):
-            return Response(
-                {
-                    'success': False,
-                    'error': 'total_amount must be a valid number greater than 0'
-                },
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({
+                'success': False,
+                'error': 'Invalid total amount',
+                'message': f'Total amount must be a valid number greater than 0. You provided: "{total_amount}"'
+            }, status=status.HTTP_400_BAD_REQUEST)
         
         # Validate date format
         try:
             check_in = datetime.strptime(check_in_date, '%Y-%m-%d').date()
             check_out = datetime.strptime(check_out_date, '%Y-%m-%d').date()
             
-            if check_out <= check_in:
-                return Response(
-                    {
+            # For venues, allow same date (single day events)
+            # For hotels and lodges, check_out must be after check_in
+            if property_type == 'venue':
+                if check_out < check_in:
+                    return Response({
                         'success': False,
-                        'error': 'check_out_date must be after check_in_date'
-                    },
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                        'error': 'Invalid date range',
+                        'message': f'For venue bookings, check-out date ({check_out_date}) cannot be before check-in date ({check_in_date}). Please select a valid date range.',
+                        'check_in_date': check_in_date,
+                        'check_out_date': check_out_date
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                # Hotel and lodge require check_out to be after check_in
+                if check_out <= check_in:
+                    return Response({
+                        'success': False,
+                        'error': 'Invalid date range',
+                        'message': f'For {property_type} bookings, check-out date ({check_out_date}) must be after check-in date ({check_in_date}). Please select a valid date range.',
+                        'check_in_date': check_in_date,
+                        'check_out_date': check_out_date
+                    }, status=status.HTTP_400_BAD_REQUEST)
         except ValueError:
-            return Response(
-                {
-                    'success': False,
-                    'error': 'Invalid date format. Use YYYY-MM-DD format for check_in_date and check_out_date'
-                },
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({
+                'success': False,
+                'error': 'Invalid date format',
+                'message': f'Dates must be in YYYY-MM-DD format (e.g., 2026-01-25). Check-in: "{check_in_date}", Check-out: "{check_out_date}"',
+                'check_in_date': check_in_date,
+                'check_out_date': check_out_date,
+                'expected_format': 'YYYY-MM-DD'
+            }, status=status.HTTP_400_BAD_REQUEST)
         
         # Validate email format
         email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
         if not re.match(email_pattern, email):
-            return Response(
-                {
-                    'success': False,
-                    'error': 'Please provide a valid email address'
-                },
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({
+                'success': False,
+                'error': 'Invalid email address',
+                'message': f'Please provide a valid email address. You provided: "{email}". Example: john.doe@example.com',
+                'provided_email': email
+            }, status=status.HTTP_400_BAD_REQUEST)
         
         # Get and validate property
         try:
@@ -3926,23 +4182,24 @@ def create_booking_with_room_api(request):
                 property_type__name__iexact=property_type
             )
         except Property.DoesNotExist:
-            return Response(
-                {
-                    'success': False,
-                    'error': f'Property with ID {property_id} and type "{property_type}" not found'
-                },
-                status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({
+                'success': False,
+                'error': 'Property not found',
+                'message': f'Property with ID {property_id} and type "{property_type}" was not found. Please check the property ID and type, then try again.',
+                'property_id': property_id,
+                'property_type': property_type
+            }, status=status.HTTP_404_NOT_FOUND)
         
         # Check property availability
         if not selected_property.is_available_for_booking(check_in, check_out):
-            return Response(
-                {
-                    'success': False,
-                    'error': 'Property is not available for the selected dates. Please choose different dates.'
-                },
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({
+                'success': False,
+                'error': 'Property not available',
+                'message': f'This property is not available for the selected dates (Check-in: {check_in_date}, Check-out: {check_out_date}). Please choose different dates.',
+                'check_in_date': check_in_date,
+                'check_out_date': check_out_date,
+                'property_id': property_id
+            }, status=status.HTTP_400_BAD_REQUEST)
         
         # Parse customer name
         name_parts = customer_name.split(' ', 1)
@@ -4007,13 +4264,13 @@ def create_booking_with_room_api(request):
         else:
             booking_reference = f"HTL-{Booking.objects.count() + 1:06d}"
         
-        # Create booking
+        # Create booking - use parsed date objects (check_in, check_out) instead of strings
         booking = Booking.objects.create(
             property_obj=selected_property,
             customer=customer,
             booking_reference=booking_reference,
-            check_in_date=check_in_date,
-            check_out_date=check_out_date,
+            check_in_date=check_in,  # Use parsed date object, not string
+            check_out_date=check_out,  # Use parsed date object, not string
             number_of_guests=number_of_guests,
             room_type=room_type,
             total_amount=total_amount_decimal,
@@ -4040,13 +4297,13 @@ def create_booking_with_room_api(request):
                 if room.status != 'available':
                     # Delete the booking if room is not available
                     booking.delete()
-                    return Response(
-                        {
-                            'success': False,
-                            'error': f'Room {room_number} is not available (Status: {room.status}). Please select an available room.'
-                        },
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
+                    return Response({
+                        'success': False,
+                        'error': 'Room not available',
+                        'message': f'Room {room_number} is not available (Status: {room.status}). Please select an available room from the list.',
+                        'room_number': room_number,
+                        'room_status': room.status
+                    }, status=status.HTTP_400_BAD_REQUEST)
                 
                 # Check for date conflicts
                 conflicting_bookings = Booking.objects.filter(
@@ -4059,13 +4316,14 @@ def create_booking_with_room_api(request):
                 
                 if conflicting_bookings:
                     booking.delete()
-                    return Response(
-                        {
-                            'success': False,
-                            'error': f'Room {room_number} is already booked for the selected dates. Please choose different dates or another room.'
-                        },
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
+                    return Response({
+                        'success': False,
+                        'error': 'Room already booked',
+                        'message': f'Room {room_number} is already booked for the selected dates (Check-in: {check_in_date}, Check-out: {check_out_date}). Please choose different dates or select another room.',
+                        'room_number': room_number,
+                        'check_in_date': check_in_date,
+                        'check_out_date': check_out_date
+                    }, status=status.HTTP_400_BAD_REQUEST)
                 
                 # Assign the room to booking
                 booking.room_number = room_number
@@ -4082,11 +4340,13 @@ def create_booking_with_room_api(request):
             except Room.DoesNotExist:
                 # Delete the booking if room doesn't exist
                 booking.delete()
-                return Response(
-                    {
-                        'success': False,
-                        'error': f'Room {room_number} not found. Please select a valid room.'
-                    },
+                return Response({
+                    'success': False,
+                    'error': 'Room not found',
+                    'message': f'Room {room_number} was not found for this property. Please select a valid room from the available rooms list.',
+                    'room_number': room_number,
+                    'property_id': property_id
+                },
                     status=status.HTTP_404_NOT_FOUND
                 )
         

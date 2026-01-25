@@ -5167,13 +5167,13 @@ def create_lodge_booking(request):
             }
         )
         
-        # Create booking
+        # Create booking - use parsed date objects (check_in, check_out) instead of strings
         booking = Booking.objects.create(
             property_obj=selected_property,
             customer=customer,
             booking_reference=f"LDG-{Booking.objects.count() + 1:06d}",
-            check_in_date=request.POST.get('check_in_date'),
-            check_out_date=request.POST.get('check_out_date'),
+            check_in_date=check_in,  # Use parsed date object, not string
+            check_out_date=check_out,  # Use parsed date object, not string
             number_of_guests=int(request.POST.get('number_of_guests', 1)),
             room_type=request.POST.get('room_type'),
             total_amount=float(request.POST.get('total_amount', 0)),
@@ -5276,13 +5276,13 @@ def create_venue_booking(request):
             }
         )
         
-        # Create booking
+        # Create booking - use parsed date objects (check_in, check_out) instead of strings
         booking = Booking.objects.create(
             property_obj=selected_property,
             customer=customer,
             booking_reference=f"VEN-{Booking.objects.count() + 1:06d}",
-            check_in_date=request.POST.get('check_in_date'),
-            check_out_date=request.POST.get('check_out_date'),
+            check_in_date=check_in,  # Use parsed date object, not string
+            check_out_date=check_out,  # Use parsed date object, not string
             number_of_guests=int(request.POST.get('number_of_guests', 1)),
             total_amount=float(request.POST.get('total_amount', 0)),
             created_by=request.user,
@@ -5357,12 +5357,13 @@ def create_house_booking(request):
         )
         
         # Create booking (rental) - calculate total based on months
+        # Use parsed date objects (check_in, check_out) instead of strings
         booking = Booking.objects.create(
             property_obj=selected_property,
             customer=customer,
             booking_reference=f"HSE-{Booking.objects.count() + 1:06d}",
-            check_in_date=request.POST.get('check_in_date'),
-            check_out_date=request.POST.get('check_out_date'),
+            check_in_date=check_in,  # Use parsed date object, not string
+            check_out_date=check_out,  # Use parsed date object, not string
             number_of_guests=int(request.POST.get('number_of_guests', 1)),
             total_amount=0,  # Will be calculated automatically
             created_by=request.user,
@@ -5816,8 +5817,8 @@ def customer_new_booking_modal(request, pk):
                 property_obj=property_obj,
                 customer=customer,
                 booking_reference=f"BK{customer.id}{property_obj.id}{timezone.now().strftime('%Y%m%d%H%M%S')}",
-                check_in_date=check_in_date,
-                check_out_date=check_out_date,
+                check_in_date=check_in,  # Use parsed date object, not string
+                check_out_date=check_out,  # Use parsed date object, not string
                 number_of_guests=number_of_guests,
                 total_amount=calculated_total,
                 special_requests=special_requests,
@@ -6746,13 +6747,13 @@ def api_create_booking(request):
             from decimal import Decimal
             total_amount_decimal = Decimal(str(total_amount)) if total_amount else Decimal('0')
             
-            # Create booking
+            # Create booking - use parsed date objects (check_in, check_out) instead of strings
             booking = Booking.objects.create(
                 property_obj=selected_property,
                 customer=customer,
                 booking_reference=booking_reference,
-                check_in_date=check_in_date,
-                check_out_date=check_out_date,
+                check_in_date=check_in,  # Use parsed date object, not string
+                check_out_date=check_out,  # Use parsed date object, not string
                 number_of_guests=number_of_guests,
                 room_type=room_type,
                 total_amount=total_amount_decimal,
