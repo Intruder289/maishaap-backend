@@ -4028,54 +4028,54 @@ def create_booking_with_room_api(request):
         if property_type != 'venue':
             # Validate and assign the selected room
             try:
-            room = Room.objects.get(
-                property_obj=selected_property,
-                room_number=room_number,
-                room_type=room_type
-            )
-            
-            # Check if room is available
-            room.sync_status_from_bookings()
-            
-            if room.status != 'available':
-                # Delete the booking if room is not available
-                booking.delete()
-                return Response(
-                    {
-                        'success': False,
-                        'error': f'Room {room_number} is not available (Status: {room.status}). Please select an available room.'
-                    },
-                    status=status.HTTP_400_BAD_REQUEST
+                room = Room.objects.get(
+                    property_obj=selected_property,
+                    room_number=room_number,
+                    room_type=room_type
                 )
-            
-            # Check for date conflicts
-            conflicting_bookings = Booking.objects.filter(
-                property_obj=selected_property,
-                room_number=room_number,
-                booking_status__in=['pending', 'confirmed', 'checked_in'],
-                check_in_date__lt=check_out,
-                check_out_date__gt=check_in
-            ).exclude(id=booking.id).exists()
-            
-            if conflicting_bookings:
-                booking.delete()
-                return Response(
-                    {
-                        'success': False,
-                        'error': f'Room {room_number} is already booked for the selected dates. Please choose different dates or another room.'
-                    },
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            # Assign the room to booking
-            booking.room_number = room_number
-            booking.save()
-            
-            # Update room status
-            room.current_booking = booking
-            room.status = 'occupied'
-            room.save()
-            
+                
+                # Check if room is available
+                room.sync_status_from_bookings()
+                
+                if room.status != 'available':
+                    # Delete the booking if room is not available
+                    booking.delete()
+                    return Response(
+                        {
+                            'success': False,
+                            'error': f'Room {room_number} is not available (Status: {room.status}). Please select an available room.'
+                        },
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                # Check for date conflicts
+                conflicting_bookings = Booking.objects.filter(
+                    property_obj=selected_property,
+                    room_number=room_number,
+                    booking_status__in=['pending', 'confirmed', 'checked_in'],
+                    check_in_date__lt=check_out,
+                    check_out_date__gt=check_in
+                ).exclude(id=booking.id).exists()
+                
+                if conflicting_bookings:
+                    booking.delete()
+                    return Response(
+                        {
+                            'success': False,
+                            'error': f'Room {room_number} is already booked for the selected dates. Please choose different dates or another room.'
+                        },
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                # Assign the room to booking
+                booking.room_number = room_number
+                booking.save()
+                
+                # Update room status
+                room.current_booking = booking
+                room.status = 'occupied'
+                room.save()
+                
                 room_message = f"Room {room_number} assigned successfully"
                 room_assigned = True
                 
