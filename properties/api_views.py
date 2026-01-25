@@ -224,7 +224,7 @@ except ImportError:
 
 from .models import (
     PropertyType, Region, PropertyFavorite, Property, PropertyImage,
-    District, Amenity, Room, Booking
+    District, Amenity, Room, Booking, Customer
 )
 from .serializers import (
     PropertyTypeSerializer,
@@ -3592,5 +3592,536 @@ def available_rooms_api(request):
     except Exception as e:
         return Response(
             {"error": f"Failed to fetch available rooms: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@extend_schema(
+    summary="Create Booking (Hotel, Lodge, or Venue)",
+    description="""
+    REST API endpoint for creating bookings.
+    Designed for mobile apps - accepts JSON and JWT Bearer token authentication.
+    
+    Supports:
+    - **Hotel/Lodge bookings** with room assignment (room_number required)
+    - **Venue bookings** without rooms (event_name, event_type, event_date required)
+    
+    **Request Body (Hotel/Lodge):**
+    - property_id (required): Property ID
+    - property_type (required): "hotel" or "lodge"
+    - room_number (required): Specific room number (e.g., "10")
+    - room_type (required): Room type
+    - check_in_date (required): Check-in date (YYYY-MM-DD)
+    - check_out_date (required): Check-out date (YYYY-MM-DD)
+    - number_of_guests (required): Number of guests
+    - total_amount (required): Total booking amount
+    - customer_name (required): Customer full name
+    - email (required): Customer email
+    - phone (required): Customer phone number
+    - special_requests (optional): Special requests or notes
+    
+    **Request Body (Venue):**
+    - property_id (required): Property ID
+    - property_type (required): "venue"
+    - event_name (required): Event name
+    - event_type (required): Event type
+    - event_date (required): Event date (YYYY-MM-DD) - used as check_in_date
+    - check_out_date (optional): Check-out date (defaults to event_date)
+    - expected_guests (required): Number of expected guests
+    - total_amount (required): Total booking amount
+    - customer_name (required): Customer full name
+    - email (required): Customer email
+    - phone (required): Customer phone number
+    - special_requests (optional): Special requests or notes
+    """,
+    tags=['Properties'],
+    request={
+        'application/json': {
+            'type': 'object',
+            'properties': {
+                'property_id': {'type': 'integer'},
+                'property_type': {'type': 'string', 'enum': ['hotel', 'lodge', 'venue']},
+                'room_number': {'type': 'string'},
+                'room_type': {'type': 'string'},
+                'check_in_date': {'type': 'string', 'format': 'date'},
+                'check_out_date': {'type': 'string', 'format': 'date'},
+                'number_of_guests': {'type': 'integer'},
+                'expected_guests': {'type': 'integer'},
+                'event_name': {'type': 'string'},
+                'event_type': {'type': 'string'},
+                'event_date': {'type': 'string', 'format': 'date'},
+                'total_amount': {'type': 'string'},
+                'customer_name': {'type': 'string'},
+                'email': {'type': 'string', 'format': 'email'},
+                'phone': {'type': 'string'},
+                'special_requests': {'type': 'string'}
+            }
+        }
+    },
+    responses={
+        201: {
+            'description': 'Booking created successfully',
+            'content': {
+                'application/json': {
+                    'schema': {
+                        'type': 'object',
+                        'properties': {
+                            'success': {'type': 'boolean'},
+                            'booking_id': {'type': 'integer'},
+                            'booking_reference': {'type': 'string'},
+                            'room_number': {'type': 'string'},
+                            'room_type': {'type': 'string'},
+                            'message': {'type': 'string'},
+                            'room_message': {'type': 'string'}
+                        }
+                    }
+                }
+            }
+        },
+        400: {'description': 'Bad request - validation error'},
+        404: {'description': 'Property or room not found'},
+        401: {'description': 'Authentication required'}
+    }
+)
+@swagger_auto_schema(
+    method='post',
+    operation_description="""
+    Create a booking for hotel, lodge, or venue properties.
+    
+    This endpoint is designed for mobile apps and accepts JSON data with JWT authentication.
+    
+    **For Hotel/Lodge:** Room number is mandatory and will be validated for availability.
+    **For Venue:** Event details are required (event_name, event_type, event_date).
+    """,
+    operation_summary="Create Booking (Hotel, Lodge, or Venue)",
+    tags=['Properties'],
+    request_body=openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        properties={
+            'property_id': openapi.Schema(type=openapi.TYPE_INTEGER, description='Property ID'),
+            'property_type': openapi.Schema(
+                type=openapi.TYPE_STRING, 
+                enum=['hotel', 'lodge', 'venue'],
+                description='Property type: hotel, lodge, or venue'
+            ),
+            'room_number': openapi.Schema(
+                type=openapi.TYPE_STRING, 
+                description='Specific room number (required for hotel/lodge, e.g., "10")'
+            ),
+            'room_type': openapi.Schema(type=openapi.TYPE_STRING, description='Room type (required for hotel/lodge)'),
+            'check_in_date': openapi.Schema(
+                type=openapi.TYPE_STRING, 
+                format=openapi.FORMAT_DATE,
+                description='Check-in date (YYYY-MM-DD) - required for hotel/lodge'
+            ),
+            'check_out_date': openapi.Schema(
+                type=openapi.TYPE_STRING, 
+                format=openapi.FORMAT_DATE,
+                description='Check-out date (YYYY-MM-DD) - required for hotel/lodge'
+            ),
+            'number_of_guests': openapi.Schema(type=openapi.TYPE_INTEGER, description='Number of guests (required for hotel/lodge)'),
+            'event_name': openapi.Schema(type=openapi.TYPE_STRING, description='Event name (required for venue)'),
+            'event_type': openapi.Schema(type=openapi.TYPE_STRING, description='Event type (required for venue)'),
+            'event_date': openapi.Schema(
+                type=openapi.TYPE_STRING, 
+                format=openapi.FORMAT_DATE,
+                description='Event date (YYYY-MM-DD) - required for venue, used as check_in_date'
+            ),
+            'expected_guests': openapi.Schema(type=openapi.TYPE_INTEGER, description='Expected guests (required for venue)'),
+            'total_amount': openapi.Schema(type=openapi.TYPE_STRING, description='Total booking amount (required)'),
+            'customer_name': openapi.Schema(type=openapi.TYPE_STRING, description='Customer full name (required)'),
+            'email': openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_EMAIL, description='Customer email (required)'),
+            'phone': openapi.Schema(type=openapi.TYPE_STRING, description='Customer phone number (required)'),
+            'special_requests': openapi.Schema(type=openapi.TYPE_STRING, description='Special requests (optional)')
+        }
+    ),
+    responses={
+        201: openapi.Response(
+            description="Booking created successfully",
+            schema=openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                    'booking_id': openapi.Schema(type=openapi.TYPE_INTEGER),
+                    'booking_reference': openapi.Schema(type=openapi.TYPE_STRING),
+                    'room_number': openapi.Schema(type=openapi.TYPE_STRING),
+                    'room_type': openapi.Schema(type=openapi.TYPE_STRING),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                    'room_message': openapi.Schema(type=openapi.TYPE_STRING)
+                }
+            )
+        ),
+        400: "Bad request - validation error",
+        404: "Property or room not found",
+        401: "Authentication required"
+    },
+    security=[{'Bearer': []}]
+)
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_booking_with_room_api(request):
+    """
+    REST API endpoint for creating bookings.
+    
+    Designed for mobile apps - accepts JSON and JWT Bearer token authentication.
+    Supports:
+    - Hotel and lodge bookings with room assignment
+    - Venue bookings without rooms
+    """
+    from datetime import datetime
+    from decimal import Decimal
+    import re
+    
+    try:
+        # Get data from JSON request body
+        data = request.data
+        
+        # Extract and validate required fields
+        property_id = data.get('property_id')
+        property_type = data.get('property_type', '').strip().lower()
+        customer_name = data.get('customer_name', '').strip()
+        email = data.get('email', '').strip()
+        phone = data.get('phone', '').strip()
+        special_requests = data.get('special_requests', '').strip()
+        total_amount = data.get('total_amount')
+        
+        # Validate property_type
+        if property_type not in ['hotel', 'lodge', 'venue']:
+            return Response(
+                {
+                    'success': False,
+                    'error': 'property_type must be "hotel", "lodge", or "venue"'
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Handle venue bookings differently
+        if property_type == 'venue':
+            # Venue-specific fields
+            event_name = data.get('event_name', '').strip()
+            event_type = data.get('event_type', '').strip()
+            event_date = data.get('event_date', '').strip()
+            check_out_date = data.get('check_out_date', '').strip() or event_date
+            expected_guests = data.get('expected_guests') or data.get('number_of_guests')
+            number_of_guests = expected_guests
+            check_in_date = event_date  # For venues, event_date is check_in_date
+            room_type = event_type  # Use event_type as room_type for venues
+            room_number = None  # Venues don't have rooms
+            
+            # Validate required fields for venue
+            if not all([event_name, event_type, event_date, expected_guests, customer_name, phone, email, total_amount]):
+                return Response(
+                    {
+                        'success': False,
+                        'error': 'Please provide all required fields: event_name, event_type, event_date, expected_guests, customer_name, phone, email, total_amount'
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            # Hotel/Lodge fields
+            room_number = data.get('room_number', '').strip()
+            room_type = data.get('room_type', '').strip()
+            check_in_date = data.get('check_in_date', '').strip()
+            check_out_date = data.get('check_out_date', '').strip()
+            number_of_guests = data.get('number_of_guests')
+            
+            # Validate required fields for hotel/lodge
+            if not all([customer_name, phone, email, room_type, room_number, 
+                       check_in_date, check_out_date, total_amount]):
+                return Response(
+                    {
+                        'success': False,
+                        'error': 'Please provide all required fields: customer_name, phone, email, room_type, room_number, check_in_date, check_out_date, total_amount'
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        # Validate property_id
+        if not property_id:
+            return Response(
+                {
+                    'success': False,
+                    'error': 'property_id is required'
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            property_id = int(property_id)
+        except (ValueError, TypeError):
+            return Response(
+                {
+                    'success': False,
+                    'error': 'property_id must be a valid integer'
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate number_of_guests
+        try:
+            number_of_guests = int(number_of_guests) if number_of_guests else 1
+            if number_of_guests < 1:
+                raise ValueError("Number of guests must be at least 1")
+        except (ValueError, TypeError):
+            return Response(
+                {
+                    'success': False,
+                    'error': 'number_of_guests must be a valid integer greater than 0'
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate total_amount
+        try:
+            total_amount = float(total_amount) if total_amount else 0
+            if total_amount <= 0:
+                raise ValueError("Total amount must be greater than 0")
+            total_amount_decimal = Decimal(str(total_amount))
+        except (ValueError, TypeError):
+            return Response(
+                {
+                    'success': False,
+                    'error': 'total_amount must be a valid number greater than 0'
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate date format
+        try:
+            check_in = datetime.strptime(check_in_date, '%Y-%m-%d').date()
+            check_out = datetime.strptime(check_out_date, '%Y-%m-%d').date()
+            
+            if check_out <= check_in:
+                return Response(
+                    {
+                        'success': False,
+                        'error': 'check_out_date must be after check_in_date'
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        except ValueError:
+            return Response(
+                {
+                    'success': False,
+                    'error': 'Invalid date format. Use YYYY-MM-DD format for check_in_date and check_out_date'
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate email format
+        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(email_pattern, email):
+            return Response(
+                {
+                    'success': False,
+                    'error': 'Please provide a valid email address'
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get and validate property
+        try:
+            selected_property = Property.objects.get(
+                id=property_id,
+                property_type__name__iexact=property_type
+            )
+        except Property.DoesNotExist:
+            return Response(
+                {
+                    'success': False,
+                    'error': f'Property with ID {property_id} and type "{property_type}" not found'
+                },
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Check property availability
+        if not selected_property.is_available_for_booking(check_in, check_out):
+            return Response(
+                {
+                    'success': False,
+                    'error': 'Property is not available for the selected dates. Please choose different dates.'
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Parse customer name
+        name_parts = customer_name.split(' ', 1)
+        first_name = name_parts[0]
+        last_name = name_parts[1] if len(name_parts) > 1 else ''
+        
+        # Create or get customer
+        try:
+            customer, created = Customer.objects.get_or_create(
+                email=email,
+                defaults={
+                    'first_name': first_name,
+                    'last_name': last_name,
+                    'phone': phone,
+                }
+            )
+            
+            # Update customer info if already exists
+            if not created:
+                updated = False
+                if customer.first_name != first_name or customer.last_name != last_name:
+                    customer.first_name = first_name
+                    customer.last_name = last_name
+                    updated = True
+                if customer.phone != phone:
+                    customer.phone = phone
+                    updated = True
+                if updated:
+                    customer.save()
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error creating/updating customer: {str(e)}")
+            return Response(
+                {
+                    'success': False,
+                    'error': f'Error saving customer information: {str(e)}. Please check that the email is unique.'
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # For venue bookings, validate capacity
+        if property_type == 'venue':
+            if selected_property.capacity and number_of_guests > selected_property.capacity:
+                return Response(
+                    {
+                        'success': False,
+                        'error': f'Expected guests ({number_of_guests}) exceeds venue capacity ({selected_property.capacity}).'
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # For venues, use event_name in special_requests
+            if event_name:
+                special_requests = f"{event_name}" + (f" - {special_requests}" if special_requests else "")
+        
+        # Generate booking reference based on property type
+        if property_type == 'lodge':
+            booking_reference = f"LDG-{Booking.objects.count() + 1:06d}"
+        elif property_type == 'venue':
+            booking_reference = f"VEN-{Booking.objects.count() + 1:06d}"
+        else:
+            booking_reference = f"HTL-{Booking.objects.count() + 1:06d}"
+        
+        # Create booking
+        booking = Booking.objects.create(
+            property_obj=selected_property,
+            customer=customer,
+            booking_reference=booking_reference,
+            check_in_date=check_in_date,
+            check_out_date=check_out_date,
+            number_of_guests=number_of_guests,
+            room_type=room_type,
+            total_amount=total_amount_decimal,
+            special_requests=special_requests,
+            created_by=request.user,
+        )
+        
+        # Handle room assignment - only for hotel/lodge, not venues
+        room_assigned = False
+        room_message = ""
+        
+        if property_type != 'venue':
+            # Validate and assign the selected room
+            try:
+            room = Room.objects.get(
+                property_obj=selected_property,
+                room_number=room_number,
+                room_type=room_type
+            )
+            
+            # Check if room is available
+            room.sync_status_from_bookings()
+            
+            if room.status != 'available':
+                # Delete the booking if room is not available
+                booking.delete()
+                return Response(
+                    {
+                        'success': False,
+                        'error': f'Room {room_number} is not available (Status: {room.status}). Please select an available room.'
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Check for date conflicts
+            conflicting_bookings = Booking.objects.filter(
+                property_obj=selected_property,
+                room_number=room_number,
+                booking_status__in=['pending', 'confirmed', 'checked_in'],
+                check_in_date__lt=check_out,
+                check_out_date__gt=check_in
+            ).exclude(id=booking.id).exists()
+            
+            if conflicting_bookings:
+                booking.delete()
+                return Response(
+                    {
+                        'success': False,
+                        'error': f'Room {room_number} is already booked for the selected dates. Please choose different dates or another room.'
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Assign the room to booking
+            booking.room_number = room_number
+            booking.save()
+            
+            # Update room status
+            room.current_booking = booking
+            room.status = 'occupied'
+            room.save()
+            
+                room_message = f"Room {room_number} assigned successfully"
+                room_assigned = True
+                
+            except Room.DoesNotExist:
+                # Delete the booking if room doesn't exist
+                booking.delete()
+                return Response(
+                    {
+                        'success': False,
+                        'error': f'Room {room_number} not found. Please select a valid room.'
+                    },
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        
+        # Return success response
+        response_data = {
+            'success': True,
+            'booking_id': booking.id,
+            'booking_reference': booking.booking_reference,
+            'message': f'Booking {booking.booking_reference} created successfully!'
+        }
+        
+        # Add room info for hotel/lodge bookings
+        if property_type != 'venue':
+            response_data['room_number'] = booking.room_number
+            response_data['room_type'] = booking.room_type
+            response_data['room_message'] = room_message
+        else:
+            # Add event info for venue bookings
+            response_data['event_name'] = event_name
+            response_data['event_type'] = event_type
+            response_data['event_date'] = event_date
+        
+        return Response(
+            response_data,
+            status=status.HTTP_201_CREATED
+        )
+        
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error creating booking: {str(e)}", exc_info=True)
+        return Response(
+            {
+                'success': False,
+                'error': f'Error creating booking: {str(e)}'
+            },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

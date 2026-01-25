@@ -54,4 +54,7 @@ urlpatterns = [
     
     # Available rooms endpoint (hotels/lodges only)
     path('available-rooms/', api_views.available_rooms_api, name='available_rooms_api'),
+    
+    # Create booking with room number endpoint (mobile app)
+    path('bookings/create/', api_views.create_booking_with_room_api, name='create_booking_with_room_api'),
 ]
