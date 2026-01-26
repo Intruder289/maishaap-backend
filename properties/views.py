@@ -5144,14 +5144,20 @@ def create_lodge_booking(request):
             messages.error(request, 'Selected lodge not found.')
             return redirect('properties:lodge_select_property')
         
-        # Check property availability
+        # Check basic property status (for lodge bookings, we check room-level availability later)
         from datetime import datetime
         try:
             check_in = datetime.strptime(request.POST.get('check_in_date'), '%Y-%m-%d').date()
             check_out = datetime.strptime(request.POST.get('check_out_date'), '%Y-%m-%d').date()
             
-            if not selected_property.is_available_for_booking(check_in, check_out):
-                messages.error(request, 'Property is not available for the selected dates. Please choose different dates.')
+            # For lodge bookings, only check basic property status, not property-level booking conflicts
+            # Room-level availability is checked later when assigning the room
+            if selected_property.status not in ['available']:
+                messages.error(request, f'This property is currently not available for booking (Status: {selected_property.status}).')
+                return redirect('properties:create_lodge_booking')
+            
+            if not selected_property.is_active:
+                messages.error(request, 'This property is currently inactive and cannot accept bookings.')
                 return redirect('properties:create_lodge_booking')
         except (ValueError, TypeError):
             messages.error(request, 'Invalid date format.')
@@ -5168,6 +5174,7 @@ def create_lodge_booking(request):
         )
         
         # Create booking - use parsed date objects (check_in, check_out) instead of strings
+        # Auto-confirm booking: Set status to 'confirmed' automatically
         booking = Booking.objects.create(
             property_obj=selected_property,
             customer=customer,
@@ -5177,6 +5184,7 @@ def create_lodge_booking(request):
             number_of_guests=int(request.POST.get('number_of_guests', 1)),
             room_type=request.POST.get('room_type'),
             total_amount=float(request.POST.get('total_amount', 0)),
+            booking_status='confirmed',  # Auto-confirm: bookings are automatically confirmed
             created_by=request.user,
         )
         
@@ -5188,6 +5196,31 @@ def create_lodge_booking(request):
         
         try:
             room = Room.objects.get(property_obj=selected_property, room_number=room_number)
+            
+            # Sync room status and check availability
+            room.sync_status_from_bookings()
+            
+            # Check if room is available
+            if room.status != 'available':
+                booking.delete()  # Delete the booking if room is not available
+                messages.error(request, f'Room {room_number} is not available (Status: {room.status}). Please select an available room.')
+                return redirect('properties:create_lodge_booking')
+            
+            # Check for date conflicts
+            conflicting_bookings = Booking.objects.filter(
+                property_obj=selected_property,
+                room_number=room_number,
+                booking_status__in=['pending', 'confirmed', 'checked_in'],
+                check_in_date__lt=check_out,
+                check_out_date__gt=check_in
+            ).exclude(id=booking.id).exists()
+            
+            if conflicting_bookings:
+                booking.delete()  # Delete the booking if there are conflicts
+                messages.error(request, f'Room {room_number} is already booked for the selected dates. Please choose different dates or select another room.')
+                return redirect('properties:create_lodge_booking')
+            
+            # Assign room to booking
             booking.room_number = room_number
             booking.room_type = room.room_type
             booking.save()
@@ -5277,6 +5310,7 @@ def create_venue_booking(request):
         )
         
         # Create booking - use parsed date objects (check_in, check_out) instead of strings
+        # Auto-confirm booking: Set status to 'confirmed' automatically
         booking = Booking.objects.create(
             property_obj=selected_property,
             customer=customer,
@@ -5285,6 +5319,7 @@ def create_venue_booking(request):
             check_out_date=check_out,  # Use parsed date object, not string
             number_of_guests=int(request.POST.get('number_of_guests', 1)),
             total_amount=float(request.POST.get('total_amount', 0)),
+            booking_status='confirmed',  # Auto-confirm: bookings are automatically confirmed
             created_by=request.user,
         )
         
@@ -5358,6 +5393,7 @@ def create_house_booking(request):
         
         # Create booking (rental) - calculate total based on months
         # Use parsed date objects (check_in, check_out) instead of strings
+        # Auto-confirm booking: Set status to 'confirmed' automatically
         booking = Booking.objects.create(
             property_obj=selected_property,
             customer=customer,
@@ -5366,6 +5402,7 @@ def create_house_booking(request):
             check_out_date=check_out,  # Use parsed date object, not string
             number_of_guests=int(request.POST.get('number_of_guests', 1)),
             total_amount=0,  # Will be calculated automatically
+            booking_status='confirmed',  # Auto-confirm: bookings are automatically confirmed
             created_by=request.user,
         )
         
@@ -5813,6 +5850,7 @@ def customer_new_booking_modal(request, pk):
             daily_rate = property_obj.rent_amount
             calculated_total = daily_rate * duration_days
             
+            # Auto-confirm booking: Set status to 'confirmed' automatically
             booking = Booking.objects.create(
                 property_obj=property_obj,
                 customer=customer,
@@ -5822,6 +5860,7 @@ def customer_new_booking_modal(request, pk):
                 number_of_guests=number_of_guests,
                 total_amount=calculated_total,
                 special_requests=special_requests,
+                booking_status='confirmed',  # Auto-confirm: bookings are automatically confirmed
                 created_by=request.user,
             )
             return JsonResponse({'success': True, 'message': f'Booking created successfully! Total: Tsh {calculated_total:,.0f} for {duration_days} days'})
@@ -6672,11 +6711,27 @@ def api_create_booking(request):
                 check_in = datetime.strptime(check_in_date, '%Y-%m-%d').date()
                 check_out = datetime.strptime(check_out_date, '%Y-%m-%d').date()
                 
-                if not selected_property.is_available_for_booking(check_in, check_out):
-                    return JsonResponse({
-                        'success': False,
-                        'error': 'Property is not available for the selected dates. Please choose different dates.'
-                    }, status=400)
+                # For venues, check full property availability (including booking conflicts)
+                # For hotel/lodge, only check basic property status - room-level availability checked later
+                if property_type == 'venue':
+                    if not selected_property.is_available_for_booking(check_in, check_out):
+                        return JsonResponse({
+                            'success': False,
+                            'error': 'Property is not available for the selected dates. Please choose different dates.'
+                        }, status=400)
+                else:
+                    # For hotel/lodge, only check basic property status
+                    if selected_property.status not in ['available']:
+                        return JsonResponse({
+                            'success': False,
+                            'error': f'This property is currently not available for booking (Status: {selected_property.status}).'
+                        }, status=400)
+                    
+                    if not selected_property.is_active:
+                        return JsonResponse({
+                            'success': False,
+                            'error': 'This property is currently inactive and cannot accept bookings.'
+                        }, status=400)
             except ValueError:
                 return JsonResponse({
                     'success': False,
@@ -6748,6 +6803,7 @@ def api_create_booking(request):
             total_amount_decimal = Decimal(str(total_amount)) if total_amount else Decimal('0')
             
             # Create booking - use parsed date objects (check_in, check_out) instead of strings
+            # Auto-confirm booking: Set status to 'confirmed' automatically
             booking = Booking.objects.create(
                 property_obj=selected_property,
                 customer=customer,
@@ -6758,6 +6814,7 @@ def api_create_booking(request):
                 room_type=room_type,
                 total_amount=total_amount_decimal,
                 special_requests=special_requests,
+                booking_status='confirmed',  # Auto-confirm: bookings are automatically confirmed
                 created_by=request.user,
             )
             
@@ -6781,20 +6838,47 @@ def api_create_booking(request):
                         room_type=room_type
                     )
                     
-                    if room.status == 'available':
-                        # Assign the selected room
-                        booking.room_number = room_number
-                        room.current_booking = booking
-                        room.status = 'occupied'
-                        room.save()
-                        booking.save()
-                        room_assigned = True
-                        room_message = f"Room {room_number} assigned successfully"
-                    else:
+                    # Sync room status to ensure it's up-to-date
+                    room.sync_status_from_bookings()
+                    
+                    # Check if room is available
+                    if room.status != 'available':
+                        booking.delete()  # Delete the booking if room is not available
                         return JsonResponse({
                             'success': False,
                             'error': f'Room {room_number} is not available (Status: {room.status}). Please select an available room.'
                         }, status=400)
+                    
+                    # Check for date conflicts
+                    conflicting_bookings = Booking.objects.filter(
+                        property_obj=selected_property,
+                        room_number=room_number,
+                        booking_status__in=['pending', 'confirmed', 'checked_in'],
+                        check_in_date__lt=check_out,
+                        check_out_date__gt=check_in
+                    ).exclude(id=booking.id).exists()
+                    
+                    if conflicting_bookings:
+                        booking.delete()  # Delete the booking if there are conflicts
+                        return JsonResponse({
+                            'success': False,
+                            'error': f'Room {room_number} is already booked for the selected dates (Check-in: {check_in_date}, Check-out: {check_out_date}). Please choose different dates or select another room.',
+                            'check_in_date': check_in_date,
+                            'check_out_date': check_out_date,
+                            'room_number': room_number
+                        }, status=400)
+                    
+                    # Assign the selected room
+                    booking.room_number = room_number
+                    booking.save()
+                    
+                    # Update room status
+                    room.current_booking = booking
+                    room.status = 'occupied'
+                    room.save()
+                    
+                    room_assigned = True
+                    room_message = f"Room {room_number} assigned successfully"
                         
                 except Room.DoesNotExist:
                     return JsonResponse({
@@ -6889,38 +6973,144 @@ def api_available_rooms(request):
                 'error': f'{property_type.capitalize()} property not found.'
             }, status=404)
         
+        # Get check-in and check-out dates from query parameters (optional)
+        check_in_date = None
+        check_out_date = None
+        check_in_str = request.GET.get('check_in_date')
+        check_out_str = request.GET.get('check_out_date')
+        
+        if check_in_str:
+            try:
+                from datetime import datetime
+                check_in_date = datetime.strptime(check_in_str, '%Y-%m-%d').date()
+            except (ValueError, TypeError):
+                pass
+        
+        if check_out_str:
+            try:
+                from datetime import datetime
+                check_out_date = datetime.strptime(check_out_str, '%Y-%m-%d').date()
+            except (ValueError, TypeError):
+                pass
+        
+        # Validate date range if both dates provided
+        if check_in_date and check_out_date:
+            if check_out_date <= check_in_date:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Check-out date must be after check-in date.'
+                }, status=400)
+        
         # Get rooms for hotel or lodge - STRICTLY filtered by property type
         rooms = Room.objects.filter(
             property_obj__property_type__name__iexact=property_type,
-            property_obj_id=selected_property_id
+            property_obj_id=selected_property_id,
+            is_active=True  # Only active rooms
         )
         
-        rooms_data = []
+        from django.utils import timezone
+        from properties.models import Booking
+        today = timezone.now().date()
+        
+        available_rooms_data = []
+        unavailable_rooms_data = []
+        
         for room in rooms:
             # Only include rooms that have a valid base_rate set
             # Each room MUST have its own price - no default/fallback pricing
-            if room.base_rate and room.base_rate > 0:
-                # Sync room status to ensure it's up-to-date with bookings
-                # This fixes cases where current_booking points to cancelled bookings
-                room.sync_status_from_bookings()
-                
-                rooms_data.append({
-                    'id': room.id,
-                    'room_number': room.room_number,
-                    'room_type': room.room_type,
-                    'capacity': room.capacity,
-                    'base_rate': float(room.base_rate),  # Use ONLY room's base_rate - no fallback
-                    'status': room.status,
-                    'floor_number': room.floor_number,
-                    'bed_type': room.bed_type,
-                    'amenities': room.amenities,
-                })
-            # Skip rooms without a valid base_rate (they shouldn't be bookable)
+            if not (room.base_rate and room.base_rate > 0):
+                continue  # Skip rooms without a valid base_rate
+            
+            # Sync room status to ensure it's up-to-date with bookings
+            # This fixes cases where current_booking points to cancelled bookings
+            room.sync_status_from_bookings()
+            
+            # Check for active bookings
+            active_bookings = Booking.objects.filter(
+                property_obj=selected_property,
+                room_number=room.room_number,
+                booking_status__in=['pending', 'confirmed', 'checked_in'],
+                check_out_date__gt=today,  # Room becomes available on checkout day
+                is_deleted=False
+            ).exclude(
+                booking_status__in=['cancelled', 'checked_out', 'no_show']
+            ).order_by('check_in_date')
+            
+            # Check for date conflicts if dates are provided
+            has_conflict = False
+            conflicting_booking = None
+            booking_dates = None
+            conflicting_bookings = None
+            
+            if check_in_date and check_out_date:
+                # Check for bookings that conflict with requested dates
+                conflicting_bookings = active_bookings.filter(
+                    check_in_date__lt=check_out_date,
+                    check_out_date__gt=check_in_date
+                )
+                if conflicting_bookings.exists():
+                    has_conflict = True
+                    conflicting_booking = conflicting_bookings.first()
+                    booking_dates = {
+                        'booked_from': conflicting_booking.check_in_date.strftime('%Y-%m-%d'),
+                        'booked_until': conflicting_booking.check_out_date.strftime('%Y-%m-%d'),
+                        'booking_reference': conflicting_booking.booking_reference
+                    }
+            elif active_bookings.exists():
+                # If no dates provided but room has active bookings, show earliest booking
+                conflicting_booking = active_bookings.first()
+                booking_dates = {
+                    'booked_from': conflicting_booking.check_in_date.strftime('%Y-%m-%d'),
+                    'booked_until': conflicting_booking.check_out_date.strftime('%Y-%m-%d'),
+                    'booking_reference': conflicting_booking.booking_reference
+                }
+            
+            # Build room data
+            room_data = {
+                'id': room.id,
+                'room_number': room.room_number,
+                'room_type': room.room_type,
+                'capacity': room.capacity,
+                'base_rate': float(room.base_rate),  # Use ONLY room's base_rate - no fallback
+                'status': room.status,
+                'floor_number': room.floor_number,
+                'bed_type': room.bed_type,
+                'amenities': room.amenities,
+            }
+            
+            # Add booking dates if room is occupied or has conflicts
+            if booking_dates:
+                room_data['booking_dates'] = booking_dates
+            
+            # Determine if room is available
+            # Room is available if:
+            # 1. Status is 'available'
+            # 2. No active bookings (or no conflicts if dates provided)
+            # 3. No current_booking assigned
+            is_available = (
+                room.status == 'available' and
+                not has_conflict and
+                (not check_in_date or not check_out_date or conflicting_bookings is None or not conflicting_bookings.exists()) and
+                (not active_bookings.exists() if not (check_in_date and check_out_date) else True) and
+                room.current_booking is None
+            )
+            
+            if is_available:
+                available_rooms_data.append(room_data)
+            else:
+                # Include unavailable rooms with booking info
+                unavailable_rooms_data.append(room_data)
         
+        # Return both available and unavailable rooms
+        # Frontend will show available rooms normally and unavailable with booking dates
         return JsonResponse({
             'success': True,
-            'rooms': rooms_data,
-            'property_type': property_type
+            'rooms': available_rooms_data + unavailable_rooms_data,  # All rooms, available first
+            'available_rooms': available_rooms_data,
+            'unavailable_rooms': unavailable_rooms_data,
+            'property_type': property_type,
+            'check_in_date': check_in_str,
+            'check_out_date': check_out_str
         })
         
     except Exception as e:

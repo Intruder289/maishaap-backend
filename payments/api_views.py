@@ -8,7 +8,17 @@ from django.utils import timezone
 from . import models, serializers
 from .gateway_service import PaymentGatewayService
 from django.shortcuts import get_object_or_404
-# Swagger documentation - using drf-spectacular (auto-discovery)
+# Swagger documentation - using drf-spectacular
+# Import extend_schema for explicit documentation
+try:
+    from drf_spectacular.utils import extend_schema, OpenApiParameter
+    from drf_spectacular.types import OpenApiTypes
+except ImportError:
+    # Fallback if drf-spectacular is not available
+    extend_schema = lambda *args, **kwargs: lambda func: func  # No-op decorator
+    OpenApiParameter = None
+    OpenApiTypes = None
+
 # Provide no-op decorator for backward compatibility with existing @swagger_auto_schema decorators
 try:
     from drf_yasg.utils import swagger_auto_schema
@@ -143,7 +153,25 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
     @swagger_auto_schema(
         method='post',
-        operation_description="Initiate payment with payment gateway (AZAM Pay) for booking payments. Works for all property types (hotel, house, lodge, venue). Uses smart phone logic to select correct phone number.",
+        operation_description="""
+        Initiate payment with payment gateway (AZAM Pay) for booking payments.
+        
+        Works for all property types: hotel, house, lodge, venue.
+        Uses smart phone logic to select correct phone number.
+        
+        **Mobile Money Provider:**
+        - If `mobile_money_provider` was already set when creating the payment, it will be used automatically
+        - If not set, you must pass it in the request body
+        - Valid values: AIRTEL, TIGO, MPESA, HALOPESA
+        
+        **Flow:**
+        1. Validates payment has booking
+        2. Gets mobile money provider (from payment or request)
+        3. Automatically sets payment provider to "AZAM Pay" if not set
+        4. Calls AZAM Pay API with smart phone selection
+        5. Creates PaymentTransaction
+        6. Returns transaction details
+        """,
         operation_summary="Initiate Gateway Payment for Booking",
         tags=['Payments'],
         request_body=openapi.Schema(
@@ -151,7 +179,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
             properties={
                 'mobile_money_provider': openapi.Schema(
                     type=openapi.TYPE_STRING,
-                    description='Mobile money provider (required for mobile_money payments): AIRTEL, TIGO, MPESA, HALOPESA',
+                    description='Mobile money provider (required if not already set on payment): AIRTEL, TIGO, MPESA, HALOPESA. If already set when creating payment, this is optional.',
                     enum=['AIRTEL', 'TIGO', 'MPESA', 'HALOPESA']
                 )
             }
@@ -177,6 +205,69 @@ class PaymentViewSet(viewsets.ModelViewSet):
             401: "Authentication required"
         },
         security=[{'Bearer': []}]
+    )
+    # CRITICAL: @extend_schema must be BEFORE @action for drf-spectacular
+    @extend_schema(
+        summary="Initiate Gateway Payment for Booking",
+        description="""
+        Initiate payment with payment gateway (AZAM Pay) for booking payments.
+        
+        Works for all property types: hotel, house, lodge, venue.
+        Uses smart phone logic to select correct phone number.
+        
+        **Mobile Money Provider:**
+        - If `mobile_money_provider` was already set when creating the payment, it will be used automatically
+        - If not set, you must pass it in the request body
+        - Valid values: AIRTEL, TIGO, MPESA, HALOPESA
+        
+        **Flow:**
+        1. Validates payment has booking
+        2. Gets mobile money provider (from payment or request)
+        3. Automatically sets payment provider to "AZAM Pay" if not set
+        4. Calls AZAM Pay API with smart phone selection
+        5. Creates PaymentTransaction
+        6. Returns transaction details
+        """,
+        tags=['Payments'],
+        request={
+            'application/json': {
+                'schema': {
+                    'type': 'object',
+                    'properties': {
+                        'mobile_money_provider': {
+                            'type': 'string',
+                            'description': 'Mobile money provider (required if not already set on payment): AIRTEL, TIGO, MPESA, HALOPESA. If already set when creating payment, this is optional.',
+                            'enum': ['AIRTEL', 'TIGO', 'MPESA', 'HALOPESA']
+                        }
+                    }
+                }
+            }
+        },
+        responses={
+            201: {
+                'description': 'Payment initiated successfully',
+                'content': {
+                    'application/json': {
+                        'schema': {
+                            'type': 'object',
+                            'properties': {
+                                'success': {'type': 'boolean'},
+                                'payment_id': {'type': 'integer'},
+                                'transaction_id': {'type': 'integer'},
+                                'transaction_reference': {'type': 'string'},
+                                'gateway_transaction_id': {'type': 'string'},
+                                'message': {'type': 'string'},
+                                'phone_number_used': {'type': 'string', 'description': 'Phone number used for payment'},
+                                'booking_reference': {'type': 'string'}
+                            }
+                        }
+                    }
+                }
+            },
+            400: {'description': 'Payment already completed, missing booking, or gateway error'},
+            404: {'description': 'Payment not found'},
+            401: {'description': 'Authentication required'}
+        }
     )
     @action(detail=True, methods=['post'], url_path='initiate-gateway')
     def initiate_gateway(self, request, pk=None):
@@ -218,18 +309,25 @@ class PaymentViewSet(viewsets.ModelViewSet):
         
         # Get mobile money provider if this is a mobile_money payment
         if payment.payment_method == 'mobile_money':
-            mobile_money_provider = request.data.get('mobile_money_provider', '').strip()
+            # Check if mobile_money_provider is already set on the payment
+            # If not, get it from request body
+            mobile_money_provider = payment.mobile_money_provider
+            if not mobile_money_provider:
+                mobile_money_provider = request.data.get('mobile_money_provider', '').strip()
+            
+            # If still not set, return error
             if not mobile_money_provider:
                 return Response({
                     'success': False,
                     'error': 'Mobile Money Provider required',
-                    'message': 'Please select your mobile money provider. Choose one of: AIRTEL, TIGO, MPESA, or HALOPESA',
+                    'message': 'Please select your mobile money provider. Choose one of: AIRTEL, TIGO, MPESA, or HALOPESA. You can pass it when creating the payment or when initiating the gateway payment.',
                     'valid_providers': ['AIRTEL', 'TIGO', 'MPESA', 'HALOPESA']
                 }, status=status.HTTP_400_BAD_REQUEST)
             
-            # Update payment with mobile money provider
-            payment.mobile_money_provider = mobile_money_provider.upper()
-            payment.save()
+            # Update payment with mobile money provider (normalize to uppercase)
+            if payment.mobile_money_provider != mobile_money_provider.upper():
+                payment.mobile_money_provider = mobile_money_provider.upper()
+                payment.save()
         
         # Get or create AZAM Pay provider
         provider, _ = models.PaymentProvider.objects.get_or_create(

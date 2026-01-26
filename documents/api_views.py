@@ -10,7 +10,17 @@ from documents.serializers import (
     LeaseSerializer, BookingSerializer, DocumentSerializer,
     LeaseCreateSerializer, BookingCreateSerializer
 )
-# Swagger documentation - using drf-spectacular (auto-discovery)
+# Swagger documentation - using drf-spectacular
+# Import extend_schema for explicit documentation
+try:
+    from drf_spectacular.utils import extend_schema, OpenApiParameter
+    from drf_spectacular.types import OpenApiTypes
+except ImportError:
+    # Fallback if drf-spectacular is not available
+    extend_schema = lambda *args, **kwargs: lambda func: func  # No-op decorator
+    OpenApiParameter = None
+    OpenApiTypes = None
+
 # Provide no-op decorator for backward compatibility with existing @swagger_auto_schema decorators
 try:
     from drf_yasg.utils import swagger_auto_schema
@@ -371,6 +381,133 @@ class BookingViewSet(viewsets.ModelViewSet):
         # Tenants see only their own bookings
         return self.queryset.filter(tenant=user)
     
+    # CRITICAL: @extend_schema must be BEFORE the method for drf-spectacular
+    @extend_schema(
+        summary="List Bookings (House Properties)",
+        description="""
+        Get list of bookings for house properties.
+        
+        **Permissions:**
+        - **Admin/Staff**: See ALL bookings (all properties, all owners)
+        - **Property Owners**: See only bookings for their own properties
+        - **Tenants**: See only their own bookings
+        
+        Returns bookings from documents.Booking model (for house/rental properties).
+        Supports filtering by status, property_ref, tenant, search, and ordering.
+        """,
+        tags=['Bookings'],
+        parameters=[
+            OpenApiParameter(
+                'status',
+                OpenApiTypes.STR,
+                OpenApiParameter.QUERY,
+                description="Filter by booking status (e.g., 'pending', 'confirmed', 'cancelled')",
+                required=False
+            ),
+            OpenApiParameter(
+                'property_ref',
+                OpenApiTypes.INT,
+                OpenApiParameter.QUERY,
+                description="Filter by property ID",
+                required=False
+            ),
+            OpenApiParameter(
+                'tenant',
+                OpenApiTypes.INT,
+                OpenApiParameter.QUERY,
+                description="Filter by tenant user ID",
+                required=False
+            ),
+            OpenApiParameter(
+                'search',
+                OpenApiTypes.STR,
+                OpenApiParameter.QUERY,
+                description="Search bookings by property name, tenant username, or tenant email",
+                required=False
+            ),
+            OpenApiParameter(
+                'ordering',
+                OpenApiTypes.STR,
+                OpenApiParameter.QUERY,
+                description="Order results by field. Use '-' prefix for descending. Options: created_at, check_in, check_out (e.g., '-created_at' for newest first)",
+                required=False
+            ),
+        ],
+        responses={
+            200: BookingSerializer(many=True),
+            401: {'description': 'Authentication required'}
+        }
+    )
+    @swagger_auto_schema(
+        method='get',
+        operation_description="""
+        Get list of bookings for house properties.
+        
+        **Permissions:**
+        - Admin/Staff: See ALL bookings (all properties, all owners)
+        - Property Owners: See only bookings for their own properties
+        - Tenants: See only their own bookings
+        
+        Returns bookings from documents.Booking model (for house/rental properties).
+        Supports filtering by status, property_ref, tenant, search, and ordering.
+        """,
+        operation_summary="List Bookings (House Properties)",
+        tags=['Bookings'],
+        manual_parameters=[
+            openapi.Parameter(
+                'status',
+                openapi.IN_QUERY,
+                description="Filter by booking status (e.g., 'pending', 'confirmed', 'cancelled')",
+                type=openapi.TYPE_STRING,
+                required=False
+            ),
+            openapi.Parameter(
+                'property_ref',
+                openapi.IN_QUERY,
+                description="Filter by property ID",
+                type=openapi.TYPE_INTEGER,
+                required=False
+            ),
+            openapi.Parameter(
+                'tenant',
+                openapi.IN_QUERY,
+                description="Filter by tenant user ID",
+                type=openapi.TYPE_INTEGER,
+                required=False
+            ),
+            openapi.Parameter(
+                'search',
+                openapi.IN_QUERY,
+                description="Search bookings by property name, tenant username, or tenant email",
+                type=openapi.TYPE_STRING,
+                required=False
+            ),
+            openapi.Parameter(
+                'ordering',
+                openapi.IN_QUERY,
+                description="Order results by field. Use '-' prefix for descending. Options: created_at, check_in, check_out (e.g., '-created_at' for newest first)",
+                type=openapi.TYPE_STRING,
+                required=False
+            ),
+        ],
+        responses={
+            200: openapi.Response(
+                description="List of bookings",
+                schema=BookingSerializer(many=True)
+            ),
+            401: "Authentication required"
+        },
+        security=[{'Bearer': []}]
+    )
+    def list(self, request, *args, **kwargs):
+        """
+        List bookings with filtering and search support.
+        
+        This method is overridden to add explicit Swagger documentation.
+        The actual implementation is handled by the parent ViewSet.
+        """
+        return super().list(request, *args, **kwargs)
+    
     @swagger_auto_schema(
         method='get',
         operation_description="Get all bookings for the current user (tenant). Returns only bookings where the current user is the tenant.",
@@ -391,9 +528,8 @@ class BookingViewSet(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         """
-        Auto-confirm bookings created via mobile app.
-        Mobile app users (non-staff) get 'confirmed' status automatically.
-        Staff/admin can still set custom status.
+        Auto-confirm all bookings - bookings are automatically set to 'confirmed' status.
+        All users (staff and non-staff) get 'confirmed' status automatically.
         """
         user = self.request.user
         
@@ -415,9 +551,9 @@ class BookingViewSet(viewsets.ModelViewSet):
             # Force tenant to current user and auto-confirm
             serializer.save(tenant=user, status='confirmed')
         else:
-            # Staff can set custom tenant and status
+            # Staff can set custom tenant, but booking is still auto-confirmed
             tenant = serializer.validated_data.get('tenant', user)
-            serializer.save(tenant=tenant)
+            serializer.save(tenant=tenant, status='confirmed')
     
     @swagger_auto_schema(
         method='get',

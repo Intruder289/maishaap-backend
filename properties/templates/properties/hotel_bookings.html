@@ -589,6 +589,13 @@ $(document).ready(function() {
     $('#checkInDate, #checkOutDate').on('change input', function() {
         console.log('Date changed:', $(this).attr('id'), $(this).val());
         calculateTotalAmount();
+        // Reload rooms when dates change to check availability for selected dates
+        const checkInDate = $('#checkInDate').val();
+        const checkOutDate = $('#checkOutDate').val();
+        if (checkInDate && checkOutDate) {
+            console.log('Reloading rooms with dates:', checkInDate, checkOutDate);
+            loadAvailableRooms();
+        }
     });
     
     // Also trigger calculation when modal is shown if values are already filled
@@ -780,10 +787,28 @@ $(document).ready(function() {
     // Function to load available rooms
     function loadAvailableRooms() {
         console.log('Loading available rooms...');
-        console.log('Making AJAX call to:', '/properties/api/available-rooms/');
+        
+        // Get check-in and check-out dates from form if available
+        const checkInDate = $('#checkInDate').val();
+        const checkOutDate = $('#checkOutDate').val();
+        
+        // Build URL with query parameters
+        let url = '/properties/api/available-rooms/';
+        const params = [];
+        if (checkInDate) {
+            params.push('check_in_date=' + encodeURIComponent(checkInDate));
+        }
+        if (checkOutDate) {
+            params.push('check_out_date=' + encodeURIComponent(checkOutDate));
+        }
+        if (params.length > 0) {
+            url += '?' + params.join('&');
+        }
+        
+        console.log('Making AJAX call to:', url);
         
         $.ajax({
-            url: '/properties/api/available-rooms/',
+            url: url,
             method: 'GET',
             success: function(data) {
                 console.log('Rooms API response:', data);
@@ -824,36 +849,78 @@ $(document).ready(function() {
             return;
         }
         
-        // Add all rooms directly (simpler approach)
+        // Separate available and unavailable rooms
+        const availableRooms = [];
+        const unavailableRooms = [];
+        
         rooms.forEach(function(room) {
-            console.log('Adding room:', room.room_number, room.room_type, room.status);
+            if (room.status === 'available' && (!room.booking_dates)) {
+                availableRooms.push(room);
+            } else {
+                unavailableRooms.push(room);
+            }
+        });
+        
+        // Add available rooms first
+        availableRooms.forEach(function(room) {
+            console.log('Adding available room:', room.room_number, room.room_type, room.status);
             
             // Format base_rate to ensure it's a number
-            // Use ONLY room.base_rate - no fallback to property rate
             const baseRate = parseFloat(room.base_rate) || 0;
             
-            // Skip rooms without a valid base_rate (shouldn't happen due to API filter, but double-check)
+            // Skip rooms without a valid base_rate
             if (!baseRate || baseRate <= 0) {
                 console.warn('Skipping room', room.room_number, '- no valid base_rate set');
-                return; // Skip this room
+                return;
             }
             
             const option = $('<option></option>')
                 .attr('value', room.room_number)
                 .attr('data-room-type', room.room_type)
                 .attr('data-status', room.status)
-                .attr('data-base-rate', baseRate)  // Store room's base_rate (ONLY source of pricing)
+                .attr('data-base-rate', baseRate)
                 .text(room.room_type + ' - Room ' + room.room_number + ' (' + room.capacity + ' guests, Tsh' + baseRate.toLocaleString() + '/night)');
-            
-            if (room.status !== 'available') {
-                option.prop('disabled', true);
-                option.text(room.room_type + ' - Room ' + room.room_number + ' (' + room.capacity + ' guests, Tsh' + baseRate.toLocaleString() + '/night) - ' + room.status.toUpperCase());
-            }
             
             roomSelect.append(option);
         });
         
-        console.log('Room dropdown populated. Total options:', roomSelect.find('option').length);
+        // Add unavailable rooms with booking dates
+        unavailableRooms.forEach(function(room) {
+            console.log('Adding unavailable room:', room.room_number, room.room_type, room.status, room.booking_dates);
+            
+            // Format base_rate to ensure it's a number
+            const baseRate = parseFloat(room.base_rate) || 0;
+            
+            // Skip rooms without a valid base_rate
+            if (!baseRate || baseRate <= 0) {
+                console.warn('Skipping room', room.room_number, '- no valid base_rate set');
+                return;
+            }
+            
+            // Build room text with status and booking dates
+            let roomText = room.room_type + ' - Room ' + room.room_number + ' (' + room.capacity + ' guests, Tsh' + baseRate.toLocaleString() + '/night)';
+            
+            // Add booking dates if available
+            if (room.booking_dates && room.booking_dates.booked_from && room.booking_dates.booked_until) {
+                const bookedFrom = new Date(room.booking_dates.booked_from).toLocaleDateString();
+                const bookedUntil = new Date(room.booking_dates.booked_until).toLocaleDateString();
+                roomText += ' - OCCUPIED (Booked: ' + bookedFrom + ' to ' + bookedUntil + ')';
+            } else {
+                roomText += ' - ' + (room.status ? room.status.toUpperCase() : 'UNAVAILABLE');
+            }
+            
+            const option = $('<option></option>')
+                .attr('value', room.room_number)
+                .attr('data-room-type', room.room_type)
+                .attr('data-status', room.status)
+                .attr('data-base-rate', baseRate)
+                .prop('disabled', true)
+                .text(roomText);
+            
+            roomSelect.append(option);
+        });
+        
+        console.log('Room dropdown populated. Total options:', roomSelect.find('option').length, '(Available:', availableRooms.length, ', Unavailable:', unavailableRooms.length, ')');
     }
     
     // Function to populate room type dropdown dynamically

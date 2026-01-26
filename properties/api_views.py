@@ -2108,35 +2108,169 @@ def property_stats(request):
 )
 @extend_schema(
     summary="List Bookings",
-    description="Get list of bookings for properties owned by the current user. Supports filtering by property_id and property_type.",
+    description="""
+    Get list of bookings for hotel, lodge, and venue properties.
+    
+    **Permissions & Visibility:**
+    - **Admin/Staff**: See ALL bookings (all properties, all owners, all customers)
+    - **Property Owners**: See bookings for properties they own
+    - **Customers**: See bookings they made (where their email matches the booking's customer email)
+    - **Both Owner & Customer**: See both their property bookings AND their personal bookings
+    
+    **Important Notes:**
+    - Returns bookings from `properties.Booking` model (hotel/lodge/venue bookings only)
+    - For house/rental bookings, use `/api/v1/documents/bookings/`
+    - Bookings are matched by email: customer's email must match logged-in user's email
+    - Soft-deleted bookings (`is_deleted=True`) are excluded
+    
+    **Filtering:**
+    - Filter by specific property using `property_id`
+    - Filter by property type using `property_type` (hotel, lodge, venue)
+    - Filter by booking status using `status` (pending, confirmed, checked_in, checked_out, cancelled)
+    - Supports pagination with `page` and `page_size` parameters
+    """,
     tags=['Bookings'],
     parameters=[
-        OpenApiParameter('property_id', OpenApiTypes.INT, OpenApiParameter.QUERY, description="Filter by property ID", required=False),
-        OpenApiParameter('property_type', OpenApiTypes.STR, OpenApiParameter.QUERY, description="Filter by property type: hotel, lodge, venue", required=False),
-        OpenApiParameter('status', OpenApiTypes.STR, OpenApiParameter.QUERY, description="Filter by booking status: pending, confirmed, checked_in, checked_out, cancelled", required=False),
-        OpenApiParameter('page', OpenApiTypes.INT, OpenApiParameter.QUERY, description="Page number", required=False),
-        OpenApiParameter('page_size', OpenApiTypes.INT, OpenApiParameter.QUERY, description="Items per page", required=False),
+        OpenApiParameter(
+            'property_id',
+            OpenApiTypes.INT,
+            OpenApiParameter.QUERY,
+            description="Filter by property ID (optional)",
+            required=False
+        ),
+        OpenApiParameter(
+            'property_type',
+            OpenApiTypes.STR,
+            OpenApiParameter.QUERY,
+            description="Filter by property type: 'hotel', 'lodge', or 'venue' (optional)",
+            required=False
+        ),
+        OpenApiParameter(
+            'status',
+            OpenApiTypes.STR,
+            OpenApiParameter.QUERY,
+            description="Filter by booking status: 'pending', 'confirmed', 'checked_in', 'checked_out', 'cancelled' (optional)",
+            required=False
+        ),
+        OpenApiParameter(
+            'page',
+            OpenApiTypes.INT,
+            OpenApiParameter.QUERY,
+            description="Page number for pagination (default: 1)",
+            required=False
+        ),
+        OpenApiParameter(
+            'page_size',
+            OpenApiTypes.INT,
+            OpenApiParameter.QUERY,
+            description="Number of items per page (default: 20)",
+            required=False
+        ),
     ],
     responses={
-        200: {'description': 'List of bookings'},
-        401: {'description': 'Authentication required'}
+        200: {
+            'description': 'List of bookings with pagination metadata',
+            'content': {
+                'application/json': {
+                    'schema': {
+                        'type': 'object',
+                        'properties': {
+                            'count': {'type': 'integer', 'description': 'Total number of bookings'},
+                            'page': {'type': 'integer', 'description': 'Current page number'},
+                            'page_size': {'type': 'integer', 'description': 'Items per page'},
+                            'total_pages': {'type': 'integer', 'description': 'Total number of pages'},
+                            'results': {
+                                'type': 'array',
+                                'items': {'type': 'object', 'description': 'Booking details'}
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        401: {'description': 'Authentication required - JWT Bearer token must be provided'}
     }
 )
 @swagger_auto_schema(
     method='get',
-    operation_description="Get list of bookings for properties owned by the current user. Supports filtering by property_id and property_type.",
-    operation_summary="List Bookings",
+    operation_description="""
+    Get list of bookings for hotel, lodge, and venue properties.
+    
+    **Permissions & Visibility:**
+    - **Admin/Staff**: See ALL bookings (all properties, all owners, all customers)
+    - **Property Owners**: See bookings for properties they own
+    - **Customers**: See bookings they made (where their email matches the booking's customer email)
+    - **Both Owner & Customer**: See both their property bookings AND their personal bookings
+    
+    **Important Notes:**
+    - Returns bookings from `properties.Booking` model (hotel/lodge/venue bookings only)
+    - For house/rental bookings, use `/api/v1/documents/bookings/`
+    - Bookings are matched by email: customer's email must match logged-in user's email
+    - Soft-deleted bookings (`is_deleted=True`) are excluded
+    
+    **Filtering:**
+    - Filter by specific property using `property_id`
+    - Filter by property type using `property_type` (hotel, lodge, venue)
+    - Filter by booking status using `status` (pending, confirmed, checked_in, checked_out, cancelled)
+    - Supports pagination with `page` and `page_size` parameters
+    """,
+    operation_summary="List Bookings (Hotel/Lodge/Venue)",
     tags=['Bookings'],
     manual_parameters=[
-        openapi.Parameter('property_id', openapi.IN_QUERY, description="Filter by property ID", type=openapi.TYPE_INTEGER, required=False),
-        openapi.Parameter('property_type', openapi.IN_QUERY, description="Filter by property type: hotel, lodge, venue", type=openapi.TYPE_STRING, required=False),
-        openapi.Parameter('status', openapi.IN_QUERY, description="Filter by booking status", type=openapi.TYPE_STRING, required=False),
-        openapi.Parameter('page', openapi.IN_QUERY, description="Page number", type=openapi.TYPE_INTEGER, required=False),
-        openapi.Parameter('page_size', openapi.IN_QUERY, description="Items per page", type=openapi.TYPE_INTEGER, required=False),
+        openapi.Parameter(
+            'property_id',
+            openapi.IN_QUERY,
+            description="Filter by property ID (optional)",
+            type=openapi.TYPE_INTEGER,
+            required=False
+        ),
+        openapi.Parameter(
+            'property_type',
+            openapi.IN_QUERY,
+            description="Filter by property type: 'hotel', 'lodge', or 'venue' (optional)",
+            type=openapi.TYPE_STRING,
+            required=False
+        ),
+        openapi.Parameter(
+            'status',
+            openapi.IN_QUERY,
+            description="Filter by booking status: 'pending', 'confirmed', 'checked_in', 'checked_out', 'cancelled' (optional)",
+            type=openapi.TYPE_STRING,
+            required=False
+        ),
+        openapi.Parameter(
+            'page',
+            openapi.IN_QUERY,
+            description="Page number for pagination (default: 1)",
+            type=openapi.TYPE_INTEGER,
+            required=False
+        ),
+        openapi.Parameter(
+            'page_size',
+            openapi.IN_QUERY,
+            description="Number of items per page (default: 20)",
+            type=openapi.TYPE_INTEGER,
+            required=False
+        ),
     ],
     responses={
-        200: openapi.Response(description="List of bookings", schema=openapi.Schema(type=openapi.TYPE_OBJECT)),
-        401: "Authentication required"
+        200: openapi.Response(
+            description="List of bookings with pagination metadata",
+            schema=openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'count': openapi.Schema(type=openapi.TYPE_INTEGER, description='Total number of bookings'),
+                    'page': openapi.Schema(type=openapi.TYPE_INTEGER, description='Current page number'),
+                    'page_size': openapi.Schema(type=openapi.TYPE_INTEGER, description='Items per page'),
+                    'total_pages': openapi.Schema(type=openapi.TYPE_INTEGER, description='Total number of pages'),
+                    'results': openapi.Schema(
+                        type=openapi.TYPE_ARRAY,
+                        items=openapi.Schema(type=openapi.TYPE_OBJECT, description='Booking details')
+                    )
+                }
+            )
+        ),
+        401: "Authentication required - JWT Bearer token must be provided"
     },
     security=[{'Bearer': []}]
 )
@@ -2147,7 +2281,8 @@ def bookings_list_api(request):
     Get list of bookings.
     
     - **Admin/Staff**: See ALL bookings (all properties, all owners)
-    - **Property Owners**: See only bookings for their own properties
+    - **Property Owners**: See bookings for their own properties
+    - **Customers**: See bookings where their email matches the booking's customer email
     
     Returns bookings from properties.Booking model (created via mobile app or web).
     Supports filtering by property_id, property_type, and status.
@@ -2161,16 +2296,18 @@ def bookings_list_api(request):
     page = int(request.query_params.get('page', 1))
     page_size = int(request.query_params.get('page_size', 20))
     
-    # Get bookings for properties owned by current user
+    # Get bookings for properties owned by current user OR bookings where user is the customer
     if request.user.is_staff or request.user.is_superuser:
         # Admin/staff can see all bookings
         bookings_query = Booking.objects.filter(is_deleted=False).select_related(
             'customer', 'property_obj', 'property_obj__property_type', 'created_by'
         ).order_by('-created_at')
     else:
-        # Property owners see only bookings for their properties
+        # Property owners see bookings for their properties
+        # Customers see bookings where their email matches the booking's customer email
+        from django.db.models import Q
         bookings_query = Booking.objects.filter(
-            property_obj__owner=request.user,
+            Q(property_obj__owner=request.user) | Q(customer__email__iexact=request.user.email),
             is_deleted=False
         ).select_related(
             'customer', 'property_obj', 'property_obj__property_type', 'created_by'
@@ -4190,16 +4327,58 @@ def create_booking_with_room_api(request):
                 'property_type': property_type
             }, status=status.HTTP_404_NOT_FOUND)
         
-        # Check property availability
-        if not selected_property.is_available_for_booking(check_in, check_out):
-            return Response({
-                'success': False,
-                'error': 'Property not available',
-                'message': f'This property is not available for the selected dates (Check-in: {check_in_date}, Check-out: {check_out_date}). Please choose different dates.',
-                'check_in_date': check_in_date,
-                'check_out_date': check_out_date,
-                'property_id': property_id
-            }, status=status.HTTP_400_BAD_REQUEST)
+        # Check basic property status (active and available status)
+        # For hotel/lodge, we skip property-level booking conflict checks since we check room-level availability later
+        # For venues, we check full property-level availability since venues don't have rooms
+        if property_type == 'venue':
+            # For venues, check full property availability (including booking conflicts)
+            if not selected_property.is_available_for_booking(check_in, check_out):
+                return Response({
+                    'success': False,
+                    'error': 'Property not available',
+                    'message': f'This property is not available for the selected dates (Check-in: {check_in_date}, Check-out: {check_out_date}). Please choose different dates.',
+                    'check_in_date': check_in_date,
+                    'check_out_date': check_out_date,
+                    'property_id': property_id
+                }, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            # For hotel/lodge, only check basic property status (not booking conflicts)
+            # Property-level booking conflicts are checked later at room level
+            if selected_property.status not in ['available']:
+                return Response({
+                    'success': False,
+                    'error': 'Property not available',
+                    'message': f'This property is currently not available for booking (Status: {selected_property.status}). Please contact the property manager.',
+                    'property_id': property_id,
+                    'property_status': selected_property.status
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            if not selected_property.is_active:
+                return Response({
+                    'success': False,
+                    'error': 'Property not active',
+                    'message': 'This property is currently inactive and cannot accept bookings. Please contact the property manager.',
+                    'property_id': property_id
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check for active leases (hotels/lodges typically don't have leases, but check anyway)
+            from documents.models import Lease
+            conflicting_lease = Lease.objects.filter(
+                property_ref=selected_property,
+                status='active',
+                start_date__lte=check_out,
+                end_date__gte=check_in
+            ).exists()
+            
+            if conflicting_lease:
+                return Response({
+                    'success': False,
+                    'error': 'Property not available',
+                    'message': f'This property has an active lease for the selected dates (Check-in: {check_in_date}, Check-out: {check_out_date}). Please choose different dates.',
+                    'check_in_date': check_in_date,
+                    'check_out_date': check_out_date,
+                    'property_id': property_id
+                }, status=status.HTTP_400_BAD_REQUEST)
         
         # Parse customer name
         name_parts = customer_name.split(' ', 1)
@@ -4265,6 +4444,7 @@ def create_booking_with_room_api(request):
             booking_reference = f"HTL-{Booking.objects.count() + 1:06d}"
         
         # Create booking - use parsed date objects (check_in, check_out) instead of strings
+        # Auto-confirm booking: Set status to 'confirmed' automatically
         booking = Booking.objects.create(
             property_obj=selected_property,
             customer=customer,
@@ -4275,6 +4455,7 @@ def create_booking_with_room_api(request):
             room_type=room_type,
             total_amount=total_amount_decimal,
             special_requests=special_requests,
+            booking_status='confirmed',  # Auto-confirm: bookings are automatically confirmed
             created_by=request.user,
         )
         
