@@ -21,15 +21,53 @@ class LeaseSerializer(serializers.ModelSerializer):
     tenant_details = UserBasicSerializer(source='tenant', read_only=True)
     is_active = serializers.ReadOnlyField()
     duration_days = serializers.ReadOnlyField()
+    payment_status = serializers.SerializerMethodField()
     
     class Meta:
         model = Lease
         fields = [
             'id', 'property_ref', 'property_details', 'tenant', 'tenant_details',
             'start_date', 'end_date', 'rent_amount', 'status', 'created_at',
-            'is_active', 'duration_days'
+            'is_active', 'duration_days', 'payment_status'
         ]
         read_only_fields = ['created_at']
+    
+    def get_payment_status(self, obj):
+        """Calculate payment status based on payments for this lease"""
+        from payments.models import Payment
+        from rent.models import RentInvoice
+        from django.db.models import Sum, Q
+        from decimal import Decimal
+        
+        # Calculate total paid amount from completed payments
+        # Include payments directly linked to lease AND payments via rent invoices
+        total_paid = Payment.objects.filter(
+            Q(lease=obj) | Q(rent_invoice__lease=obj),
+            status='completed'
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        
+        # Calculate total amount due from all rent invoices for this lease
+        total_invoice_amount = RentInvoice.objects.filter(
+            lease=obj
+        ).exclude(status='cancelled').aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
+        
+        # Use rent_amount as fallback if no invoices exist yet
+        # Otherwise, use the total invoice amount
+        if total_invoice_amount > 0:
+            total_due = total_invoice_amount
+        else:
+            total_due = obj.rent_amount or Decimal('0')
+        
+        # Determine payment status
+        if total_due > 0:
+            if total_paid >= total_due:
+                return 'paid'
+            elif total_paid > 0:
+                return 'partial'
+            else:
+                return 'unpaid'
+        else:
+            return 'unpaid'
     
     def validate(self, data):
         """Validate lease dates"""

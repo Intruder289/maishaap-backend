@@ -1021,6 +1021,135 @@ def approve_user(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# ==================== User Account Deletion Endpoint (Play Store Compliance) ====================
+
+@extend_schema(
+    summary="Delete User Account",
+    description="""
+    Delete the authenticated user's own account. This endpoint is required for Play Store compliance 
+    to allow users to delete their data whenever they want.
+    
+    **Important:**
+    - Users can only delete their own account
+    - This action is permanent and cannot be undone
+    - All user data will be deleted (subject to database cascade rules)
+    - User must be authenticated
+    """,
+    tags=['User Account'],
+    responses={
+        200: {
+            'description': 'Account deleted successfully',
+            'content': {
+                'application/json': {
+                    'schema': {
+                        'type': 'object',
+                        'properties': {
+                            'success': {'type': 'boolean'},
+                            'message': {'type': 'string'}
+                        }
+                    }
+                }
+            }
+        },
+        401: {'description': 'Authentication required'},
+        403: {'description': 'Permission denied - cannot delete other users\' accounts'}
+    }
+)
+@swagger_auto_schema(
+    method='delete',
+    operation_description="""
+    Delete the authenticated user's own account. This endpoint is required for Play Store compliance 
+    to allow users to delete their data whenever they want.
+    
+    **Important:**
+    - Users can only delete their own account
+    - This action is permanent and cannot be undone
+    - All user data will be deleted (subject to database cascade rules)
+    - User must be authenticated
+    """,
+    operation_summary="Delete User Account",
+    tags=['User Account'],
+    responses={
+        200: openapi.Response(
+            description="Account deleted successfully",
+            schema=openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING)
+                }
+            )
+        ),
+        401: "Authentication required",
+        403: "Permission denied - cannot delete other users' accounts"
+    },
+    security=[{'Bearer': []}]
+)
+@swagger_auto_schema(
+    method='post',
+    operation_description="""
+    Delete the authenticated user's own account. This endpoint is required for Play Store compliance 
+    to allow users to delete their data whenever they want.
+    
+    **Important:**
+    - Users can only delete their own account
+    - This action is permanent and cannot be undone
+    - All user data will be deleted (subject to database cascade rules)
+    - User must be authenticated
+    """,
+    operation_summary="Delete User Account",
+    tags=['User Account'],
+    responses={
+        200: openapi.Response(
+            description="Account deleted successfully",
+            schema=openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING)
+                }
+            )
+        ),
+        401: "Authentication required",
+        403: "Permission denied - cannot delete other users' accounts"
+    },
+    security=[{'Bearer': []}]
+)
+@api_view(['DELETE', 'POST'])
+@permission_classes([IsAuthenticated])
+def delete_user_account(request):
+    """
+    Delete the authenticated user's own account.
+    Play Store compliance: Users must be able to delete their data.
+    """
+    try:
+        user = request.user
+        
+        # Log the deletion attempt
+        logger.info(f"User account deletion requested: {user.username} ({user.email})")
+        
+        # Store user info before deletion for logging
+        username = user.username
+        email = user.email
+        
+        # Delete the user (this will cascade delete related data based on model relationships)
+        user.delete()
+        
+        logger.info(f"User account deleted successfully: {username} ({email})")
+        
+        return Response({
+            'success': True,
+            'message': 'Your account has been deleted successfully. All your data has been removed.'
+        }, status=status.HTTP_200_OK)
+    
+    except Exception as e:
+        logger.error(f"User account deletion error: {str(e)}")
+        return Response({
+            'success': False,
+            'message': 'An error occurred while deleting your account. Please try again later.'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 # ==================== MULTI-TENANCY: Admin Owner Management Endpoints ====================
 
 # CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular

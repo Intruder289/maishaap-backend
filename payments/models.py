@@ -141,16 +141,103 @@ class Payment(models.Model):
 
     def save(self, *args, **kwargs):
         self.full_clean()
+        
+        # Check if this is a new payment being completed without an invoice
+        is_new_completion = False
+        if self.pk:
+            try:
+                old_payment = Payment.objects.get(pk=self.pk)
+                is_new_completion = (
+                    old_payment.status != 'completed' and 
+                    self.status == 'completed' and
+                    self.lease and 
+                    not self.rent_invoice
+                )
+            except Payment.DoesNotExist:
+                is_new_completion = (
+                    self.status == 'completed' and
+                    self.lease and 
+                    not self.rent_invoice
+                )
+        else:
+            is_new_completion = (
+                self.status == 'completed' and
+                self.lease and 
+                not self.rent_invoice
+            )
+        
         super().save(*args, **kwargs)
         
+        # Auto-create invoice for lease payments without invoices when payment completes
+        # Use transaction with lock to prevent race conditions
+        if is_new_completion and self.lease and not self.rent_invoice:
+            from rent.models import RentInvoice
+            from documents.models import Lease
+            from django.utils import timezone
+            from django.db import transaction
+            from datetime import datetime, timedelta
+            
+            # Use transaction with select_for_update to prevent race conditions
+            with transaction.atomic():
+                # Lock lease to prevent concurrent invoice creation
+                locked_lease = Lease.objects.select_for_update().get(pk=self.lease.pk)
+                
+                # Determine the period for the invoice (current month)
+                # Use payment date if available, otherwise use today
+                payment_date = self.paid_date if self.paid_date else timezone.now().date()
+                period_start = payment_date.replace(day=1)  # First day of payment month
+                
+                # Calculate period_end (last day of payment month)
+                if period_start.month == 12:
+                    period_end = datetime(period_start.year + 1, 1, 1).date() - timedelta(days=1)
+                else:
+                    period_end = datetime(period_start.year, period_start.month + 1, 1).date() - timedelta(days=1)
+                
+                # Check if invoice already exists for this period (with lock)
+                existing_invoice = RentInvoice.objects.filter(
+                    lease=locked_lease,
+                    period_start=period_start,
+                    period_end=period_end
+                ).first()
+                
+                if existing_invoice:
+                    # Link payment to existing invoice
+                    self.rent_invoice = existing_invoice
+                    self.save(update_fields=['rent_invoice'])
+                    # Update invoice amount_paid (will be handled by the code below)
+                else:
+                    # Create new invoice for this period
+                    due_date = period_start + timedelta(days=5)  # Due 5 days after period start
+                    new_invoice = RentInvoice.objects.create(
+                        lease=locked_lease,
+                        tenant=self.tenant,
+                        due_date=due_date,
+                        period_start=period_start,
+                        period_end=period_end,
+                        base_rent=locked_lease.rent_amount,
+                        status='sent'  # Mark as sent since payment is being made
+                    )
+                    # Link payment to new invoice
+                    self.rent_invoice = new_invoice
+                    self.save(update_fields=['rent_invoice'])
+        
         # Auto-update rent invoice amount_paid if this is a rent payment
+        # This ensures invoice status and balance are always accurate
         if self.rent_invoice and self.status == 'completed':
             from django.db.models import Sum
+            # Recalculate total_paid from all completed payments for accuracy
             total_paid = Payment.objects.filter(
                 rent_invoice=self.rent_invoice,
                 status='completed'
             ).aggregate(total=Sum('amount'))['total'] or 0
             self.rent_invoice.amount_paid = total_paid
+            
+            # Update invoice status based on payment
+            if self.rent_invoice.amount_paid >= self.rent_invoice.total_amount:
+                self.rent_invoice.status = 'paid'
+            elif self.rent_invoice.due_date < timezone.now().date() and self.rent_invoice.status not in ['paid', 'cancelled']:
+                self.rent_invoice.status = 'overdue'
+            
             self.rent_invoice.save()
 
     def __str__(self):

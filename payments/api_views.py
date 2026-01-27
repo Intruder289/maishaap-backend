@@ -759,6 +759,55 @@ def azam_pay_webhook(request):
         payment.save()
         logger.info(f"Transaction {transaction.id} and Payment {payment.id} updated successfully")
         
+        # Auto-create invoice for lease-only payments when payment completes via webhook
+        # This handles the case where payment was created without invoice and completed via gateway
+        if payment.status == 'completed' and payment.lease and not payment.rent_invoice:
+            from rent.models import RentInvoice
+            from documents.models import Lease
+            from django.db import transaction as db_transaction
+            from datetime import datetime, timedelta
+            
+            with db_transaction.atomic():
+                # Lock lease to prevent concurrent invoice creation
+                locked_lease = Lease.objects.select_for_update().get(pk=payment.lease.pk)
+                
+                # Determine the period for the invoice (payment month)
+                payment_date = payment.paid_date if payment.paid_date else timezone.now().date()
+                period_start = payment_date.replace(day=1)
+                
+                # Calculate period_end
+                if period_start.month == 12:
+                    period_end = datetime(period_start.year + 1, 1, 1).date() - timedelta(days=1)
+                else:
+                    period_end = datetime(period_start.year, period_start.month + 1, 1).date() - timedelta(days=1)
+                
+                # Check if invoice already exists for this period
+                existing_invoice = RentInvoice.objects.filter(
+                    lease=locked_lease,
+                    period_start=period_start,
+                    period_end=period_end
+                ).first()
+                
+                if existing_invoice:
+                    # Link payment to existing invoice
+                    payment.rent_invoice = existing_invoice
+                    payment.save(update_fields=['rent_invoice'])
+                else:
+                    # Create new invoice for this period
+                    due_date = period_start + timedelta(days=5)
+                    new_invoice = RentInvoice.objects.create(
+                        lease=locked_lease,
+                        tenant=payment.tenant,
+                        due_date=due_date,
+                        period_start=period_start,
+                        period_end=period_end,
+                        base_rent=locked_lease.rent_amount,
+                        status='sent'
+                    )
+                    # Link payment to new invoice
+                    payment.rent_invoice = new_invoice
+                    payment.save(update_fields=['rent_invoice'])
+        
         # Update rent invoice if this is a rent payment
         if payment.rent_invoice and payment.status == 'completed':
             from django.db.models import Sum

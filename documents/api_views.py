@@ -107,6 +107,201 @@ class LeaseViewSet(viewsets.ModelViewSet):
             return LeaseCreateSerializer
         return LeaseSerializer
     
+    @extend_schema(
+        summary="List Leases",
+        description="""
+        Get list of leases filtered by user role.
+        
+        **Permissions:**
+        - **Admin/Staff**: See ALL leases (all properties, all owners)
+        - **Property Owners**: See only leases for their own properties
+        - **Tenants**: See only their own leases
+        
+        **Response includes:**
+        - `payment_status`: Payment status field showing 'paid', 'partial', or 'unpaid' (similar to bookings API)
+        - All lease details with nested property and tenant information
+        
+        Supports filtering by status, property_ref, tenant, search, and ordering.
+        """,
+        tags=['Leases'],
+        parameters=[
+            OpenApiParameter(
+                'status',
+                OpenApiTypes.STR,
+                OpenApiParameter.QUERY,
+                description="Filter by lease status (e.g., 'pending', 'active', 'terminated')",
+                required=False
+            ),
+            OpenApiParameter(
+                'property_ref',
+                OpenApiTypes.INT,
+                OpenApiParameter.QUERY,
+                description="Filter by property ID",
+                required=False
+            ),
+            OpenApiParameter(
+                'tenant',
+                OpenApiTypes.INT,
+                OpenApiParameter.QUERY,
+                description="Filter by tenant user ID",
+                required=False
+            ),
+            OpenApiParameter(
+                'search',
+                OpenApiTypes.STR,
+                OpenApiParameter.QUERY,
+                description="Search leases by property name, tenant username, or tenant email",
+                required=False
+            ),
+            OpenApiParameter(
+                'ordering',
+                OpenApiTypes.STR,
+                OpenApiParameter.QUERY,
+                description="Order results by field. Use '-' prefix for descending. Options: created_at, start_date, end_date (e.g., '-created_at' for newest first)",
+                required=False
+            ),
+        ],
+        responses={
+            200: {
+                'description': 'List of leases with payment_status field',
+                'content': {
+                    'application/json': {
+                        'schema': LeaseSerializer(many=True)
+                    }
+                }
+            },
+            401: {'description': 'Authentication required'}
+        }
+    )
+    @swagger_auto_schema(
+        method='get',
+        operation_description="""
+        Get list of leases filtered by user role.
+        
+        **Permissions:**
+        - Admin/Staff: See ALL leases (all properties, all owners)
+        - Property Owners: See only leases for their own properties
+        - Tenants: See only their own leases
+        
+        **Response includes:**
+        - `payment_status`: Payment status field showing 'paid', 'partial', or 'unpaid' (similar to bookings API)
+        - All lease details with nested property and tenant information
+        
+        Supports filtering by status, property_ref, tenant, search, and ordering.
+        """,
+        operation_summary="List Leases",
+        tags=['Leases'],
+        manual_parameters=[
+            openapi.Parameter(
+                'status',
+                openapi.IN_QUERY,
+                description="Filter by lease status (e.g., 'pending', 'active', 'terminated')",
+                type=openapi.TYPE_STRING,
+                required=False
+            ),
+            openapi.Parameter(
+                'property_ref',
+                openapi.IN_QUERY,
+                description="Filter by property ID",
+                type=openapi.TYPE_INTEGER,
+                required=False
+            ),
+            openapi.Parameter(
+                'tenant',
+                openapi.IN_QUERY,
+                description="Filter by tenant user ID",
+                type=openapi.TYPE_INTEGER,
+                required=False
+            ),
+            openapi.Parameter(
+                'search',
+                openapi.IN_QUERY,
+                description="Search leases by property name, tenant username, or tenant email",
+                type=openapi.TYPE_STRING,
+                required=False
+            ),
+            openapi.Parameter(
+                'ordering',
+                openapi.IN_QUERY,
+                description="Order results by field. Use '-' prefix for descending. Options: created_at, start_date, end_date (e.g., '-created_at' for newest first)",
+                type=openapi.TYPE_STRING,
+                required=False
+            ),
+        ],
+        responses={
+            200: openapi.Response(
+                description="List of leases with payment_status field",
+                schema=LeaseSerializer(many=True)
+            ),
+            401: "Authentication required"
+        },
+        security=[{'Bearer': []}]
+    )
+    @extend_schema(
+        summary="Retrieve Lease",
+        description="""
+        Get details of a specific lease.
+        
+        **Response includes:**
+        - `id`: Lease ID
+        - `payment_status`: Payment status field showing 'paid', 'partial', or 'unpaid'
+        - All lease details with nested property and tenant information
+        
+        **Payment Status Calculation:**
+        - Calculated from all payments (invoice-based + lease-only)
+        - `paid`: Total paid >= total due
+        - `partial`: Some payment made but not full
+        - `unpaid`: No payments made
+        """,
+        tags=['Leases'],
+        responses={
+            200: {
+                'description': 'Lease details with payment_status field',
+                'content': {
+                    'application/json': {
+                        'schema': LeaseSerializer
+                    }
+                }
+            },
+            404: {'description': 'Lease not found'},
+            401: {'description': 'Authentication required'}
+        }
+    )
+    @swagger_auto_schema(
+        method='get',
+        operation_description="""
+        Get details of a specific lease.
+        
+        **Response includes:**
+        - `payment_status`: Payment status field showing 'paid', 'partial', or 'unpaid'
+        - All lease details with nested property and tenant information
+        """,
+        operation_summary="Retrieve Lease",
+        tags=['Leases'],
+        responses={
+            200: LeaseSerializer,
+            404: "Lease not found",
+            401: "Authentication required"
+        },
+        security=[{'Bearer': []}]
+    )
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Retrieve a specific lease.
+        
+        Returns lease details including payment_status field.
+        """
+        return super().retrieve(request, *args, **kwargs)
+    
+    def list(self, request, *args, **kwargs):
+        """
+        List leases with filtering and search support.
+        
+        This method is overridden to add explicit Swagger documentation.
+        The actual implementation is handled by the parent ViewSet.
+        """
+        return super().list(request, *args, **kwargs)
+    
     def get_queryset(self):
         """
         MULTI-TENANCY: Filter queryset based on user role for data isolation
@@ -171,11 +366,92 @@ class LeaseViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(leases, many=True)
         return Response(serializer.data)
     
+    @extend_schema(
+        summary="Create Lease",
+        description="""
+        Create a new lease agreement.
+        
+        **Important Notes:**
+        - Non-staff users can only create leases for themselves (tenant is automatically set to current user)
+        - Non-staff users' leases are automatically set to 'active' status
+        - Staff/admin users can set custom tenant and status
+        - **Response includes the lease ID** and all lease details including payment_status
+        
+        **Response includes:**
+        - `id`: The generated lease ID (required for creating payments)
+        - `payment_status`: Payment status ('paid', 'partial', or 'unpaid')
+        - All other lease fields with nested property and tenant details
+        """,
+        tags=['Leases'],
+        request=LeaseCreateSerializer,
+        responses={
+            201: {
+                'description': 'Lease created successfully',
+                'content': {
+                    'application/json': {
+                        'schema': LeaseSerializer
+                    }
+                }
+            },
+            400: {'description': 'Validation error'},
+            401: {'description': 'Authentication required'}
+        }
+    )
+    @swagger_auto_schema(
+        method='post',
+        operation_description="""
+        Create a new lease agreement.
+        
+        **Important Notes:**
+        - Non-staff users can only create leases for themselves (tenant is automatically set to current user)
+        - Non-staff users' leases are automatically set to 'active' status
+        - Staff/admin users can set custom tenant and status
+        - **Response includes the lease ID** and all lease details including payment_status
+        
+        **Response includes:**
+        - `id`: The generated lease ID (required for creating payments)
+        - `payment_status`: Payment status ('paid', 'partial', or 'unpaid')
+        - All other lease fields with nested property and tenant details
+        """,
+        operation_summary="Create Lease",
+        tags=['Leases'],
+        request_body=LeaseCreateSerializer,
+        responses={
+            201: openapi.Response(
+                description="Lease created successfully",
+                schema=LeaseSerializer
+            ),
+            400: "Validation error",
+            401: "Authentication required"
+        },
+        security=[{'Bearer': []}]
+    )
+    def create(self, request, *args, **kwargs):
+        """Override create to return full serializer with ID"""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        user = self.request.user
+        # Ensure non-staff users can only create leases for themselves
+        if not (user.is_staff or user.is_superuser):
+            # Force tenant to current user and auto-confirm
+            lease = serializer.save(tenant=user, status='active')
+        else:
+            # Staff can set custom tenant and status
+            tenant = serializer.validated_data.get('tenant', user)
+            lease = serializer.save(tenant=tenant)
+        
+        # Return full serializer with ID and all fields
+        response_serializer = LeaseSerializer(lease)
+        headers = self.get_success_headers(response_serializer.data)
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+    
     def perform_create(self, serializer):
         """
         Set tenant to current user and auto-confirm leases created via mobile app.
         Mobile app users (non-staff) get 'active' status automatically.
         Staff/admin can still set custom status.
+        Note: This method is now only used internally by create() override.
         """
         user = self.request.user
         # Ensure non-staff users can only create leases for themselves

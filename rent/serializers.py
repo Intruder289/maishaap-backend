@@ -61,25 +61,56 @@ class RentPaymentSerializer(serializers.ModelSerializer):
 
 
 class RentPaymentCreateSerializer(serializers.ModelSerializer):
-    """Serializer for creating rent payments (using unified Payment model)"""
+    """
+    Serializer for creating rent payments (using unified Payment model)
+    
+    **Payment Options:**
+    1. **With Invoice:** Provide `rent_invoice` ID - payment is linked to specific invoice
+    2. **Without Invoice:** Provide `lease` ID - payment is linked directly to lease.
+       An invoice will be auto-created when payment completes.
+    
+    **Note:** Either `rent_invoice` OR `lease` must be provided. If `rent_invoice` is provided,
+    `lease` will be automatically set from the invoice.
+    """
     rent_invoice = serializers.PrimaryKeyRelatedField(
         queryset=RentInvoice.objects.all(),
         required=False,
-        allow_null=True
+        allow_null=True,
+        help_text="Optional: Invoice ID. If not provided, lease must be provided."
+    )
+    lease = serializers.PrimaryKeyRelatedField(
+        queryset=Lease.objects.all(),
+        required=False,
+        allow_null=True,
+        help_text="Optional: Lease ID. Required if rent_invoice is not provided."
     )
     
     class Meta:
         model = Payment
         fields = [
-            'rent_invoice', 'amount', 'payment_method', 'mobile_money_provider', 
-            'reference_number', 'transaction_id', 'notes', 'lease', 'tenant'
+            'rent_invoice', 'lease', 'amount', 'payment_method', 'mobile_money_provider', 
+            'reference_number', 'transaction_id', 'notes', 'tenant'
         ]
     
     def validate(self, data):
-        """Validate that payment amount doesn't exceed invoice balance - STRICT: No overpayment allowed"""
+        """
+        Validate payment data:
+        1. Either rent_invoice OR lease must be provided
+        2. If rent_invoice provided, validate amount doesn't exceed invoice balance
+        3. Ensure amount is positive
+        """
         rent_invoice = data.get('rent_invoice')
+        lease = data.get('lease')
         amount = data.get('amount')
         
+        # Ensure either rent_invoice or lease is provided
+        if not rent_invoice and not lease:
+            raise serializers.ValidationError({
+                'rent_invoice': 'Either rent_invoice or lease must be provided.',
+                'lease': 'Either rent_invoice or lease must be provided.'
+            })
+        
+        # If rent_invoice is provided, validate amount against invoice balance
         if rent_invoice and amount:
             from decimal import Decimal
             from django.db.models import Sum
@@ -132,6 +163,12 @@ class RentPaymentCreateSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError({
                         'amount': 'Payment amount must be greater than zero. Please enter a valid payment amount.'
                     })
+        
+        # Validate amount is positive for lease-only payments too
+        if amount and amount <= 0:
+            raise serializers.ValidationError({
+                'amount': 'Payment amount must be greater than zero. Please enter a valid payment amount.'
+            })
         
         return data
     
@@ -186,25 +223,26 @@ class RentPaymentCreateSerializer(serializers.ModelSerializer):
                 validated_data['lease'] = locked_invoice.lease
                 validated_data['tenant'] = locked_invoice.tenant
             else:
-                # If rent_invoice is provided, use it to set lease and tenant
-                rent_invoice = validated_data.pop('rent_invoice', None)
-                if rent_invoice:
-                    validated_data['lease'] = rent_invoice.lease
-                    validated_data['tenant'] = rent_invoice.tenant
-            
-            # Ensure required fields are set
-            if 'lease' not in validated_data or not validated_data.get('lease'):
-                raise serializers.ValidationError({
-                    'lease': 'Lease information is required. Please provide a valid lease when creating a payment without an invoice.'
-                })
-            if 'tenant' not in validated_data or not validated_data.get('tenant'):
-                # Try to get tenant from lease if not provided
+                # Payment without invoice - ensure lease is provided
                 lease = validated_data.get('lease')
-                if lease and hasattr(lease, 'tenant'):
-                    validated_data['tenant'] = lease.tenant
-                else:
+                if not lease:
                     raise serializers.ValidationError({
-                        'tenant': 'Tenant information is required. Please provide a valid tenant when creating a payment without an invoice.'
+                        'lease': 'Lease information is required when creating a payment without an invoice.'
+                    })
+                
+                # Ensure tenant is set from lease
+                if 'tenant' not in validated_data or not validated_data.get('tenant'):
+                    if lease and hasattr(lease, 'tenant'):
+                        validated_data['tenant'] = lease.tenant
+                    else:
+                        raise serializers.ValidationError({
+                            'tenant': 'Tenant information is required. Please provide a valid tenant when creating a payment without an invoice.'
+                        })
+                
+                # Validate lease is active (optional but good practice)
+                if lease.status != 'active':
+                    raise serializers.ValidationError({
+                        'lease': f'Cannot create payment for lease with status "{lease.status}". Only active leases can receive payments.'
                     })
             
             validated_data['paid_date'] = timezone.now().date()

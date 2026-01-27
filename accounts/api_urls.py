@@ -21,6 +21,7 @@ urlpatterns = [
     path('auth/profile/', api_views.tenant_profile, name='api_tenant_profile'),
     path('auth/profile/update/', api_views.update_tenant_profile, name='api_update_tenant_profile'),
     path('auth/change-password/', api_views.change_password, name='api_change_password'),
+    path('auth/delete-account/', api_views.delete_user_account, name='api_delete_user_account'),
     
     # Admin endpoints
     path('admin/pending-users/', api_views.pending_users, name='api_pending_users'),

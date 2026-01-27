@@ -392,6 +392,10 @@ class RentPaymentViewSet(viewsets.ModelViewSet):
     update: Update a rent payment
     partial_update: Partially update a rent payment
     destroy: Delete a rent payment
+    
+    **Payment Types Supported:**
+    - Invoice-based payments (payments linked to rent_invoice)
+    - Lease-only payments (payments linked directly to lease, invoice auto-created on completion)
     """
     permission_classes = [permissions.IsAuthenticated]
     
@@ -400,13 +404,223 @@ class RentPaymentViewSet(viewsets.ModelViewSet):
             return RentPaymentCreateSerializer
         return RentPaymentSerializer
     
+    @extend_schema(
+        summary="List Rent Payments",
+        description="""
+        Get list of rent payments filtered by user role.
+        
+        **Returns:**
+        - Invoice-based payments (payments linked to rent_invoice)
+        - Lease-only payments (payments linked directly to lease)
+        
+        **Permissions:**
+        - **Admin/Staff**: See ALL rent payments
+        - **Tenants**: See only their own payments
+        
+        **Filtering:**
+        - `tenant_id`: Filter by tenant (admin/staff only)
+        - `invoice_id`: Filter by rent invoice
+        - `lease_id`: Filter by lease
+        - `payment_method`: Filter by payment method (cash, mobile_money, online)
+        
+        **Response includes:**
+        - Payment details with invoice information (if invoice-based)
+        - Payment details with lease information (if lease-only)
+        - Payment status and transaction details
+        """,
+        tags=['Rent'],
+        parameters=[
+            OpenApiParameter(
+                'tenant_id',
+                OpenApiTypes.INT,
+                OpenApiParameter.QUERY,
+                description="Filter by tenant user ID (admin/staff only)",
+                required=False
+            ),
+            OpenApiParameter(
+                'invoice_id',
+                OpenApiTypes.INT,
+                OpenApiParameter.QUERY,
+                description="Filter by rent invoice ID",
+                required=False
+            ),
+            OpenApiParameter(
+                'lease_id',
+                OpenApiTypes.INT,
+                OpenApiParameter.QUERY,
+                description="Filter by lease ID",
+                required=False
+            ),
+            OpenApiParameter(
+                'payment_method',
+                OpenApiTypes.STR,
+                OpenApiParameter.QUERY,
+                description="Filter by payment method (cash, mobile_money, online)",
+                required=False
+            ),
+        ],
+        responses={
+            200: {
+                'description': 'List of rent payments (includes both invoice-based and lease-only payments)',
+                'content': {
+                    'application/json': {
+                        'schema': RentPaymentSerializer(many=True)
+                    }
+                }
+            },
+            401: {'description': 'Authentication required'}
+        }
+    )
+    @swagger_auto_schema(
+        method='get',
+        operation_description="""
+        Get list of rent payments filtered by user role.
+        
+        **Returns:**
+        - Invoice-based payments (payments linked to rent_invoice)
+        - Lease-only payments (payments linked directly to lease)
+        
+        **Permissions:**
+        - Admin/Staff: See ALL rent payments
+        - Tenants: See only their own payments
+        
+        **Filtering:**
+        - `tenant_id`: Filter by tenant (admin/staff only)
+        - `invoice_id`: Filter by rent invoice
+        - `lease_id`: Filter by lease
+        - `payment_method`: Filter by payment method
+        """,
+        operation_summary="List Rent Payments",
+        tags=['Rent'],
+        manual_parameters=[
+            openapi.Parameter(
+                'tenant_id',
+                openapi.IN_QUERY,
+                description="Filter by tenant user ID (admin/staff only)",
+                type=openapi.TYPE_INTEGER,
+                required=False
+            ),
+            openapi.Parameter(
+                'invoice_id',
+                openapi.IN_QUERY,
+                description="Filter by rent invoice ID",
+                type=openapi.TYPE_INTEGER,
+                required=False
+            ),
+            openapi.Parameter(
+                'lease_id',
+                openapi.IN_QUERY,
+                description="Filter by lease ID",
+                type=openapi.TYPE_INTEGER,
+                required=False
+            ),
+            openapi.Parameter(
+                'payment_method',
+                openapi.IN_QUERY,
+                description="Filter by payment method (cash, mobile_money, online)",
+                type=openapi.TYPE_STRING,
+                required=False
+            ),
+        ],
+        responses={
+            200: openapi.Response(
+                description="List of rent payments",
+                schema=RentPaymentSerializer(many=True)
+            ),
+            401: "Authentication required"
+        },
+        security=[{'Bearer': []}]
+    )
+    def list(self, request, *args, **kwargs):
+        """
+        List rent payments with filtering support.
+        
+        Returns both invoice-based and lease-only payments.
+        """
+        return super().list(request, *args, **kwargs)
+    
+    @extend_schema(
+        summary="Create Rent Payment",
+        description="""
+        Create a new rent payment. Supports two payment flows:
+        
+        **Option 1: Payment with Invoice (Structured)**
+        - Provide `rent_invoice` ID
+        - Payment is linked to specific invoice
+        - Invoice balance is validated (no overpayment allowed)
+        - Returns updated invoice balance
+        
+        **Option 2: Payment without Invoice (Flexible)**
+        - Provide `lease` ID (rent_invoice can be null)
+        - Payment is linked directly to lease
+        - Invoice will be auto-created when payment completes
+        - More flexible - tenants can pay anytime
+        
+        **Important Notes:**
+        - Either `rent_invoice` OR `lease` must be provided
+        - If `rent_invoice` is provided, `lease` is automatically set from invoice
+        - For invoice-based payments, amount cannot exceed invoice balance
+        - For lease-only payments, any amount can be paid
+        - Invoice auto-creation happens when payment status changes to 'completed'
+        """,
+        tags=['Rent'],
+        request=RentPaymentCreateSerializer,
+        responses={
+            201: {
+                'description': 'Payment created successfully',
+                'content': {
+                    'application/json': {
+                        'schema': RentPaymentSerializer
+                    }
+                }
+            },
+            400: {'description': 'Validation error (e.g., overpayment, missing lease/invoice)'},
+            401: {'description': 'Authentication required'}
+        }
+    )
+    @swagger_auto_schema(
+        method='post',
+        operation_description="""
+        Create a new rent payment. Supports two payment flows:
+        
+        **Option 1: Payment with Invoice (Structured)**
+        - Provide `rent_invoice` ID
+        - Payment is linked to specific invoice
+        - Invoice balance is validated (no overpayment allowed)
+        
+        **Option 2: Payment without Invoice (Flexible)**
+        - Provide `lease` ID (rent_invoice can be null)
+        - Payment is linked directly to lease
+        - Invoice will be auto-created when payment completes
+        
+        **Important:** Either `rent_invoice` OR `lease` must be provided.
+        """,
+        operation_summary="Create Rent Payment",
+        tags=['Rent'],
+        request_body=RentPaymentCreateSerializer,
+        responses={
+            201: openapi.Response(
+                description="Payment created successfully",
+                schema=RentPaymentSerializer
+            ),
+            400: "Validation error",
+            401: "Authentication required"
+        },
+        security=[{'Bearer': []}]
+    )
     def create(self, request, *args, **kwargs):
-        """Create payment and return updated invoice balance"""
+        """
+        Create payment and return updated information.
+        
+        Supports two payment flows:
+        1. **With Invoice:** Payment linked to specific invoice - returns invoice balance
+        2. **Without Invoice:** Payment linked directly to lease - invoice auto-created on completion
+        """
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         payment = serializer.save()
         
-        # Refresh invoice to get updated balance
+        # Refresh invoice to get updated balance (if exists)
         if payment.rent_invoice:
             payment.rent_invoice.refresh_from_db()
             invoice = payment.rent_invoice
@@ -424,15 +638,29 @@ class RentPaymentViewSet(viewsets.ModelViewSet):
             
             return Response(response_data, status=status.HTTP_201_CREATED)
         
-        return Response(RentPaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
+        # For lease-only payments, return payment with lease info
+        response_data = RentPaymentSerializer(payment).data
+        if payment.lease:
+            response_data['lease'] = {
+                'id': payment.lease.id,
+                'rent_amount': str(payment.lease.rent_amount),
+                'status': payment.lease.status,
+                'payment_status': 'partial' if payment.status == 'completed' else 'unpaid'
+            }
+            response_data['message'] = 'Payment created successfully. Invoice will be auto-created when payment completes.'
+        
+        return Response(response_data, status=status.HTTP_201_CREATED)
     
     def get_queryset(self):
         # Handle schema generation (swagger_fake_view)
         if getattr(self, 'swagger_fake_view', False):
             return Payment.objects.none()
             
-        # Filter only rent payments (those with rent_invoice set)
-        queryset = Payment.objects.filter(rent_invoice__isnull=False).select_related('rent_invoice', 'lease', 'tenant')
+        # Filter rent payments (those with rent_invoice OR lease set)
+        # This includes both invoice-based and lease-only payments
+        queryset = Payment.objects.filter(
+            Q(rent_invoice__isnull=False) | Q(lease__isnull=False)
+        ).select_related('rent_invoice', 'lease', 'tenant')
         
         # Filter based on user role
         if not self.request.user.is_staff:
@@ -447,15 +675,105 @@ class RentPaymentViewSet(viewsets.ModelViewSet):
         if invoice_id:
             queryset = queryset.filter(rent_invoice_id=invoice_id)
         
+        lease_id = self.request.query_params.get('lease_id')
+        if lease_id:
+            queryset = queryset.filter(lease_id=lease_id)
+        
         payment_method = self.request.query_params.get('payment_method')
         if payment_method:
             queryset = queryset.filter(payment_method=payment_method)
         
         return queryset.order_by('-paid_date')
     
+    @extend_schema(
+        summary="Retrieve Rent Payment",
+        description="""
+        Get details of a specific rent payment.
+        
+        **Returns:**
+        - Payment details with invoice information (if invoice-based)
+        - Payment details with lease information (if lease-only)
+        - Payment status and transaction details
+        
+        **Note:** Works for both invoice-based and lease-only payments.
+        """,
+        tags=['Rent'],
+        responses={
+            200: {
+                'description': 'Rent payment details',
+                'content': {
+                    'application/json': {
+                        'schema': RentPaymentSerializer
+                    }
+                }
+            },
+            404: {'description': 'Payment not found'},
+            401: {'description': 'Authentication required'}
+        }
+    )
     @swagger_auto_schema(
         method='get',
-        operation_description="Get recent rent payments. Returns the most recent payments, limited by 'limit' query parameter (default: 10).",
+        operation_description="""
+        Get details of a specific rent payment.
+        
+        Works for both invoice-based and lease-only payments.
+        """,
+        operation_summary="Retrieve Rent Payment",
+        tags=['Rent'],
+        responses={
+            200: RentPaymentSerializer,
+            404: "Payment not found",
+            401: "Authentication required"
+        },
+        security=[{'Bearer': []}]
+    )
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Retrieve a specific rent payment.
+        
+        Returns payment details including invoice or lease information.
+        """
+        return super().retrieve(request, *args, **kwargs)
+    
+    @extend_schema(
+        summary="Get Recent Rent Payments",
+        description="""
+        Get recent rent payments. Returns the most recent payments, limited by 'limit' query parameter.
+        
+        **Returns:**
+        - Both invoice-based and lease-only payments
+        - Ordered by payment date (most recent first)
+        - Limited to specified number (default: 10)
+        """,
+        tags=['Rent'],
+        parameters=[
+            OpenApiParameter(
+                'limit',
+                OpenApiTypes.INT,
+                OpenApiParameter.QUERY,
+                description="Number of recent payments to return (default: 10)",
+                required=False
+            ),
+        ],
+        responses={
+            200: {
+                'description': 'List of recent rent payments',
+                'content': {
+                    'application/json': {
+                        'schema': RentPaymentSerializer(many=True)
+                    }
+                }
+            },
+            401: {'description': 'Authentication required'}
+        }
+    )
+    @swagger_auto_schema(
+        method='get',
+        operation_description="""
+        Get recent rent payments. Returns the most recent payments, limited by 'limit' query parameter (default: 10).
+        
+        Returns both invoice-based and lease-only payments.
+        """,
         operation_summary="Get Recent Rent Payments",
         tags=['Rent'],
         manual_parameters=[
@@ -486,12 +804,15 @@ class RentPaymentViewSet(viewsets.ModelViewSet):
         - Valid values: AIRTEL, TIGO, MPESA, HALOPESA
         
         **Flow:**
-        1. Validates payment has rent_invoice
+        1. Validates payment has lease (required for rent payments)
         2. Gets mobile money provider (from payment or request)
         3. Automatically sets payment provider to "AZAM Pay" if not set
         4. Calls AZAM Pay API
         5. Creates PaymentTransaction
         6. Returns payment link
+        
+        **Note:** Payments can be made with or without invoices. If no invoice exists,
+        one will be auto-created when the payment completes.
         """,
         tags=['Rent'],
         request={
@@ -527,7 +848,7 @@ class RentPaymentViewSet(viewsets.ModelViewSet):
                     }
                 }
             },
-            400: {'description': 'Payment already completed, missing rent_invoice, missing mobile_money_provider, or gateway error'},
+            400: {'description': 'Payment already completed, missing lease, missing mobile_money_provider, or gateway error'},
             404: {'description': 'Payment not found'},
             401: {'description': 'Authentication required'}
         }
@@ -569,7 +890,7 @@ class RentPaymentViewSet(viewsets.ModelViewSet):
                     }
                 )
             ),
-            400: "Payment already completed, missing rent_invoice, missing mobile_money_provider, or gateway error",
+            400: "Payment already completed, missing lease, missing mobile_money_provider, or gateway error",
             401: "Authentication required"
         },
         security=[{'Bearer': []}]
@@ -580,11 +901,14 @@ class RentPaymentViewSet(viewsets.ModelViewSet):
         Initiate payment with payment gateway (AZAM Pay)
         
         Flow:
-        1. Validates payment has rent_invoice
+        1. Validates payment has lease (required for rent payments)
         2. Gets mobile money provider (from payment or request)
         3. Creates PaymentTransaction
         4. Calls AZAM Pay API
         5. Returns payment link to mobile app
+        
+        **Note:** Payments can be made with or without invoices. If no invoice exists,
+        one will be auto-created when the payment completes.
         """
         payment = self.get_object()
         
@@ -598,12 +922,12 @@ class RentPaymentViewSet(viewsets.ModelViewSet):
                 'status': payment.status
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Validate payment has rent_invoice (required for rent payments)
-        if not payment.rent_invoice:
+        # Validate payment has lease (required for rent payments)
+        if not payment.lease:
             return Response({
                 'success': False,
-                'error': 'Rent invoice required',
-                'message': 'This payment must be linked to a rent invoice. This endpoint is for rent payments only. Please create a payment with a valid rent_invoice ID.',
+                'error': 'Lease required',
+                'message': 'This payment must be linked to a lease. Please create a payment with a valid lease ID.',
                 'payment_id': payment.id
             }, status=status.HTTP_400_BAD_REQUEST)
         
