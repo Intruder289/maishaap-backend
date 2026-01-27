@@ -3032,7 +3032,7 @@ def property_visit_status(request, property_id):
 # CRITICAL: @extend_schema must be BEFORE @api_view for drf-spectacular
 @extend_schema(
     summary="Initiate Property Visit Payment",
-    description="Initiate a property visit payment. Creates a payment request for visiting the property.",
+    description="Initiate a property visit payment. Creates a payment request for visiting the property. If payment_method is 'mobile_money', mobile_money_provider is required (unless already set in existing payment).",
     tags=['Properties'],
     parameters=[
         OpenApiParameter('property_id', OpenApiTypes.INT, OpenApiParameter.PATH, description="Property ID", required=True),
@@ -3044,28 +3044,44 @@ def property_visit_status(request, property_id):
                 'properties': {
                     'payment_method': {
                         'type': 'string',
-                        'description': 'Payment method (e.g., mobile_money, card)'
+                        'description': 'Payment method (e.g., mobile_money, card). Default: mobile_money',
+                        'default': 'mobile_money'
+                    },
+                    'mobile_money_provider': {
+                        'type': 'string',
+                        'description': 'Mobile money provider (required if payment_method is mobile_money and not already set in payment). Options: AIRTEL, TIGO, MPESA, HALOPESA',
+                        'enum': ['AIRTEL', 'TIGO', 'MPESA', 'HALOPESA']
                     }
-                }
+                },
+                'required': []
             }
         }
     },
     responses={
         200: {'description': 'Payment initiated successfully'},
-        400: {'description': 'Invalid request'},
+        400: {'description': 'Invalid request (e.g., Mobile Money Provider required)'},
         401: {'description': 'Authentication required'},
         404: {'description': 'Property not found'}
     }
 )
 @swagger_auto_schema(
     method='post',
-    operation_description="Initiate a property visit payment. Creates a payment request for visiting the property.",
+    operation_description="Initiate a property visit payment. Creates a payment request for visiting the property. If payment_method is 'mobile_money', mobile_money_provider is required (unless already set in existing payment).",
     operation_summary="Initiate Property Visit Payment",
     tags=['Property Visits'],
     request_body=openapi.Schema(
         type=openapi.TYPE_OBJECT,
         properties={
-            'payment_method': openapi.Schema(type=openapi.TYPE_STRING, description='Payment method (e.g., mobile_money, card)'),
+            'payment_method': openapi.Schema(
+                type=openapi.TYPE_STRING, 
+                description='Payment method (e.g., mobile_money, card). Default: mobile_money',
+                default='mobile_money'
+            ),
+            'mobile_money_provider': openapi.Schema(
+                type=openapi.TYPE_STRING,
+                description='Mobile money provider (required if payment_method is mobile_money and not already set in payment). Options: AIRTEL, TIGO, MPESA, HALOPESA',
+                enum=['AIRTEL', 'TIGO', 'MPESA', 'HALOPESA']
+            ),
         }
     ),
     manual_parameters=[
@@ -3169,9 +3185,16 @@ def property_visit_initiate(request, property_id):
     payment_method = request.data.get('payment_method', 'mobile_money')
     
     # Get mobile money provider if this is a mobile_money payment
+    # Priority: 1) Existing payment object, 2) Request data
     mobile_money_provider = None
     if payment_method == 'mobile_money':
-        mobile_money_provider = request.data.get('mobile_money_provider', '').strip()
+        # Check if payment already exists and has mobile_money_provider set
+        if visit_payment.payment and visit_payment.payment.mobile_money_provider:
+            mobile_money_provider = visit_payment.payment.mobile_money_provider
+        else:
+            # Get from request data
+            mobile_money_provider = request.data.get('mobile_money_provider', '').strip()
+        
         if not mobile_money_provider:
             return Response({
                 'success': False,
@@ -3193,6 +3216,9 @@ def property_visit_initiate(request, property_id):
         payment.payment_method = payment_method
         if mobile_money_provider:
             payment.mobile_money_provider = mobile_money_provider.upper()
+        # Auto-set provider if not set
+        if not payment.provider:
+            payment.provider = provider
         payment.status = 'pending'
         payment.save()
     else:

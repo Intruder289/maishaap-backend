@@ -54,8 +54,8 @@ class RentPaymentSerializer(serializers.ModelSerializer):
         model = Payment
         fields = [
             'id', 'rent_invoice', 'lease', 'tenant', 'invoice_number', 'lease_property',
-            'payment_date', 'amount', 'payment_method', 'reference_number', 
-            'status', 'transaction_id', 'notes', 'created_at'
+            'payment_date', 'amount', 'payment_method', 'mobile_money_provider', 
+            'reference_number', 'status', 'transaction_id', 'notes', 'created_at'
         ]
         read_only_fields = ['id', 'created_at', 'tenant', 'lease']
 
@@ -71,8 +71,8 @@ class RentPaymentCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Payment
         fields = [
-            'rent_invoice', 'amount', 'payment_method', 'reference_number', 
-            'transaction_id', 'notes', 'lease', 'tenant'
+            'rent_invoice', 'amount', 'payment_method', 'mobile_money_provider', 
+            'reference_number', 'transaction_id', 'notes', 'lease', 'tenant'
         ]
     
     def validate(self, data):

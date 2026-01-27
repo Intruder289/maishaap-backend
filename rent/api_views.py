@@ -10,6 +10,14 @@ from decimal import Decimal
 # Swagger documentation - using drf-spectacular (auto-discovery)
 # Provide no-op decorator for backward compatibility with existing @swagger_auto_schema decorators
 try:
+    from drf_spectacular.utils import extend_schema, OpenApiParameter
+    from drf_spectacular.types import OpenApiTypes
+except ImportError:
+    extend_schema = lambda *args, **kwargs: lambda func: func
+    OpenApiParameter = None
+    OpenApiTypes = None
+
+try:
     from drf_yasg.utils import swagger_auto_schema
     from drf_yasg import openapi
 except ImportError:
@@ -467,11 +475,85 @@ class RentPaymentViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
     
+    @extend_schema(
+        summary="Initiate Gateway Payment for Rent",
+        description="""
+        Initiate payment with payment gateway (AZAM Pay) for rent payments.
+        
+        **Mobile Money Provider:**
+        - If `mobile_money_provider` was already set when creating the payment, it will be used automatically
+        - If not set, you must pass it in the request body
+        - Valid values: AIRTEL, TIGO, MPESA, HALOPESA
+        
+        **Flow:**
+        1. Validates payment has rent_invoice
+        2. Gets mobile money provider (from payment or request)
+        3. Automatically sets payment provider to "AZAM Pay" if not set
+        4. Calls AZAM Pay API
+        5. Creates PaymentTransaction
+        6. Returns payment link
+        """,
+        tags=['Rent'],
+        request={
+            'application/json': {
+                'schema': {
+                    'type': 'object',
+                    'properties': {
+                        'mobile_money_provider': {
+                            'type': 'string',
+                            'description': 'Mobile money provider (required if not already set on payment): AIRTEL, TIGO, MPESA, HALOPESA. If already set when creating payment, this is optional.',
+                            'enum': ['AIRTEL', 'TIGO', 'MPESA', 'HALOPESA']
+                        }
+                    }
+                }
+            }
+        },
+        responses={
+            201: {
+                'description': 'Payment initiated successfully',
+                'content': {
+                    'application/json': {
+                        'schema': {
+                            'type': 'object',
+                            'properties': {
+                                'success': {'type': 'boolean'},
+                                'payment_id': {'type': 'integer'},
+                                'transaction_id': {'type': 'integer'},
+                                'payment_link': {'type': 'string', 'description': 'URL to redirect user for payment'},
+                                'transaction_reference': {'type': 'string'},
+                                'message': {'type': 'string'}
+                            }
+                        }
+                    }
+                }
+            },
+            400: {'description': 'Payment already completed, missing rent_invoice, missing mobile_money_provider, or gateway error'},
+            404: {'description': 'Payment not found'},
+            401: {'description': 'Authentication required'}
+        }
+    )
     @swagger_auto_schema(
         method='post',
-        operation_description="Initiate payment with payment gateway (AZAM Pay). Creates PaymentTransaction and returns payment link for mobile app.",
-        operation_summary="Initiate Gateway Payment",
+        operation_description="""
+        Initiate payment with payment gateway (AZAM Pay) for rent payments.
+        
+        **Mobile Money Provider:**
+        - If `mobile_money_provider` was already set when creating the payment, it will be used automatically
+        - If not set, you must pass it in the request body
+        - Valid values: AIRTEL, TIGO, MPESA, HALOPESA
+        """,
+        operation_summary="Initiate Gateway Payment for Rent",
         tags=['Rent'],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'mobile_money_provider': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description='Mobile money provider (required if not already set on payment): AIRTEL, TIGO, MPESA, HALOPESA. If already set when creating payment, this is optional.',
+                    enum=['AIRTEL', 'TIGO', 'MPESA', 'HALOPESA']
+                )
+            }
+        ),
         responses={
             201: openapi.Response(
                 description="Payment initiated successfully",
@@ -487,7 +569,7 @@ class RentPaymentViewSet(viewsets.ModelViewSet):
                     }
                 )
             ),
-            400: "Payment already completed or gateway error",
+            400: "Payment already completed, missing rent_invoice, missing mobile_money_provider, or gateway error",
             401: "Authentication required"
         },
         security=[{'Bearer': []}]
@@ -498,10 +580,11 @@ class RentPaymentViewSet(viewsets.ModelViewSet):
         Initiate payment with payment gateway (AZAM Pay)
         
         Flow:
-        1. Creates Payment record (status='pending')
-        2. Creates PaymentTransaction
-        3. Calls AZAM Pay API
-        4. Returns payment link to mobile app
+        1. Validates payment has rent_invoice
+        2. Gets mobile money provider (from payment or request)
+        3. Creates PaymentTransaction
+        4. Calls AZAM Pay API
+        5. Returns payment link to mobile app
         """
         payment = self.get_object()
         
@@ -515,11 +598,47 @@ class RentPaymentViewSet(viewsets.ModelViewSet):
                 'status': payment.status
             }, status=status.HTTP_400_BAD_REQUEST)
         
+        # Validate payment has rent_invoice (required for rent payments)
+        if not payment.rent_invoice:
+            return Response({
+                'success': False,
+                'error': 'Rent invoice required',
+                'message': 'This payment must be linked to a rent invoice. This endpoint is for rent payments only. Please create a payment with a valid rent_invoice ID.',
+                'payment_id': payment.id
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get mobile money provider if this is a mobile_money payment
+        if payment.payment_method == 'mobile_money':
+            # Check if mobile_money_provider is already set on the payment
+            # If not, get it from request body
+            mobile_money_provider = payment.mobile_money_provider
+            if not mobile_money_provider:
+                mobile_money_provider = request.data.get('mobile_money_provider', '').strip()
+            
+            # If still not set, return error
+            if not mobile_money_provider:
+                return Response({
+                    'success': False,
+                    'error': 'Mobile Money Provider required',
+                    'message': 'Please select your mobile money provider. Choose one of: AIRTEL, TIGO, MPESA, or HALOPESA. You can pass it when creating the payment or when initiating the gateway payment.',
+                    'valid_providers': ['AIRTEL', 'TIGO', 'MPESA', 'HALOPESA']
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Update payment with mobile money provider (normalize to uppercase)
+            if payment.mobile_money_provider != mobile_money_provider.upper():
+                payment.mobile_money_provider = mobile_money_provider.upper()
+                payment.save()
+        
         # Get or create AZAM Pay provider
         provider, _ = PaymentProvider.objects.get_or_create(
             name='AZAM Pay',
             defaults={'description': 'AZAM Pay Payment Gateway'}
         )
+        
+        # Update payment provider if not set
+        if not payment.provider:
+            payment.provider = provider
+            payment.save()
         
         # Get callback URL - use configured webhook URL (production) instead of localhost
         from django.conf import settings

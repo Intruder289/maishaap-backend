@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 import os
 from decouple import Csv, Config, RepositoryEnv
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -37,12 +38,32 @@ else:
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config('SECRET_KEY', default='django-insecure--lcr^7cu6oeuae)6&4(*s8h_4e@2aph+104tmjtm%2nt0n0*m6')
+# SECURITY FIX: Removed insecure default - SECRET_KEY must be set in .env file
+# System will fail fast with clear error if SECRET_KEY is missing (prevents using insecure default)
+try:
+    SECRET_KEY = config('SECRET_KEY')
+except Exception as e:
+    raise ImproperlyConfigured(
+        "SECRET_KEY is required but not set in .env file. "
+        "Please set SECRET_KEY in your .env file. "
+        "This is a security requirement to prevent using insecure default keys."
+    ) from e
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config('DEBUG', default='True', cast=bool)
+# SECURITY FIX: Default changed to False for safety (was True)
+# DEBUG must be explicitly set to True in .env for development
+DEBUG = config('DEBUG', default='False', cast=bool)
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='*', cast=Csv())
+# SECURITY FIX: Removed wildcard default - ALLOWED_HOSTS must be set in .env file
+# System will fail fast with clear error if ALLOWED_HOSTS is missing (prevents Host header attacks)
+try:
+    ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv())
+except Exception as e:
+    raise ImproperlyConfigured(
+        "ALLOWED_HOSTS is required but not set in .env file. "
+        "Please set ALLOWED_HOSTS in your .env file (comma-separated list of allowed hosts). "
+        "This is a security requirement to prevent Host header attacks."
+    ) from e
 
 # Increase field limit for forms with many fields (e.g., property formsets)
 # Default is 1000, increased significantly for property forms with images and amenities
@@ -119,11 +140,11 @@ WSGI_APPLICATION = 'Maisha_backend.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('DATABASE_NAME'),
-        'USER': config('DATABASE_USER'),
-        'PASSWORD': config('DATABASE_PASSWORD'),
-        'HOST': config('DATABASE_HOST'),
-        'PORT': config('DATABASE_PORT'),
+        'NAME': config('DATABASE_NAME', default='maisha'),
+        'USER': config('DATABASE_USER', default='postgres'),
+        'PASSWORD': config('DATABASE_PASSWORD', default='alfred'),
+        'HOST': config('DATABASE_HOST', default='localhost'),
+        'PORT': config('DATABASE_PORT', default='5432'),
         'OPTIONS': {
             'connect_timeout': 10,
         },
