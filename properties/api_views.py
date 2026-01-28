@@ -29,7 +29,7 @@ def format_currency(amount):
 # Swagger documentation - using drf-spectacular
 # Always import extend_schema from drf-spectacular as it's used throughout the file
 try:
-    from drf_spectacular.utils import extend_schema, OpenApiParameter
+    from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse
     from drf_spectacular.types import OpenApiTypes
 except ImportError:
     # Fallback if drf-spectacular is not available
@@ -217,9 +217,41 @@ except ImportError:
         if spectacular_params:
             schema_kwargs['parameters'] = spectacular_params
         
-        # Add responses if provided
-        if kwargs.get('responses'):
-            schema_kwargs['responses'] = kwargs.get('responses')
+        # Add responses if provided - clean serializer instances
+        responses = kwargs.get('responses')
+        if responses:
+            cleaned_responses = {}
+            for status_code, response_value in responses.items():
+                # Handle serializer instances (e.g., PropertyListSerializer(many=True))
+                if hasattr(response_value, '__class__') and 'Serializer' in response_value.__class__.__name__:
+                    serializer_class = response_value.__class__
+                    many = getattr(response_value, 'many', False)
+                    cleaned_responses[status_code] = OpenApiResponse(
+                        response=serializer_class,
+                        description=f'List of {serializer_class.__name__.replace("Serializer", "").lower()}s' if many else f'{serializer_class.__name__.replace("Serializer", "")} details'
+                    )
+                # Handle openapi.Response objects with serializer instances
+                elif hasattr(response_value, 'schema') and hasattr(response_value.schema, '__class__'):
+                    schema_obj = response_value.schema
+                    if hasattr(schema_obj, '__class__') and 'Serializer' in schema_obj.__class__.__name__:
+                        serializer_class = schema_obj.__class__
+                        many = getattr(schema_obj, 'many', False)
+                        cleaned_responses[status_code] = OpenApiResponse(
+                            response=serializer_class,
+                            description=getattr(response_value, 'description', '') or f'{serializer_class.__name__.replace("Serializer", "")} details'
+                        )
+                    else:
+                        cleaned_responses[status_code] = response_value
+                # Handle string responses
+                elif isinstance(response_value, str):
+                    cleaned_responses[status_code] = {'description': response_value}
+                # Handle dict responses
+                elif isinstance(response_value, dict):
+                    cleaned_responses[status_code] = response_value
+                # For other types, pass through
+                else:
+                    cleaned_responses[status_code] = response_value
+            schema_kwargs['responses'] = cleaned_responses
         
         # Add request/request_body if provided (for POST/PUT/PATCH)
         if kwargs.get('request_body'):
@@ -288,7 +320,7 @@ class PropertyListCreateAPIView(APIView):
             OpenApiParameter('page', OpenApiTypes.INT, OpenApiParameter.QUERY, description="Page number for pagination (default: 1)", required=False),
             OpenApiParameter('page_size', OpenApiTypes.INT, OpenApiParameter.QUERY, description="Number of items per page (default: 20, max: 100)", required=False),
         ],
-        responses={200: PropertyListSerializer(many=True)}
+        responses={200: OpenApiResponse(response=PropertyListSerializer, description='List of properties with pagination')}
     )
     @swagger_auto_schema(
         operation_description="Get a list of all properties. Public endpoint - no authentication required. Supports filtering and pagination.",
@@ -886,7 +918,7 @@ class PropertyTypeListAPIView(APIView):
         parameters=[
             OpenApiParameter('search', OpenApiTypes.STR, OpenApiParameter.QUERY, description="Search property types by name", required=False),
         ],
-        responses={200: PropertyTypeSerializer(many=True)}
+        responses={200: OpenApiResponse(response=PropertyTypeSerializer, description='List of property types')}
     )
     @swagger_auto_schema(
         operation_description="Get a list of all property types (apartment, house, studio, etc.). Supports optional search.",
@@ -973,7 +1005,7 @@ class RegionListAPIView(APIView):
         parameters=[
             OpenApiParameter('search', OpenApiTypes.STR, OpenApiParameter.QUERY, description="Search regions by name", required=False),
         ],
-        responses={200: RegionSerializer(many=True)}
+        responses={200: OpenApiResponse(response=RegionSerializer, description='List of regions')}
     )
     @swagger_auto_schema(
         operation_description="Get a list of all regions/locations where properties are available. Supports optional search.",
@@ -1061,7 +1093,7 @@ class DistrictListAPIView(APIView):
             OpenApiParameter('search', OpenApiTypes.STR, OpenApiParameter.QUERY, description="Search districts by name", required=False),
             OpenApiParameter('region', OpenApiTypes.INT, OpenApiParameter.QUERY, description="Filter districts by region ID", required=False),
         ],
-        responses={200: DistrictSerializer(many=True)}
+        responses={200: OpenApiResponse(response=DistrictSerializer, description='List of districts')}
     )
     @swagger_auto_schema(
         operation_description="Get a list of all districts within regions. Supports optional filtering.",
@@ -1157,7 +1189,7 @@ class AmenityListAPIView(APIView):
         parameters=[
             OpenApiParameter('search', OpenApiTypes.STR, OpenApiParameter.QUERY, description="Search amenities by name", required=False),
         ],
-        responses={200: AmenitySerializer(many=True)}
+        responses={200: OpenApiResponse(response=AmenitySerializer, description='List of amenities')}
     )
     @swagger_auto_schema(
         operation_description="Get a list of all property amenities (e.g., WiFi, Parking, Pool, etc.). Supports optional search.",
@@ -1311,7 +1343,7 @@ class FavoritePropertiesAPIView(APIView):
             OpenApiParameter('category', OpenApiTypes.STR, OpenApiParameter.QUERY, description="Filter favorites by category name (e.g., 'house', 'hotel', 'lodge', 'venue')", required=False),
         ],
         responses={
-            200: PropertyFavoriteSerializer(many=True),
+            200: OpenApiResponse(response=PropertyFavoriteSerializer, description='List of favorite properties'),
             401: {'description': 'Authentication required'}
         }
     )
@@ -1548,7 +1580,7 @@ def toggle_favorite(request):
         OpenApiParameter('page', OpenApiTypes.INT, OpenApiParameter.QUERY, description="Page number for pagination (default: 1)", required=False),
         OpenApiParameter('page_size', OpenApiTypes.INT, OpenApiParameter.QUERY, description="Number of items per page (default: 20, max: 100)", required=False),
     ],
-    responses={200: PropertyListSerializer(many=True)}
+    responses={200: OpenApiResponse(response=PropertyListSerializer, description='List of properties matching search criteria')}
 )
 @swagger_auto_schema(
     method='get',
@@ -1728,7 +1760,7 @@ def property_search(request):
             required=False
         ),
     ],
-    responses={200: PropertyListSerializer(many=True)}
+    responses={200: OpenApiResponse(response=PropertyListSerializer, description='List of featured properties')}
 )
 @swagger_auto_schema(
     method='get',
@@ -1830,7 +1862,7 @@ def featured_properties(request):
             required=False
         ),
     ],
-    responses={200: PropertyListSerializer(many=True)}
+    responses={200: OpenApiResponse(response=PropertyListSerializer, description='List of recently added properties')}
 )
 @swagger_auto_schema(
     method='get',

@@ -10,12 +10,13 @@ from decimal import Decimal
 # Swagger documentation - using drf-spectacular (auto-discovery)
 # Provide no-op decorator for backward compatibility with existing @swagger_auto_schema decorators
 try:
-    from drf_spectacular.utils import extend_schema, OpenApiParameter
+    from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse
     from drf_spectacular.types import OpenApiTypes
 except ImportError:
     extend_schema = lambda *args, **kwargs: lambda func: func
     OpenApiParameter = None
     OpenApiTypes = None
+    OpenApiResponse = None
 
 try:
     from drf_yasg.utils import swagger_auto_schema
@@ -460,14 +461,7 @@ class RentPaymentViewSet(viewsets.ModelViewSet):
             ),
         ],
         responses={
-            200: {
-                'description': 'List of rent payments (includes both invoice-based and lease-only payments)',
-                'content': {
-                    'application/json': {
-                        'schema': RentPaymentSerializer(many=True)
-                    }
-                }
-            },
+            200: OpenApiResponse(response=RentPaymentSerializer, description='List of rent payments (includes both invoice-based and lease-only payments)'),
             401: {'description': 'Authentication required'}
         }
     )
@@ -566,14 +560,7 @@ class RentPaymentViewSet(viewsets.ModelViewSet):
         tags=['Rent'],
         request=RentPaymentCreateSerializer,
         responses={
-            201: {
-                'description': 'Payment created successfully',
-                'content': {
-                    'application/json': {
-                        'schema': RentPaymentSerializer
-                    }
-                }
-            },
+            201: OpenApiResponse(response=RentPaymentSerializer, description='Payment created successfully'),
             400: {'description': 'Validation error (e.g., overpayment, missing lease/invoice)'},
             401: {'description': 'Authentication required'}
         }
@@ -699,14 +686,7 @@ class RentPaymentViewSet(viewsets.ModelViewSet):
         """,
         tags=['Rent'],
         responses={
-            200: {
-                'description': 'Rent payment details',
-                'content': {
-                    'application/json': {
-                        'schema': RentPaymentSerializer
-                    }
-                }
-            },
+            200: OpenApiResponse(response=RentPaymentSerializer, description='Rent payment details'),
             404: {'description': 'Payment not found'},
             401: {'description': 'Authentication required'}
         }
@@ -756,14 +736,7 @@ class RentPaymentViewSet(viewsets.ModelViewSet):
             ),
         ],
         responses={
-            200: {
-                'description': 'List of recent rent payments',
-                'content': {
-                    'application/json': {
-                        'schema': RentPaymentSerializer(many=True)
-                    }
-                }
-            },
+            200: OpenApiResponse(response=RentPaymentSerializer, description='List of recent rent payments'),
             401: {'description': 'Authentication required'}
         }
     )

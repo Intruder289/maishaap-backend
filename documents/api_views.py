@@ -13,13 +13,14 @@ from documents.serializers import (
 # Swagger documentation - using drf-spectacular
 # Import extend_schema for explicit documentation
 try:
-    from drf_spectacular.utils import extend_schema, OpenApiParameter
+    from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse
     from drf_spectacular.types import OpenApiTypes
 except ImportError:
     # Fallback if drf-spectacular is not available
     extend_schema = lambda *args, **kwargs: lambda func: func  # No-op decorator
     OpenApiParameter = None
     OpenApiTypes = None
+    OpenApiResponse = None
 
 # Provide no-op decorator for backward compatibility with existing @swagger_auto_schema decorators
 try:
@@ -162,14 +163,7 @@ class LeaseViewSet(viewsets.ModelViewSet):
             ),
         ],
         responses={
-            200: {
-                'description': 'List of leases with payment_status field',
-                'content': {
-                    'application/json': {
-                        'schema': LeaseSerializer(many=True)
-                    }
-                }
-            },
+            200: OpenApiResponse(response=LeaseSerializer, description='List of leases with payment_status field'),
             401: {'description': 'Authentication required'}
         }
     )
@@ -255,14 +249,7 @@ class LeaseViewSet(viewsets.ModelViewSet):
         """,
         tags=['Leases'],
         responses={
-            200: {
-                'description': 'Lease details with payment_status field',
-                'content': {
-                    'application/json': {
-                        'schema': LeaseSerializer
-                    }
-                }
-            },
+            200: OpenApiResponse(response=LeaseSerializer, description='Lease details with payment_status field'),
             404: {'description': 'Lease not found'},
             401: {'description': 'Authentication required'}
         }
@@ -385,14 +372,7 @@ class LeaseViewSet(viewsets.ModelViewSet):
         tags=['Leases'],
         request=LeaseCreateSerializer,
         responses={
-            201: {
-                'description': 'Lease created successfully',
-                'content': {
-                    'application/json': {
-                        'schema': LeaseSerializer
-                    }
-                }
-            },
+            201: OpenApiResponse(response=LeaseSerializer, description='Lease created successfully'),
             400: {'description': 'Validation error'},
             401: {'description': 'Authentication required'}
         }
@@ -710,7 +690,7 @@ class BookingViewSet(viewsets.ModelViewSet):
             ),
         ],
         responses={
-            200: BookingSerializer(many=True),
+            200: OpenApiResponse(response=BookingSerializer, description='List of bookings for house properties'),
             401: {'description': 'Authentication required'}
         }
     )

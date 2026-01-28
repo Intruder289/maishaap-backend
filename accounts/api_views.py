@@ -29,7 +29,7 @@ try:
     from drf_yasg import openapi
 except ImportError:
     # drf-yasg not installed, use drf-spectacular instead
-    from drf_spectacular.utils import extend_schema, OpenApiParameter
+    from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse
     from drf_spectacular.types import OpenApiTypes
     
     # Create a wrapper to convert swagger_auto_schema to extend_schema for drf-spectacular
@@ -92,12 +92,57 @@ except ImportError:
                         )
                     )
         
+        # Clean responses to convert serializer instances to classes
+        responses = kwargs.get('responses', {})
+        cleaned_responses = {}
+        if responses:
+            for status_code, response_value in responses.items():
+                # Handle serializer instances (e.g., LeaseSerializer(many=True))
+                if hasattr(response_value, '__class__') and 'Serializer' in response_value.__class__.__name__:
+                    # It's a serializer instance - extract the class
+                    serializer_class = response_value.__class__
+                    # Check if it's many=True
+                    many = getattr(response_value, 'many', False)
+                    if many:
+                        # For list responses, use OpenApiResponse with the class
+                        cleaned_responses[status_code] = OpenApiResponse(
+                            response=serializer_class,
+                            description=f'List of {serializer_class.__name__.replace("Serializer", "").lower()}s'
+                        )
+                    else:
+                        # For single responses, use OpenApiResponse with the class
+                        cleaned_responses[status_code] = OpenApiResponse(
+                            response=serializer_class,
+                            description=f'{serializer_class.__name__.replace("Serializer", "")} details'
+                        )
+                # Handle openapi.Response objects with serializer instances in schema
+                elif hasattr(response_value, 'schema') and hasattr(response_value.schema, '__class__'):
+                    schema_obj = response_value.schema
+                    if hasattr(schema_obj, '__class__') and 'Serializer' in schema_obj.__class__.__name__:
+                        serializer_class = schema_obj.__class__
+                        many = getattr(schema_obj, 'many', False)
+                        cleaned_responses[status_code] = OpenApiResponse(
+                            response=serializer_class,
+                            description=getattr(response_value, 'description', '') or f'{serializer_class.__name__.replace("Serializer", "")} details'
+                        )
+                    else:
+                        cleaned_responses[status_code] = response_value
+                # Handle string responses (e.g., "Authentication required")
+                elif isinstance(response_value, str):
+                    cleaned_responses[status_code] = {'description': response_value}
+                # Handle dict responses
+                elif isinstance(response_value, dict):
+                    cleaned_responses[status_code] = response_value
+                # For other types, pass through (might be OpenApiResponse already)
+                else:
+                    cleaned_responses[status_code] = response_value
+        
         return extend_schema(
             summary=kwargs.get('operation_summary', ''),
             description=kwargs.get('operation_description', ''),
             tags=kwargs.get('tags', []),
             parameters=spectacular_params if spectacular_params else None,
-            responses=kwargs.get('responses', {})
+            responses=cleaned_responses if cleaned_responses else None
         )
     
     class openapi:
