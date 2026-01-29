@@ -144,15 +144,24 @@ class RentInvoiceViewSet(viewsets.ModelViewSet):
     
     @swagger_auto_schema(
         method='post',
-        operation_description="Mark a rent invoice as paid. Creates a payment record and updates invoice status.",
-        operation_summary="Mark Invoice as Paid",
+        operation_description="""
+        Mark a rent invoice as paid. Creates a payment record and updates invoice status.
+        
+        **IMPORTANT**: This endpoint is ONLY for cash/offline payments.
+        For gateway payments (mobile_money, online), use the normal payment creation flow:
+        1. POST /api/v1/rent/payments/ with payment_method='mobile_money' or 'online'
+        2. POST /api/v1/rent/payments/{id}/initiate-gateway/ to initiate the gateway payment
+        
+        This endpoint will automatically mark the payment as completed since it's for offline/cash payments.
+        """,
+        operation_summary="Mark Invoice as Paid (Cash/Offline Only)",
         tags=['Rent'],
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             properties={
                 'amount': openapi.Schema(type=openapi.TYPE_NUMBER, description='Payment amount (defaults to balance due)'),
-                'payment_method': openapi.Schema(type=openapi.TYPE_STRING, description='Payment method (cash, mobile_money, bank_transfer)'),
-                'reference_number': openapi.Schema(type=openapi.TYPE_STRING, description='Payment reference number')
+                'payment_method': openapi.Schema(type=openapi.TYPE_STRING, description='Payment method - ONLY "cash" is allowed. Gateway payments (mobile_money, online) must use the normal payment creation flow.', default='cash'),
+                'reference_number': openapi.Schema(type=openapi.TYPE_STRING, description='Payment reference number (optional)')
             }
         ),
         responses={
@@ -174,7 +183,13 @@ class RentInvoiceViewSet(viewsets.ModelViewSet):
     )
     @action(detail=True, methods=['post'])
     def mark_paid(self, request, pk=None):
-        """Mark an invoice as paid - STRICT: No overpayment allowed"""
+        """
+        Mark an invoice as paid - STRICT: No overpayment allowed
+        
+        **IMPORTANT**: This endpoint is ONLY for cash/offline payments.
+        For gateway payments (mobile_money, online), use the normal payment creation flow
+        which will create a pending payment that can be initiated via gateway.
+        """
         from decimal import Decimal
         from django.db.models import Sum
         from django.db import transaction
@@ -183,6 +198,17 @@ class RentInvoiceViewSet(viewsets.ModelViewSet):
         amount = Decimal(str(request.data.get('amount', invoice.balance_due)))
         payment_method = request.data.get('payment_method', 'cash')
         reference = request.data.get('reference_number', '')
+        
+        # Validate payment method - gateway payments should use normal payment creation flow
+        gateway_methods = ['mobile_money', 'online']
+        if payment_method in gateway_methods:
+            return Response({
+                'success': False,
+                'error': 'Invalid payment method for this endpoint',
+                'message': f'Payment method "{payment_method}" cannot be used with this endpoint. Gateway payments (mobile_money, online) must use the normal payment creation flow, which will create a pending payment that can be initiated via the gateway. This endpoint is only for cash/offline payments.',
+                'valid_payment_methods': ['cash'],
+                'gateway_payment_flow': 'Use POST /api/v1/rent/payments/ to create a payment with gateway method, then use POST /api/v1/rent/payments/{id}/initiate-gateway/ to initiate the gateway payment.'
+            }, status=status.HTTP_400_BAD_REQUEST)
         
         # Use transaction with select_for_update to prevent race conditions
         with transaction.atomic():
@@ -550,6 +576,12 @@ class RentPaymentViewSet(viewsets.ModelViewSet):
         - Invoice will be auto-created when payment completes
         - More flexible - tenants can pay anytime
         
+        **Payment Status Behavior:**
+        - **Cash payments** (`payment_method='cash'`): Created with `status='completed'` immediately
+        - **Gateway payments** (`payment_method='mobile_money'` or `'online'`): Created with `status='pending'`
+          - Must call `/initiate-gateway/` endpoint to start the payment process
+          - Status changes to `'completed'` when gateway payment succeeds (via webhook or verify)
+        
         **Important Notes:**
         - Either `rent_invoice` OR `lease` must be provided
         - If `rent_invoice` is provided, `lease` is automatically set from invoice
@@ -579,6 +611,12 @@ class RentPaymentViewSet(viewsets.ModelViewSet):
         - Provide `lease` ID (rent_invoice can be null)
         - Payment is linked directly to lease
         - Invoice will be auto-created when payment completes
+        
+        **Payment Status Behavior:**
+        - **Cash payments** (`payment_method='cash'`): Created with `status='completed'` immediately
+        - **Gateway payments** (`payment_method='mobile_money'` or `'online'`): Created with `status='pending'`
+          - Must call `/initiate-gateway/` endpoint to start the payment process
+          - Status changes to `'completed'` when gateway payment succeeds
         
         **Important:** Either `rent_invoice` OR `lease` must be provided.
         """,
@@ -771,21 +809,27 @@ class RentPaymentViewSet(viewsets.ModelViewSet):
         description="""
         Initiate payment with payment gateway (AZAM Pay) for rent payments.
         
+        **Prerequisites:**
+        - Payment must be created with `payment_method='mobile_money'` or `'online'`
+        - Payment must have `status='pending'` (gateway payments start as pending)
+        - Payment cannot be already completed (will return error if status='completed')
+        
         **Mobile Money Provider:**
         - If `mobile_money_provider` was already set when creating the payment, it will be used automatically
         - If not set, you must pass it in the request body
         - Valid values: AIRTEL, TIGO, MPESA, HALOPESA
         
         **Flow:**
-        1. Validates payment has lease (required for rent payments)
-        2. Gets mobile money provider (from payment or request)
-        3. Automatically sets payment provider to "AZAM Pay" if not set
-        4. Calls AZAM Pay API
-        5. Creates PaymentTransaction
-        6. Returns payment link
+        1. Validates payment status is 'pending' (not 'completed')
+        2. Validates payment has lease (required for rent payments)
+        3. Gets mobile money provider (from payment or request)
+        4. Automatically sets payment provider to "AZAM Pay" if not set
+        5. Calls AZAM Pay API
+        6. Creates PaymentTransaction
+        7. Returns payment link
         
         **Note:** Payments can be made with or without invoices. If no invoice exists,
-        one will be auto-created when the payment completes.
+        one will be auto-created when the payment completes (via webhook or verify endpoint).
         """,
         tags=['Rent'],
         request={
@@ -830,6 +874,11 @@ class RentPaymentViewSet(viewsets.ModelViewSet):
         method='post',
         operation_description="""
         Initiate payment with payment gateway (AZAM Pay) for rent payments.
+        
+        **Prerequisites:**
+        - Payment must be created with `payment_method='mobile_money'` or `'online'`
+        - Payment must have `status='pending'` (gateway payments start as pending)
+        - Payment cannot be already completed (will return error if status='completed')
         
         **Mobile Money Provider:**
         - If `mobile_money_provider` was already set when creating the payment, it will be used automatically

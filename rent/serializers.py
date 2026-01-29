@@ -245,8 +245,20 @@ class RentPaymentCreateSerializer(serializers.ModelSerializer):
                         'lease': f'Cannot create payment for lease with status "{lease.status}". Only active leases can receive payments.'
                     })
             
-            validated_data['paid_date'] = timezone.now().date()
-            validated_data['status'] = 'completed'
+            # Set payment status and paid_date based on payment method
+            payment_method = validated_data.get('payment_method', 'cash')
+            
+            # For cash payments, mark as completed immediately
+            # For gateway payments (mobile_money, online), mark as pending until gateway completes
+            if payment_method == 'cash':
+                validated_data['status'] = 'completed'
+                validated_data['paid_date'] = timezone.now().date()
+            else:
+                # Gateway payments start as pending
+                validated_data['status'] = 'pending'
+                # Don't set paid_date yet - it will be set when gateway payment completes
+                validated_data['paid_date'] = None
+            
             validated_data['recorded_by'] = self.context['request'].user
             
             # Create payment
